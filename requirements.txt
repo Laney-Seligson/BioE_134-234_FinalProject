@@ -1,5 +1,0 @@
-fastmcp
-google-genai
-python-dotenv
-biopython>=1.80
-pytest>=7.0

@@ -55,6 +55,47 @@ Use when the user asks to:
 **Coordinate example:** "translate bases 100 to 200" → `start=100, end=200`
 "translate the first 60bp" → `start=0, end=60` (or omit start, set `end=60`)
 
+## Tool: create_construction_file
+
+Before calling this tool, gather all required fields for the selected assembly strategy.
+
+For all workflows:
+- construct_name
+- host_organism
+- backbone_name
+- backbone_sequence
+- insert_name
+- insert_sequence
+
+For GoldenGate:
+- insert_forward_primer_name
+- insert_forward_primer_sequence
+- insert_reverse_primer_name
+- insert_reverse_primer_sequence
+- vector_forward_primer_name
+- vector_forward_primer_sequence
+- vector_reverse_primer_name
+- vector_reverse_primer_sequence
+- enzyme
+
+For Gibson:
+- insert_forward_primer_name
+- insert_forward_primer_sequence
+- insert_reverse_primer_name
+- insert_reverse_primer_sequence
+- vector_forward_primer_name
+- vector_forward_primer_sequence
+- vector_reverse_primer_name
+- vector_reverse_primer_sequence
+
+Optional:
+- cell_strain
+- selection
+- temperature_c
+
+If any required field is missing, ask for all missing required fields in one message before calling the tool.
+Normalize host organism to `E_coli` when the user says "E. coli", "e coli", or "e. coli".
+
 ---
 
 ## Interpreting results

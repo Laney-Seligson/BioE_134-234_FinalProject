@@ -131,6 +131,7 @@ class CreateConstructionFile:
             validated_parts,
             validated_operations
         )
+        host_organism = self._normalize_host_organism(host_organism)
 
         return {
             "construct_name": construct_name,
@@ -173,11 +174,22 @@ class CreateConstructionFile:
                 ("vector_reverse_primer", vector_reverse_primer_name, vector_reverse_primer_sequence),
             ]
 
+            missing_fields = []
+
             for label, primer_name, primer_seq in required_pairs:
-                if not primer_name.strip() or not primer_seq.strip():
-                    raise ValueError(
-                        f"{label} name and sequence are required for {assembly_strategy}."
-                    )
+                if not primer_name.strip():
+                    missing_fields.append(f"{label}_name")
+                if not primer_seq.strip():
+                    missing_fields.append(f"{label}_sequence")
+
+            if assembly_strategy == "GoldenGate" and not enzyme.strip():
+                missing_fields.append("enzyme")
+
+            if missing_fields:
+                raise ValueError(
+                    "Missing required fields for "
+                    f"{assembly_strategy}: {', '.join(missing_fields)}."
+                )
 
         if assembly_strategy == "GoldenGate" and not enzyme.strip():
             raise ValueError("enzyme is required for GoldenGate workflows.")
@@ -569,6 +581,12 @@ class CreateConstructionFile:
             )
 
         return "\n".join(lines)
+    
+    def _normalize_host_organism(self, host_organism: str) -> str:
+        normalized = host_organism.strip().lower().replace(".", "").replace(" ", "_")
+        if normalized in {"e_coli", "ecoli"}:
+            return "E_coli"
+        return host_organism.strip()
 
 
 _instance = CreateConstructionFile()

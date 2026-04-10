@@ -1,7 +1,7 @@
 {
     "id": "org.bioe134-234.function.crispr.create_construction_file.v1",
     "name": "Create Construction File",
-    "description": "Generate a construction file for an E_coli cloning workflow. Before calling, gather all required fields for the selected assembly strategy. GoldenGate requires backbone name and sequence, insert name and sequence, four primer names and sequences, and an enzyme.",
+    "description": "Generate a construction file for an E_coli cloning workflow. Before calling, gather all required fields for the selected assembly strategy. If any required field is missing, ask for all missing required fields in one message. If all required fields are present, call the tool immediately. Do not wait for additional confirmation and do not return an empty response.",
     "type": "function",
     "seq_params": [
       "backbone_sequence",

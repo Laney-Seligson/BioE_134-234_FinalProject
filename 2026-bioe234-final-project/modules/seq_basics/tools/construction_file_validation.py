@@ -146,16 +146,32 @@ def choose_best_pcr_product(
     reverse_primer: str,
     template: str,
     min_anneal_len: int = 12,
+    is_circular: bool = False,
 ) -> Dict[str, object]:
+    """
+    Evaluate all forward/reverse binding combinations and choose the best valid PCR product.
+
+    Linear template:
+    - require forward_start < reverse_start
+    - require no overlap
+
+    Circular template:
+    - search on template + template
+    - allow wraparound products
+    - only allow products spanning <= one template length
+    """
     forward_primer = normalize_sequence(forward_primer)
     reverse_primer = normalize_sequence(reverse_primer)
     template = normalize_sequence(template)
 
+    template_len = len(template)
+    search_template = template + template if is_circular else template
+
     forward_matches = find_all_forward_matches(
-        forward_primer, template, min_anneal_len=min_anneal_len
+        forward_primer, search_template, min_anneal_len=min_anneal_len
     )
     reverse_matches = find_all_reverse_matches(
-        reverse_primer, template, min_anneal_len=min_anneal_len
+        reverse_primer, search_template, min_anneal_len=min_anneal_len
     )
 
     candidates: List[dict] = []
@@ -165,36 +181,79 @@ def choose_best_pcr_product(
             fwd_start = fwd["binding_start"]
             fwd_end = fwd["binding_end"]
             rev_start = rev["binding_start"]
+            rev_end = rev["binding_end"]
 
-            if fwd_start >= rev_start:
-                continue
+            if not is_circular:
+                if fwd_start >= rev_start:
+                    continue
+                if fwd_end > rev_start:
+                    continue
 
-            if fwd_end > rev_start:
-                continue
+                internal_template_region = search_template[fwd_end:rev_start]
+                predicted_product = (
+                    forward_primer
+                    + internal_template_region
+                    + reverse_complement(reverse_primer)
+                )
 
-            internal_template_region = template[fwd_end:rev_start]
-            predicted_product = (
-                forward_primer
-                + internal_template_region
-                + reverse_complement(reverse_primer)
-            )
+                candidates.append(
+                    {
+                        "predicted_sequence": predicted_product,
+                        "forward_binding_start": fwd_start,
+                        "forward_binding_end": fwd_end,
+                        "forward_anneal_sequence": fwd["anneal_sequence"],
+                        "forward_anneal_length": fwd["anneal_length"],
+                        "reverse_binding_start": rev_start,
+                        "reverse_binding_end": rev_end,
+                        "reverse_anneal_sequence": rev["anneal_sequence"],
+                        "reverse_anneal_length": rev["anneal_length"],
+                        "product_length": len(predicted_product),
+                        "is_circular_template": False,
+                    }
+                )
+            else:
+                # For circular templates, require the reverse site to be downstream
+                # of the forward site on the doubled template.
+                if rev_start <= fwd_start:
+                    continue
+                if fwd_end > rev_start:
+                    continue
 
-            candidates.append(
-                {
-                    "predicted_sequence": predicted_product,
-                    "forward_binding_start": fwd_start,
-                    "forward_binding_end": fwd_end,
-                    "forward_anneal_sequence": fwd["anneal_sequence"],
-                    "forward_anneal_length": fwd["anneal_length"],
-                    "reverse_binding_start": rev["binding_start"],
-                    "reverse_binding_end": rev["binding_end"],
-                    "reverse_anneal_sequence": rev["anneal_sequence"],
-                    "reverse_anneal_length": rev["anneal_length"],
-                    "product_length": len(predicted_product),
-                }
-            )
+                span = rev_start - fwd_end
+                if span < 0:
+                    continue
+                if span > template_len:
+                    continue
+
+                internal_template_region = search_template[fwd_end:rev_start]
+                predicted_product = (
+                    forward_primer
+                    + internal_template_region
+                    + reverse_complement(reverse_primer)
+                )
+
+                candidates.append(
+                    {
+                        "predicted_sequence": predicted_product,
+                        "forward_binding_start": fwd_start % template_len,
+                        "forward_binding_end": fwd_end % template_len,
+                        "forward_anneal_sequence": fwd["anneal_sequence"],
+                        "forward_anneal_length": fwd["anneal_length"],
+                        "reverse_binding_start": rev_start % template_len,
+                        "reverse_binding_end": rev_end % template_len,
+                        "reverse_anneal_sequence": rev["anneal_sequence"],
+                        "reverse_anneal_length": rev["anneal_length"],
+                        "product_length": len(predicted_product),
+                        "is_circular_template": True,
+                        "wraparound_span": span,
+                    }
+                )
 
     if not candidates:
+        if is_circular:
+            raise ConstructionValidationError(
+                "No valid forward/reverse primer pair produced a PCR amplicon on the circular plasmid template."
+            )
         raise ConstructionValidationError(
             "No valid forward/reverse primer pair produced a correctly oriented PCR amplicon."
         )
@@ -218,12 +277,14 @@ def predict_pcr_product(
     reverse_primer: str,
     template: str,
     min_anneal_len: int = 12,
+    is_circular: bool = False,
 ) -> Dict[str, object]:
     return choose_best_pcr_product(
         forward_primer=forward_primer,
         reverse_primer=reverse_primer,
         template=template,
         min_anneal_len=min_anneal_len,
+        is_circular=is_circular,
     )
 
 
@@ -268,15 +329,24 @@ def validate_pcr_step(
     if not forward_name or not reverse_name or not template_name or not output_name:
         raise ConstructionValidationError("PCR step is missing required names.")
 
+    if template_name not in part_lookup:
+        raise ConstructionValidationError(f"Template part '{template_name}' not found.")
+
+    template_part = part_lookup[template_name]
+    template_type = template_part.get("part_type", "").strip()
+
     forward_seq = get_part_sequence(part_lookup, forward_name)
     reverse_seq = get_part_sequence(part_lookup, reverse_name)
     template_seq = get_part_sequence(part_lookup, template_name)
+
+    is_circular = template_type == "plasmid"
 
     prediction = predict_pcr_product(
         forward_primer=forward_seq,
         reverse_primer=reverse_seq,
         template=template_seq,
         min_anneal_len=min_anneal_len,
+        is_circular=is_circular,
     )
 
     predicted_seq = prediction["predicted_sequence"]
@@ -291,12 +361,17 @@ def validate_pcr_step(
                 f"PCR output '{output_name}' does not match the expected sequence."
             )
 
+    if is_circular:
+        message = "PCR step validated successfully on circular plasmid template."
+    else:
+        message = "PCR step validated successfully."
+
     return {
         "step_number": step.get("step_number"),
         "step_type": "PCR",
         "output_name": output_name,
         "is_valid": True,
-        "message": "PCR step validated successfully.",
+        "message": message,
         "expected_sequence_provided": expected_seq is not None,
         "matches_expected_sequence": matches_expected,
         "details": prediction,
@@ -412,6 +487,8 @@ def format_validation_report(report: dict) -> str:
 
         details = step.get("details")
         if isinstance(details, dict) and step_type == "PCR" and step_valid is True:
+            if details.get("is_circular_template"):
+                lines.append("       Template type: circular plasmid")
             lines.append(
                 f"       Forward binding: {details.get('forward_binding_start')} to {details.get('forward_binding_end')}"
             )

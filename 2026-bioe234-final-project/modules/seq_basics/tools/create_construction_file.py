@@ -74,6 +74,7 @@ class CreateConstructionFile:
         self._require_nonempty_string(insert_sequence, "insert_sequence")
 
         host_organism = self._normalize_host_organism(host_organism)
+        assembly_strategy = self._normalize_assembly_strategy(assembly_strategy)
 
         if host_organism not in self.supported_organisms:
             raise ValueError("host_organism must be E_coli for version 1.")
@@ -618,6 +619,26 @@ class CreateConstructionFile:
         if normalized in {"e_coli", "ecoli"}:
             return "E_coli"
         return host_organism.strip()
+    
+    def _normalize_assembly_strategy(self, strategy: str) -> str:
+        s = strategy.lower().replace(" ", "")
+        
+        if s == "goldengate":
+            return "GoldenGate"
+        elif s == "golden gate":
+            return "GoldenGate"
+        elif s == "Golden Gate":
+            return "GoldenGate"
+        elif s == "gibson":
+            return "Gibson"
+        elif s == "directsynthesis":
+            return "DirectSynthesis"
+        elif s == "Directsynthesis":
+            return "DirectSynthesis"
+        elif s == "directSynthesis":
+            return "DirectSynthesis"
+        else:
+            return strategy  # fallback → will trigger validation error
 
 
 _instance = CreateConstructionFile()

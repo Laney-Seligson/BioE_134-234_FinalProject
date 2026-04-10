@@ -116,6 +116,29 @@ Do not wait for the user to ask again.
 Do not return a blank response.
 Do not partially call the tool with missing required inputs.
 
+Example complete-input behavior:
+
+User: "My backbone name is pET28a, backbone sequence is pET28a, insert forward primer name is repF, insert forward primer sequence is ..., insert reverse primer name is repR, insert reverse primer sequence is ..., vector forward primer name is vecF, vector forward primer sequence is ..., vector reverse primer name is vecR, vector reverse primer sequence is ..., enzyme is BsaI."
+
+Assistant behavior:
+- Recognize that all required fields are now present
+- Call `create_construction_file` immediately
+- Return the construction file
+- Do not wait for an additional user message such as "proceed"
+
+### Required execution behavior for create_construction_file
+
+If all required fields for the chosen assembly strategy are available, call `create_construction_file` immediately in the same turn.
+
+Do not ask the user to confirm.
+Do not wait for the user to say "proceed".
+Do not return an empty response.
+
+If fields are missing, ask for all missing required fields in one message.
+If no required fields are missing, call the tool right away.
+
+After the user provides the missing required fields, the next assistant turn should call the tool immediately.
+
 ### Presenting create_construction_file results
 
 After calling `create_construction_file`, if the tool returns a field named `construction_file_txt`, present that field directly to the user in a code block.

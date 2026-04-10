@@ -164,7 +164,7 @@
     ],
     "execution_details": {
       "language": "Python",
-      "source": "2026-bioe234-final-project/modules/seq_basics/tools/create_construction_file.py",
+      "source": "2026-bioe234-final-project/modules/crispr_tools/tools/create_construction_file.py",
       "initialization": "initiate",
       "execution": "run",
       "disposal": null,

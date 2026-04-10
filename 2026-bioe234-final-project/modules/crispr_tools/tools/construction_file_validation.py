@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from modules.seq_basics.tools.create_construction_file import CreateConstructionFile
+from modules.crispr_tools.tools.create_construction_file import CreateConstructionFile
 
 
 DNA_ALPHABET = {"A", "C", "G", "T", "N"}

@@ -34,7 +34,7 @@
     {
       "name": "assembly_strategy",
       "type": "string",
-      "description": "Main assembly strategy. Supported values are GoldenGate, Gibson, and DirectSynthesis."
+      "description": "Main assembly strategy. Supported values are GoldenGate, golden gate, goldengate, gibson, Gibson, directsynthesis, direct synthesis, Direct Synthesis, and DirectSynthesis."
     },
     {
       "name": "backbone_name",
@@ -180,7 +180,7 @@
   ],
   "execution_details": {
     "language": "Python",
-    "source": "modules/seq_basics/tools/validate_construction_file.py",
+    "source": "modules/cripr_tools/tools/validate_construction_file.py",
     "initialization": "initiate",
     "execution": "run",
     "disposal": null,

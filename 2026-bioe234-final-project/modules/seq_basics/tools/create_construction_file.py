@@ -73,8 +73,20 @@ class CreateConstructionFile:
         self._require_nonempty_string(insert_name, "insert_name")
         self._require_nonempty_string(insert_sequence, "insert_sequence")
 
+        host_organism = self._normalize_host_organism(host_organism)
+
         if host_organism not in self.supported_organisms:
             raise ValueError("host_organism must be E_coli for version 1.")
+
+# Fail early if seq_params did not resolve properly
+        for field_name, seq_value in (
+            ("backbone_sequence", backbone_sequence),
+            ("insert_sequence", insert_sequence),
+        ):
+            if isinstance(seq_value, str) and seq_value.strip().startswith("resource://"):
+                raise ValueError(
+                    f"{field_name} was not resolved from the resource before validation."
+                )
 
         if assembly_strategy not in self.allowed_strategies:
             raise ValueError(
@@ -134,18 +146,6 @@ class CreateConstructionFile:
         host_organism = self._normalize_host_organism(host_organism)
 
         return {
-            "construct_name": construct_name,
-            "host_organism": host_organism,
-            "assembly_strategy": assembly_strategy,
-            "notes": notes,
-            "structured_construction_file": {
-                "construct_name": construct_name,
-                "host_organism": host_organism,
-                "assembly_strategy": assembly_strategy,
-                "parts": validated_parts,
-                "operations": validated_operations
-            },
-            "file_name": f"{construct_name}_construction.txt",
             "construction_file_txt": construction_file_txt
         }
 
@@ -351,12 +351,33 @@ class CreateConstructionFile:
         if not isinstance(sequence, str) or not sequence.strip():
             raise ValueError("sequence must be a non-empty string.")
 
+        raw = sequence.strip()
+
+        # Reject obvious unresolved placeholders / resource names
+        # instead of silently converting them into fake DNA.
+        if raw.startswith("resource://"):
+            raise ValueError(
+                f"sequence '{raw}' was not resolved before normalization."
+            )
+
         cleaned = []
-        for char in sequence.upper():
+        for char in raw.upper():
             if char.isalpha():
                 cleaned.append(char)
 
-        return "".join(cleaned)
+        cleaned = "".join(cleaned)
+
+        if not cleaned:
+            raise ValueError("sequence became empty after normalization.")
+
+        invalid = set(cleaned) - set("ACGTN")
+        if invalid:
+            raise ValueError(
+                "sequence contains invalid DNA characters or appears to be an unresolved "
+                f"resource/placeholder: {sorted(invalid)}"
+            )
+
+        return cleaned
 
     def _validate_parts(self, parts: list) -> list:
         validated = []
@@ -518,6 +539,11 @@ class CreateConstructionFile:
     def _render_construction_file(self, parts: list, operations: list) -> str:
         lines = []
 
+        def _shorten(seq: str, max_len: int = 40) -> str:
+            if len(seq) <= max_len:
+                return seq
+            return f"{seq[:20]}...{seq[-20:]} ({len(seq)} bp)"
+
         for op in operations:
             step_type = op["step_type"]
             inputs = op["inputs"]
@@ -574,10 +600,15 @@ class CreateConstructionFile:
         lines.append("")
 
         for part in parts:
+            if part["part_type"] == "oligo":
+                seq_display = part["sequence"]
+            else:
+                seq_display = _shorten(part["sequence"])
+
             lines.append(
                 f"{part['part_type']:<14}"
                 f"{part['name']:<14}"
-                f"{part['sequence']}"
+                f"{seq_display}"
             )
 
         return "\n".join(lines)

@@ -3,6 +3,10 @@
     "name": "Create Construction File",
     "description": "Generate a construction file for an E_coli cloning workflow. Before calling, gather all required fields for the selected assembly strategy. GoldenGate requires backbone name and sequence, insert name and sequence, four primer names and sequences, and an enzyme.",
     "type": "function",
+    "seq_params": [
+      "backbone_sequence",
+      "insert_sequence"
+    ],
     "keywords": [
       "CRISPR",
       "construction file",
@@ -160,7 +164,7 @@
     ],
     "execution_details": {
       "language": "Python",
-      "source": "Construction_Files/create_construction_file.py",
+      "source": "2026-bioe234-final-project/modules/seq_basics/tools/create_construction_file.py",
       "initialization": "initiate",
       "execution": "run",
       "disposal": null,

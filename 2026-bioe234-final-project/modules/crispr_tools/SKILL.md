@@ -8,144 +8,173 @@ module correctly and interpret their results meaningfully.
 
 ## What this module does
 
-The `crispr_tools` module provides fundamental tools to go through the crispr pipeline.
+The `crispr_tools` module provides fundamental tools to go through the CRISPR pipeline,
+including generating and validating cloning construction workflows.
 
 ---
 
 ## Available resources
 
-Here are the descriptions of the available resources. When a user inquires for a plasmid or a backbone sequence, provide the names of the plasmid and a short description of the plasmid to help the user choose which one to use.
+Here are the descriptions of the available resources. When a user inquires for a plasmid
+or a backbone sequence, provide the names of the plasmid and a short description to help
+the user choose.
 
-| Resource name | Description |
-|---------------|-------------|
-| `pBR322`      | E. coli cloning vector pBR322, 4361 bp, circular, double-stranded. A classic lab plasmid commonly used as a reference sequence. Contains genes for ampicillin resistance (bla) and tetracycline resistance (tet). |
+| Resource name | Description                                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `pBR322`      | E. coli cloning vector pBR322, 4361 bp, circular, double-stranded. Contains ampicillin (bla) and tetracycline (tet) resistance genes. |
+| `pET28a`      | E. coli cloning vector pET28a, 5369 bp, circular, double-stranded. Contains kanamycin resistance and a 6x His tag.                    |
 
-When a user refers to "pBR322", use the resource name `"pBR322"` directly
-as the sequence argument — do not ask the user to paste the sequence.
-
-| Resource name | Description |
-|---------------|-------------|
-| `pET28a`      | E. coli cloning vector pET28a, 5369 bp, circular, double-stranded. A classic lab plasmid commonly used as a reference sequence. Contains genes for kanmycin (kan) resistance. Has a 6x His tag. |
-
-When a user refers to "pET28a", use the resource name `"pET28a"` directly
-as the sequence argument — do not ask the user to paste the sequence.
+When a user refers to these plasmids, use the resource name directly (e.g., `"pET28a"`).
+Do NOT ask the user to paste sequences.
 
 ---
 
 ## Tools and when to use them
 
 ### `dna_reverse_complement`
+
 Returns the reverse complement of a DNA or RNA sequence.
 
 Use when the user asks for:
-- "reverse complement of X"
-- "complement of the bottom strand"
-- "what does the antisense strand look like"
-- "flip the sequence"
 
-The result is the same length as the input. Uppercase output.
+* reverse complement
+* antisense strand
+* flipping a sequence
+
+---
 
 ### `dna_translate`
-Translates a DNA coding sequence to a protein sequence using the standard genetic code.
+
+Translates DNA into protein.
 
 Use when the user asks to:
-- "translate", "get the protein", "what protein does this encode"
-- work with a specific reading frame (1, 2, or 3)
-- translate a specific region using `start` / `end` coordinates (0-indexed, end is exclusive)
 
-**Frame guidance:**
-- Frame 1 — start reading from the first base (default)
-- Frame 2 — skip 1 base, then read triplets
-- Frame 3 — skip 2 bases, then read triplets
+* translate a sequence
+* get a protein sequence
+* evaluate reading frames
 
-**Stop codons** appear as `*` in the output. **Unrecognised codons** appear as `X`.
-
-**Coordinate example:** "translate bases 100 to 200" → `start=100, end=200`
-"translate the first 60bp" → `start=0, end=60` (or omit start, set `end=60`)
+---
 
 ## Tool: create_construction_file
 
-Before calling this tool, gather all required fields for the selected assembly strategy.
+This tool generates a cloning construction workflow.
+
+---
+
+### Required inputs
 
 For all workflows:
-- construct_name
-- host_organism
-- backbone_name
-- backbone_sequence
-- insert_name
-- insert_sequence
+
+* construct_name
+* host_organism
+* backbone_name
+* backbone_sequence
+* insert_name
+* insert_sequence
 
 For GoldenGate:
-- insert_forward_primer_name
-- insert_forward_primer_sequence
-- insert_reverse_primer_name
-- insert_reverse_primer_sequence
-- vector_forward_primer_name
-- vector_forward_primer_sequence
-- vector_reverse_primer_name
-- vector_reverse_primer_sequence
-- enzyme
 
-For Gibson:
-- insert_forward_primer_name
-- insert_forward_primer_sequence
-- insert_reverse_primer_name
-- insert_reverse_primer_sequence
-- vector_forward_primer_name
-- vector_forward_primer_sequence
-- vector_reverse_primer_name
-- vector_reverse_primer_sequence
+* insert_forward_primer_name
+* insert_forward_primer_sequence
+* insert_reverse_primer_name
+* insert_reverse_primer_sequence
+* vector_forward_primer_name
+* vector_forward_primer_sequence
+* vector_reverse_primer_name
+* vector_reverse_primer_sequence
+* enzyme
 
 Optional:
-- cell_strain
-- selection
-- temperature_c
 
-If any required field is missing, ask for all missing required fields in one message before calling the tool.
-Normalize host organism to `E_coli` when the user says "E. coli", "e coli", or "e. coli".
+* cell_strain
+* selection
+* temperature_c
 
-### Required interaction rule for create_construction_file
 
-Never return an empty response.
+## 🚨 CRITICAL EXECUTION RULES (MANDATORY)
 
-If the user has not provided all required fields for `create_construction_file`, do not call the tool yet.
-Instead, respond with one concise message that lists **all missing required fields at once**.
+The assistant must ALWAYS take exactly ONE action per turn:
 
-Do not wait for the user to ask again.
-Do not return a blank response.
-Do not partially call the tool with missing required inputs.
+1. Ask for missing required fields
+2. Call `create_construction_file`
 
-Example complete-input behavior:
+The assistant must NEVER:
 
-User: "My backbone name is pET28a, backbone sequence is pET28a, insert forward primer name is repF, insert forward primer sequence is ..., insert reverse primer name is repR, insert reverse primer sequence is ..., vector forward primer name is vecF, vector forward primer sequence is ..., vector reverse primer name is vecR, vector reverse primer sequence is ..., enzyme is BsaI."
+* Return an empty response
+* Return a placeholder response
+* Wait for the user to say "proceed"
+* Delay execution after all fields are present
 
-Assistant behavior:
-- Recognize that all required fields are now present
-- Call `create_construction_file` immediately
-- Return the construction file
-- Do not wait for an additional user message such as "proceed"
 
-### Required execution behavior for create_construction_file
+## Required interaction behavior
 
-If all required fields for the chosen assembly strategy are available, call `create_construction_file` immediately in the same turn.
+If any required fields are missing:
 
-Do not ask the user to confirm.
-Do not wait for the user to say "proceed".
-Do not return an empty response.
+* Ask for ALL missing fields in ONE message
+* Do NOT ask multiple follow-ups
+* Do NOT call the tool yet
 
-If fields are missing, ask for all missing required fields in one message.
-If no required fields are missing, call the tool right away.
 
-After the user provides the missing required fields, the next assistant turn should call the tool immediately.
+## Required execution behavior
 
-### Presenting create_construction_file results
+If ALL required fields are present:
 
-After calling `create_construction_file`, if the tool returns a field named `construction_file_txt`, present that field directly to the user in a code block.
+* Call `create_construction_file` IMMEDIATELY
+* Do NOT ask for confirmation
+* Do NOT wait for another message
+* Do NOT return text instead of calling the tool
 
-Do not present the raw MCP response object.
-Do not present JSON unless the user explicitly asks for structured output.
-Prefer this format:
+---
 
+## Fallback rule (VERY IMPORTANT)
+
+If unsure whether all required fields are present:
+
+* ASSUME they are present
+* CALL the tool anyway
+
+It is ALWAYS better to attempt a tool call than to return an empty response.
+
+---
+
+## Mandatory example behavior
+
+This is REQUIRED behavior:
+
+User provides missing fields:
+
+Assistant MUST:
+
+* Recognize all required fields are now present
+* Immediately call `create_construction_file`
+* Return the result
+
+Assistant MUST NOT:
+
+* Return an empty response
+* Ask for confirmation
+* Wait for "proceed"
+* Skip the tool call
+
+Failure to call the tool when inputs are complete is incorrect behavior.
+
+---
+
+## Presenting results
+
+After calling `create_construction_file`:
+
+* If `construction_file_txt` is returned:
+
+  * Display it directly in a code block
+
+* Do NOT show raw JSON
+
+* Do NOT show MCP output format
+
+Correct format:
+
+```
 PCR           ...
 PCR           ...
 GoldenGate    ...
@@ -153,90 +182,75 @@ GoldenGate    ...
 plasmid       ...
 dsdna         ...
 oligo         ...
+```
 
+---
 
 ## Tool: validate_construction_file
 
-Validates whether a construction file generated by `create_construction_file` is biologically correct.
-
-Use this tool **after generating a construction file** to confirm that the workflow is valid.
-
-When to use:
-Call this tool when the user asks:
-- "is this construct valid?"
-- "did I design this correctly?"
-- "check my cloning workflow"
-- "does this PCR work?"
-- "verify this assembly"
-- "debug why this construct failed"
-
-Also use it automatically after creating a construction file **if the user expresses uncertainty or asks for confirmation**.
-
-What it checks (Version 1):
-The validator currently performs **biological validation of PCR steps**:
-- Forward primer anneals to template (3' suffix match)
-- Reverse primer anneals to template (reverse complement match)
-- Primers are in correct orientation
-- Amplicon can be formed without overlap
-- A valid PCR product sequence can be predicted
-
-If any of these fail, the step is marked as invalid.
-
-What it does NOT check yet:
-- GoldenGate assembly correctness
-- Gibson assembly overlaps
-- Restriction enzyme cut sites
-- Transformation efficiency or strain compatibility
-- Circular plasmid wraparound PCR (linear assumption only)
-
-These steps will appear as:
-- `[SKIP]` in the validation report
-- Included as warnings, not errors
-
-How to use:
-Pass the `structured_construction_file` returned by `create_construction_file` directly into this tool.
-
-Do NOT modify names of parts or steps — validation is **name-agnostic** and follows references internally.
-
-Interpreting results:
-- `[PASS]` → step is biologically valid  
-- `[FAIL]` → step is invalid and must be fixed  
-- `[SKIP]` → validation not implemented for that step yet  
-
-If any PCR step fails:
-- the overall construct is considered invalid
-- the error message explains what went wrong (e.g., primer does not anneal)
-
-Example workflow:
-1. Call `create_construction_file`
-2. Call `validate_construction_file` on the result
-3. If validation fails:
-   - Identify the failing step
-   - Suggest corrected primers or inputs
-   - Regenerate the construction file if needed
-
-Important behavior:
-- Validation is **name-agnostic** — do not rely on fixed names like `rep_pcr` or `vec_pcr`
-- Always follow the references defined in each step (`forward_primer`, `reverse_primer`, `template`, `output`)
-- Always validate a construction file before presenting it as final if the workflow includes PCR steps
+Validates whether a construction workflow is biologically correct.
 
 ---
 
-## Interpreting results
+### When to use
 
-- A protein sequence like `MSKGEEK...` starting with `M` (methionine) suggests you've
-  found the correct reading frame for a real open reading frame.
-- A sequence full of `*` stop codons or `X` unknowns usually means the wrong frame,
-  wrong coordinates, or the sequence is not a coding region.
-- When translating a full plasmid, most of the output will be non-coding — only specific
-  coordinate ranges will give meaningful protein sequence.
+Use when the user asks:
+
+* "is this valid?"
+* "does this PCR work?"
+* "check my cloning workflow"
+* "verify this assembly"
+
+Also use after generating a construction file IF the user asks for confirmation.
 
 ---
 
-## Sequence input rules (handled automatically)
+## Required execution rules (validation)
 
-You never need to paste the full sequence. The framework resolves these automatically:
-- `"pBR322"` → full 4361 bp sequence
-- A raw string like `"ATGCGATCG"` → used as-is
-- A FASTA string starting with `>` → sequence extracted automatically
-- A GenBank string starting with `LOCUS` → sequence extracted automatically
+If user requests validation:
+
+* Call `validate_construction_file` immediately
+
+Do NOT:
+
+* Return an empty response
+* Delay execution
+* Ask unnecessary follow-up questions
+
+---
+
+## What validation checks (Version 1)
+
+* PCR primer annealing
+* Primer orientation
+* Valid amplicon formation
+
+---
+
+## Not yet implemented
+
+* GoldenGate validation (future versions)
+* Gibson overlaps
+* enzyme cut simulation
+
+These steps appear as `[SKIP]`
+
+---
+
+## Interpreting validation results
+
+* `[PASS]` → valid
+* `[FAIL]` → incorrect, must fix
+* `[SKIP]` → not implemented
+
+---
+
+## Sequence input rules
+
+Sequences are automatically resolved:
+
+* `"pET28a"` → full plasmid sequence
+* raw strings → used directly
+* FASTA / GenBank → parsed automatically
+
+No need to paste full sequences.

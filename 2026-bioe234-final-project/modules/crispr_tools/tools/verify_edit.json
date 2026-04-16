@@ -1,0 +1,73 @@
+{
+  "id": "org.bioe234.function.crispr.verify_edit.v1",
+  "name": "CRISPR Edit Verifier",
+  "description": "Predicts the expected Cas9 cut site for a given protospacer in a reference sequence, designs flanking Sanger sequencing primers, and returns an ICE/TIDE-style interpretation guide for verifying editing efficiency from sequencing trace data.",
+  "type": "function",
+  "keywords": ["CRISPR", "Cas9", "edit verification", "cut site", "ICE", "TIDE", "Sanger", "sequencing", "indel", "DSB"],
+  "date_created": "2026-04-16",
+  "date_last_modified": "2026-04-16",
+
+  "inputs": [
+    {
+      "name": "protospacer",
+      "type": "string",
+      "description": "The 20 bp DNA protospacer sequence (without PAM) used during editing. Standard bases A, T, G, C only."
+    },
+    {
+      "name": "reference",
+      "type": "string",
+      "description": "The reference DNA sequence in which the edit was made. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves these automatically."
+    },
+    {
+      "name": "primer_offset",
+      "type": "integer",
+      "optional": true,
+      "description": "Distance in bp from the cut site to the start of each sequencing primer. Default is 150. Reduce if the cut site is near the ends of the reference."
+    },
+    {
+      "name": "primer_len",
+      "type": "integer",
+      "optional": true,
+      "description": "Length of the designed sequencing primers in bp. Default is 20."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dictionary containing the protospacer strand, cut position, forward and reverse sequencing primer sequences and positions, expected amplicon sequence and length, cut offset within the amplicon, and a step-by-step ICE/TIDE interpretation guide."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "protospacer": "TCAGAAACCTGCCAGTTTGC",
+        "reference": "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC",
+        "primer_offset": 10,
+        "primer_len": 20
+      },
+      "output": {
+        "result": {
+          "protospacer": "TCAGAAACCTGCCAGTTTGC",
+          "strand": "+",
+          "pam_sequence": "TGG",
+          "cut_position": 32,
+          "amplicon_length": 60,
+          "interpretation_guide": "Edit Verification Protocol (ICE/TIDE):..."
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/verify_edit.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_verify_edit",
+    "seq_params": ["reference"]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "id": "org.bioe234.function.crispr.predict_offtargets.v1",
+  "name": "CRISPR Off-Target Predictor",
+  "description": "Scans a reference DNA sequence for potential CRISPR off-target sites by sliding a window across both strands and counting mismatches against the protospacer. Sites within the mismatch threshold are scored using seed-region weighting (Hsu et al. 2013) and PAM presence, then ranked by risk level (HIGH, MEDIUM, LOW).",
+  "type": "function",
+  "keywords": ["CRISPR", "off-target", "protospacer", "mismatch", "specificity", "Hsu", "seed region", "PAM", "gRNA"],
+  "date_created": "2026-04-16",
+  "date_last_modified": "2026-04-16",
+
+  "inputs": [
+    {
+      "name": "protospacer",
+      "type": "string",
+      "description": "The 20 bp DNA protospacer sequence from the gRNA design step (without PAM). Standard bases A, T, G, C only."
+    },
+    {
+      "name": "reference",
+      "type": "string",
+      "description": "Reference DNA sequence to scan for off-target sites. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves these automatically."
+    },
+    {
+      "name": "max_mismatches",
+      "type": "integer",
+      "optional": true,
+      "description": "Maximum number of mismatches allowed for a site to be reported as a potential off-target. Default is 3. Values above 4 may produce many low-confidence results."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dictionary containing the protospacer, reference length, number of sites evaluated, a ranked list of off-target sites with position/strand/mismatch/risk details, and a one-sentence specificity summary."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "protospacer": "ATGATGATGATGATGATGAT",
+        "reference": "ATGATGATGATGATGATGATAGG",
+        "max_mismatches": 3
+      },
+      "output": {
+        "result": {
+          "protospacer": "ATGATGATGATGATGATGAT",
+          "offtarget_sites": [
+            {
+              "position": 0,
+              "strand": "+",
+              "sequence": "ATGATGATGATGATGATGAT",
+              "mismatches": 0,
+              "seed_mismatches": 0,
+              "has_pam": true,
+              "risk": "HIGH"
+            }
+          ],
+          "high_risk_count": 1,
+          "specificity_summary": "1 on-target site found (0 mismatches)."
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/predict_offtargets.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_predict_offtargets",
+    "seq_params": ["reference"]
+  }
+}

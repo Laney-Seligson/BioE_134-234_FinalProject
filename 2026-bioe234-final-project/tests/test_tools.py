@@ -16,10 +16,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from modules.seq_basics.tools.translate import translate
 from modules.seq_basics.tools.reverse_complement import reverse_complement
-from modules.seq_basics.tools.create_construction_file import create_construction_file
-from modules.seq_basics.tools.construction_file_validation import (
+from modules.crispr_tools.tools.create_construction_file import create_construction_file
+from modules.crispr_tools.tools.construction_file_validation import (
     validate_construction_record,
 )
+from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
+from modules.crispr_tools.tools.verify_edit import verify_edit
 
 
 def test_reverse_complement_basic():
@@ -123,3 +125,92 @@ def test_validate_construction_record_fails_with_bad_primer():
     assert report["step_results"][0]["step_type"] == "PCR"
     assert report["step_results"][0]["is_valid"] is False
     assert len(report["errors"]) >= 1
+
+
+# ---------------------------------------------------------------------------
+# predict_offtargets tests
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_exact_match_high_risk():
+    # exact match + NGG PAM → should be flagged HIGH risk
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference="ATGATGATGATGATGATGATAGG",
+    )
+    assert len(result["offtarget_sites"]) >= 1
+    top = result["offtarget_sites"][0]
+    assert top["mismatches"] == 0
+    assert top["has_pam"] is True
+    assert top["risk"] == "HIGH"
+
+
+def test_predict_offtargets_no_match_returns_empty():
+    # no similarity → no sites within default 3-mismatch threshold
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference="CCCCCCCCCCCCCCCCCCCCAGG",
+    )
+    # all sites should have mismatches > 0 (or list is empty)
+    for site in result["offtarget_sites"]:
+        assert site["mismatches"] > 0
+
+
+def test_predict_offtargets_empty_protospacer_raises():
+    with pytest.raises(ValueError):
+        predict_offtargets(protospacer="", reference="ATGATGATG")
+
+
+def test_predict_offtargets_empty_reference_raises():
+    with pytest.raises(ValueError):
+        predict_offtargets(protospacer="ATGATGATGATGATGATGAT", reference="")
+
+
+def test_predict_offtargets_max_mismatches_zero():
+    # with max_mismatches=0, only the perfect-match site should come back
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference="ATGATGATGATGATGATGATAGG",
+        max_mismatches=0,
+    )
+    for site in result["offtarget_sites"]:
+        assert site["mismatches"] == 0
+
+
+# ---------------------------------------------------------------------------
+# verify_edit tests
+# ---------------------------------------------------------------------------
+
+_VERIFY_REFERENCE = (
+    "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTT"
+    "AGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC"
+)
+_VERIFY_PROTOSPACER = "TCAGAAACCTGCCAGTTTGC"
+
+
+def test_verify_edit_standard_case():
+    # protospacer at position 15, PAM = TGG, cut at position 32
+    result = verify_edit(protospacer=_VERIFY_PROTOSPACER, reference=_VERIFY_REFERENCE)
+    assert isinstance(result["cut_position"], int)
+    assert result["cut_position"] >= 0
+    assert result["pam_sequence"] == "TGG"
+    assert result["strand"] == "+"
+    assert result["protospacer_position"] == 15
+    assert result["cut_position"] == 32
+
+
+def test_verify_edit_protospacer_not_in_reference_raises():
+    with pytest.raises(ValueError):
+        verify_edit(
+            protospacer="AAAAAAAAAAAAAAAAAAAA",
+            reference="ATGCATGCATGC",
+        )
+
+
+def test_verify_edit_empty_protospacer_raises():
+    with pytest.raises(ValueError):
+        verify_edit(protospacer="", reference="ATGCATGCATGC")
+
+
+def test_verify_edit_empty_reference_raises():
+    with pytest.raises(ValueError):
+        verify_edit(protospacer=_VERIFY_PROTOSPACER, reference="")

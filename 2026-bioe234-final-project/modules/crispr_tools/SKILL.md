@@ -8,173 +8,144 @@ module correctly and interpret their results meaningfully.
 
 ## What this module does
 
-The `crispr_tools` module provides fundamental tools to go through the CRISPR pipeline,
-including generating and validating cloning construction workflows.
+The `crispr_tools` module provides fundamental tools to go through the crispr pipeline.
 
 ---
 
 ## Available resources
 
-Here are the descriptions of the available resources. When a user inquires for a plasmid
-or a backbone sequence, provide the names of the plasmid and a short description to help
-the user choose.
+Here are the descriptions of the available resources. When a user inquires for a plasmid or a backbone sequence, provide the names of the plasmid and a short description of the plasmid to help the user choose which one to use.
 
-| Resource name | Description                                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `pBR322`      | E. coli cloning vector pBR322, 4361 bp, circular, double-stranded. Contains ampicillin (bla) and tetracycline (tet) resistance genes. |
-| `pET28a`      | E. coli cloning vector pET28a, 5369 bp, circular, double-stranded. Contains kanamycin resistance and a 6x His tag.                    |
+| Resource name | Description |
+|---------------|-------------|
+| `pBR322`      | E. coli cloning vector pBR322, 4361 bp, circular, double-stranded. A classic lab plasmid commonly used as a reference sequence. Contains genes for ampicillin resistance (bla) and tetracycline resistance (tet). |
 
-When a user refers to these plasmids, use the resource name directly (e.g., `"pET28a"`).
-Do NOT ask the user to paste sequences.
+When a user refers to "pBR322", use the resource name `"pBR322"` directly
+as the sequence argument — do not ask the user to paste the sequence.
+
+| Resource name | Description |
+|---------------|-------------|
+| `pET28a`      | E. coli cloning vector pET28a, 5369 bp, circular, double-stranded. A classic lab plasmid commonly used as a reference sequence. Contains genes for kanmycin (kan) resistance. Has a 6x His tag. |
+
+When a user refers to "pET28a", use the resource name `"pET28a"` directly
+as the sequence argument — do not ask the user to paste the sequence.
 
 ---
 
 ## Tools and when to use them
 
 ### `dna_reverse_complement`
-
 Returns the reverse complement of a DNA or RNA sequence.
 
 Use when the user asks for:
+- "reverse complement of X"
+- "complement of the bottom strand"
+- "what does the antisense strand look like"
+- "flip the sequence"
 
-* reverse complement
-* antisense strand
-* flipping a sequence
-
----
+The result is the same length as the input. Uppercase output.
 
 ### `dna_translate`
-
-Translates DNA into protein.
+Translates a DNA coding sequence to a protein sequence using the standard genetic code.
 
 Use when the user asks to:
+- "translate", "get the protein", "what protein does this encode"
+- work with a specific reading frame (1, 2, or 3)
+- translate a specific region using `start` / `end` coordinates (0-indexed, end is exclusive)
 
-* translate a sequence
-* get a protein sequence
-* evaluate reading frames
+**Frame guidance:**
+- Frame 1 — start reading from the first base (default)
+- Frame 2 — skip 1 base, then read triplets
+- Frame 3 — skip 2 bases, then read triplets
 
----
+**Stop codons** appear as `*` in the output. **Unrecognised codons** appear as `X`.
+
+**Coordinate example:** "translate bases 100 to 200" → `start=100, end=200`
+"translate the first 60bp" → `start=0, end=60` (or omit start, set `end=60`)
 
 ## Tool: create_construction_file
 
-This tool generates a cloning construction workflow.
-
----
-
-### Required inputs
+Before calling this tool, gather all required fields for the selected assembly strategy.
 
 For all workflows:
-
-* construct_name
-* host_organism
-* backbone_name
-* backbone_sequence
-* insert_name
-* insert_sequence
+- construct_name
+- host_organism
+- backbone_name
+- backbone_sequence
+- insert_name
+- insert_sequence
 
 For GoldenGate:
+- insert_forward_primer_name
+- insert_forward_primer_sequence
+- insert_reverse_primer_name
+- insert_reverse_primer_sequence
+- vector_forward_primer_name
+- vector_forward_primer_sequence
+- vector_reverse_primer_name
+- vector_reverse_primer_sequence
+- enzyme
 
-* insert_forward_primer_name
-* insert_forward_primer_sequence
-* insert_reverse_primer_name
-* insert_reverse_primer_sequence
-* vector_forward_primer_name
-* vector_forward_primer_sequence
-* vector_reverse_primer_name
-* vector_reverse_primer_sequence
-* enzyme
+For Gibson:
+- insert_forward_primer_name
+- insert_forward_primer_sequence
+- insert_reverse_primer_name
+- insert_reverse_primer_sequence
+- vector_forward_primer_name
+- vector_forward_primer_sequence
+- vector_reverse_primer_name
+- vector_reverse_primer_sequence
 
 Optional:
+- cell_strain
+- selection
+- temperature_c
 
-* cell_strain
-* selection
-* temperature_c
+If any required field is missing, ask for all missing required fields in one message before calling the tool.
+Normalize host organism to `E_coli` when the user says "E. coli", "e coli", or "e. coli".
 
+### Required interaction rule for create_construction_file
 
-## 🚨 CRITICAL EXECUTION RULES (MANDATORY)
+Never return an empty response.
 
-The assistant must ALWAYS take exactly ONE action per turn:
+If the user has not provided all required fields for `create_construction_file`, do not call the tool yet.
+Instead, respond with one concise message that lists **all missing required fields at once**.
 
-1. Ask for missing required fields
-2. Call `create_construction_file`
+Do not wait for the user to ask again.
+Do not return a blank response.
+Do not partially call the tool with missing required inputs.
 
-The assistant must NEVER:
+Example complete-input behavior:
 
-* Return an empty response
-* Return a placeholder response
-* Wait for the user to say "proceed"
-* Delay execution after all fields are present
+User: "My backbone name is pET28a, backbone sequence is pET28a, insert forward primer name is repF, insert forward primer sequence is ..., insert reverse primer name is repR, insert reverse primer sequence is ..., vector forward primer name is vecF, vector forward primer sequence is ..., vector reverse primer name is vecR, vector reverse primer sequence is ..., enzyme is BsaI."
 
+Assistant behavior:
+- Recognize that all required fields are now present
+- Call `create_construction_file` immediately
+- Return the construction file
+- Do not wait for an additional user message such as "proceed"
 
-## Required interaction behavior
+### Required execution behavior for create_construction_file
 
-If any required fields are missing:
+If all required fields for the chosen assembly strategy are available, call `create_construction_file` immediately in the same turn.
 
-* Ask for ALL missing fields in ONE message
-* Do NOT ask multiple follow-ups
-* Do NOT call the tool yet
+Do not ask the user to confirm.
+Do not wait for the user to say "proceed".
+Do not return an empty response.
 
+If fields are missing, ask for all missing required fields in one message.
+If no required fields are missing, call the tool right away.
 
-## Required execution behavior
+After the user provides the missing required fields, the next assistant turn should call the tool immediately.
 
-If ALL required fields are present:
+### Presenting create_construction_file results
 
-* Call `create_construction_file` IMMEDIATELY
-* Do NOT ask for confirmation
-* Do NOT wait for another message
-* Do NOT return text instead of calling the tool
+After calling `create_construction_file`, if the tool returns a field named `construction_file_txt`, present that field directly to the user in a code block.
 
----
+Do not present the raw MCP response object.
+Do not present JSON unless the user explicitly asks for structured output.
+Prefer this format:
 
-## Fallback rule (VERY IMPORTANT)
-
-If unsure whether all required fields are present:
-
-* ASSUME they are present
-* CALL the tool anyway
-
-It is ALWAYS better to attempt a tool call than to return an empty response.
-
----
-
-## Mandatory example behavior
-
-This is REQUIRED behavior:
-
-User provides missing fields:
-
-Assistant MUST:
-
-* Recognize all required fields are now present
-* Immediately call `create_construction_file`
-* Return the result
-
-Assistant MUST NOT:
-
-* Return an empty response
-* Ask for confirmation
-* Wait for "proceed"
-* Skip the tool call
-
-Failure to call the tool when inputs are complete is incorrect behavior.
-
----
-
-## Presenting results
-
-After calling `create_construction_file`:
-
-* If `construction_file_txt` is returned:
-
-  * Display it directly in a code block
-
-* Do NOT show raw JSON
-
-* Do NOT show MCP output format
-
-Correct format:
-
-```
 PCR           ...
 PCR           ...
 GoldenGate    ...
@@ -182,131 +153,146 @@ GoldenGate    ...
 plasmid       ...
 dsdna         ...
 oligo         ...
-```
 
----
 
 ## Tool: validate_construction_file
 
-Validates whether a construction workflow is biologically correct.
+Validates whether a construction file generated by `create_construction_file` is biologically correct.
+
+Use this tool **after generating a construction file** to confirm that the workflow is valid.
+
+When to use:
+Call this tool when the user asks:
+- "is this construct valid?"
+- "did I design this correctly?"
+- "check my cloning workflow"
+- "does this PCR work?"
+- "verify this assembly"
+- "debug why this construct failed"
+
+Also use it automatically after creating a construction file **if the user expresses uncertainty or asks for confirmation**.
+
+What it checks (Version 1):
+The validator currently performs **biological validation of PCR steps**:
+- Forward primer anneals to template (3' suffix match)
+- Reverse primer anneals to template (reverse complement match)
+- Primers are in correct orientation
+- Amplicon can be formed without overlap
+- A valid PCR product sequence can be predicted
+
+If any of these fail, the step is marked as invalid.
+
+What it does NOT check yet:
+- GoldenGate assembly correctness
+- Gibson assembly overlaps
+- Restriction enzyme cut sites
+- Transformation efficiency or strain compatibility
+- Circular plasmid wraparound PCR (linear assumption only)
+
+These steps will appear as:
+- `[SKIP]` in the validation report
+- Included as warnings, not errors
+
+How to use:
+Pass the `structured_construction_file` returned by `create_construction_file` directly into this tool.
+
+Do NOT modify names of parts or steps — validation is **name-agnostic** and follows references internally.
+
+Interpreting results:
+- `[PASS]` → step is biologically valid  
+- `[FAIL]` → step is invalid and must be fixed  
+- `[SKIP]` → validation not implemented for that step yet  
+
+If any PCR step fails:
+- the overall construct is considered invalid
+- the error message explains what went wrong (e.g., primer does not anneal)
+
+Example workflow:
+1. Call `create_construction_file`
+2. Call `validate_construction_file` on the result
+3. If validation fails:
+   - Identify the failing step
+   - Suggest corrected primers or inputs
+   - Regenerate the construction file if needed
+
+Important behavior:
+- Validation is **name-agnostic** — do not rely on fixed names like `rep_pcr` or `vec_pcr`
+- Always follow the references defined in each step (`forward_primer`, `reverse_primer`, `template`, `output`)
+- Always validate a construction file before presenting it as final if the workflow includes PCR steps
 
 ---
 
-### When to use
+## Interpreting results
+
+- A protein sequence like `MSKGEEK...` starting with `M` (methionine) suggests you've
+  found the correct reading frame for a real open reading frame.
+- A sequence full of `*` stop codons or `X` unknowns usually means the wrong frame,
+  wrong coordinates, or the sequence is not a coding region.
+- When translating a full plasmid, most of the output will be non-coding — only specific
+  coordinate ranges will give meaningful protein sequence.
+
+---
+
+### `crispr_predict_offtargets`
+Scans a reference DNA sequence for potential CRISPR off-target sites — places the guide RNA might accidentally bind and cause Cas9 to cut somewhere unintended.
 
 Use when the user asks:
+- "does this guide have off-target sites?"
+- "is this gRNA specific enough?"
+- "check for off-targets in [reference]"
+- "how many mismatches are there between my guide and [sequence]?"
 
-* "is this valid?"
-* "does this PCR work?"
-* "check my cloning workflow"
-* "verify this assembly"
+**Inputs:**
+- `protospacer`: the 20 bp DNA protospacer from gRNA design (no PAM). Standard A/T/G/C only.
+- `reference`: the DNA sequence to scan. Accepts resource name (e.g. `"pBR322"`), raw string, FASTA, or GenBank.
+- `max_mismatches` (optional): max mismatches to still flag a site. Default 3.
 
-Also use after generating a construction file IF the user asks for confirmation.
+**What it returns:**
+A ranked list of off-target sites, each with position, strand, mismatch count, seed-region mismatches, PAM presence, and a risk level (HIGH / MEDIUM / LOW). Also includes a one-sentence specificity summary.
 
-### `crispr_cas_selector`
-Analyzes the GC and AT content of a DNA sequence and recommends Cas9 or Cas12a.
+**Risk logic (Hsu et al. 2013):**
+- HIGH: 0 mismatches, or no seed-region mismatches + PAM present
+- MEDIUM: ≤1 seed mismatch + PAM, or ≤2 total mismatches + PAM
+- LOW: everything else
+
+The seed region is positions 1–12 from the PAM end — mismatches there are more dangerous because that is where Cas9 first contacts DNA.
+
+---
+
+### `crispr_verify_edit`
+After a CRISPR experiment, calculates the expected Cas9 cut site and designs flanking sequencing primers for ICE/TIDE analysis to verify editing efficiency.
 
 Use when the user asks:
-- "which CRISPR system should I use for this organism?"
-- "should I use Cas9 or Cas12a?"
-- "what is the GC content of this genome?"
-- "is this sequence GC-rich or AT-rich?"
+- "how do I verify my CRISPR edit?"
+- "where did Cas9 cut?"
+- "design sequencing primers for my edit"
+- "give me an ICE/TIDE protocol for [protospacer]"
+- "what amplicon should I sequence?"
 
-Output includes gc_fraction, at_fraction, recommendation ("Cas9" or "Cas12a"),
-and a one-sentence rationale. GC >= 50% → Cas9 (NGG PAM abundant);
-GC < 50% → Cas12a (TTTV PAM abundant).
+**Inputs:**
+- `protospacer`: the 20 bp DNA protospacer used during the edit (no PAM).
+- `reference`: the original unedited reference sequence. Accepts resource name, raw string, FASTA, or GenBank.
+- `primer_offset` (optional): bp from cut site to each primer. Default 150. Reduce for short test sequences.
+- `primer_len` (optional): primer length in bp. Default 20.
 
----
+**What it returns:**
+- `cut_position`: where Cas9 cuts (between nt 17–18 of the protospacer, 3 bp upstream of PAM)
+- `forward_primer` / `reverse_primer`: sequencing primer sequences and positions
+- `amplicon_sequence` / `amplicon_length`: what to PCR-amplify
+- `cut_offset_in_amplicon`: where the cut falls inside the amplicon (needed for ICE/TIDE)
+- `interpretation_guide`: step-by-step ICE/TIDE protocol with all coordinates filled in
 
-### `crispr_design_cas9_grna`
-Scans a DNA sequence for all NGG PAM sites, scores each candidate protospacer
-using Doench et al. 2016 efficiency rules, and returns the optimal Cas9 gRNA.
-
-Use when the user asks:
-- "design a Cas9 gRNA for this sequence"
-- "what is the best guide RNA for Cas9?"
-- "find a Cas9 target site in pBR322"
-
-Scoring rules (each worth 1 point, max score 3):
-- GC content of protospacer between 40-70%
-- No poly-T run (TTTT+) in protospacer
-- Final base of protospacer (position 20) is G
-
-Output includes the full RNA gRNA sequence, protospacer, PAM site,
-efficiency_score (0-3), and any warnings.
+**Workflow after calling this tool:**
+1. PCR-amplify the amplicon using the returned primers
+2. Sanger-sequence the PCR product
+3. Upload the .ab1 trace to ICE (Synthego) or TIDE (Brinkman et al. 2014) with the amplicon sequence and cut offset
 
 ---
 
-### `crispr_design_cas12a_crrna`
-Scans a DNA sequence for all TTTV PAM sites, scores each candidate protospacer
-using Zetsche et al. 2015 and Pausch et al. 2020 efficiency rules, and returns
-the optimal FnCas12a crRNA.
+## Sequence input rules (handled automatically)
 
-Use when the user asks:
-- "design a Cas12a crRNA for this sequence"
-- "what is the best guide RNA for Cas12a?"
-- "find a Cas12a target site in pBR322"
-
-Key difference from Cas9: PAM is TTTV (not NGG), protospacer is 23 bp and lies
-DOWNSTREAM of the PAM (not upstream), and the scaffold is a direct repeat
-(not tracrRNA).
-
-Scoring rules (each worth 1 point, max score 3):
-- GC content of protospacer between 30-70%
-- No poly-T run (TTTT+) in protospacer
-- First base of protospacer (PAM-proximal) is C or G
-
-Output includes the full RNA crRNA sequence, protospacer, PAM site,
-efficiency_score (0-3), and any warnings.
-
----
-
-## Required execution rules (validation)
-
-If user requests validation:
-
-* Call `validate_construction_file` immediately
-
-Do NOT:
-
-* Return an empty response
-* Delay execution
-* Ask unnecessary follow-up questions
-
----
-
-## What validation checks (Version 1)
-
-* PCR primer annealing
-* Primer orientation
-* Valid amplicon formation
-
----
-
-## Not yet implemented
-
-* GoldenGate validation (future versions)
-* Gibson overlaps
-* enzyme cut simulation
-
-These steps appear as `[SKIP]`
-
----
-
-## Interpreting validation results
-
-* `[PASS]` → valid
-* `[FAIL]` → incorrect, must fix
-* `[SKIP]` → not implemented
-
----
-
-## Sequence input rules
-
-Sequences are automatically resolved:
-
-* `"pET28a"` → full plasmid sequence
-* raw strings → used directly
-* FASTA / GenBank → parsed automatically
-
-No need to paste full sequences.
+You never need to paste the full sequence. The framework resolves these automatically:
+- `"pBR322"` → full 4361 bp sequence
+- A raw string like `"ATGCGATCG"` → used as-is
+- A FASTA string starting with `>` → sequence extracted automatically
+- A GenBank string starting with `LOCUS` → sequence extracted automatically

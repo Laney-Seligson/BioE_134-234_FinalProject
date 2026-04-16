@@ -287,6 +287,26 @@ Use when the user asks:
 2. Sanger-sequence the PCR product
 3. Upload the .ab1 trace to ICE (Synthego) or TIDE (Brinkman et al. 2014) with the amplicon sequence and cut offset
 
+### `crispr_design_cloning_oligos`
+Designs the top and bottom strand DNA oligos needed to clone a protospacer
+into a restriction-digested expression vector. Works for any Cas system.
+
+Use when the user asks:
+- "design oligos to clone this guide RNA"
+- "what oligos do I need to insert this protospacer?"
+- "give me the sequences to order for cloning"
+
+Inputs:
+- protospacer: the DNA protospacer sequence (from design_cas9_grna or design_cas12a_crrna, or typed manually)
+- top_overhang: default "CACC" (BbsI/pX330 for Cas9)
+- bottom_overhang: default "AAAC" (BbsI/pX330 for Cas9)
+
+If the user is using a different vector, ask them for the overhangs before calling the tool.
+
+Output includes top_oligo, bottom_oligo, g_prepended (bool), and notes.
+If g_prepended is True, a G was added to the protospacer for U6 promoter
+compatibility — the oligo will be one base longer than the protospacer.
+
 ---
 
 ## Sequence input rules (handled automatically)

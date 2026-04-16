@@ -1,0 +1,42 @@
+{
+  "id": "org.bioe234.function.crispr.design_cas12a_crrna.v1",
+  "name": "Cas12a crRNA Designer",
+  "description": "Scans a DNA sequence for all TTTV PAM sites, scores each candidate protospacer using efficiency rules from Zetsche et al. 2015 and Pausch et al. 2020 (GC content, poly-T avoidance, PAM-proximal base), and returns the optimal FnCas12a crRNA sequence.",
+  "type": "function",
+  "keywords": ["CRISPR", "Cas12a", "Cpf1", "crRNA", "PAM", "TTTV", "protospacer", "Zetsche", "Pausch"],
+  "date_created": null,
+  "date_last_modified": null,
+
+  "inputs": [
+    {
+      "name": "seq",
+      "type": "string",
+      "description": "DNA target sequence to scan for Cas12a crRNA candidates. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves the format automatically."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dictionary with crrna_sequence (full RNA crRNA), protospacer (23 bp DNA), pam_site (TTTV), gc_fraction, efficiency_score (0-3 per Zetsche 2015 / Pausch 2020), warnings (list of rule violations), and candidates_evaluated (int)."
+    }
+  ],
+
+  "examples": [
+    {
+      "input":  { "seq": "CCCTAGATGCCTTTTAGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" },
+      "output": { "result": { "pam_site": "TTTA", "efficiency_score": 2, "warnings": [] } }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/design_cas12a_crrna.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_design_cas12a_crrna",
+    "seq_params": ["seq"]
+  }
+}

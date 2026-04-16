@@ -1,0 +1,42 @@
+{
+  "id": "org.bioe234.function.crispr.design_cas9_grna.v1",
+  "name": "Cas9 gRNA Designer",
+  "description": "Scans a DNA sequence for all NGG PAM sites, scores each candidate protospacer using Doench et al. 2016 efficiency rules (GC content, poly-T avoidance, terminal G), and returns the optimal Cas9 gRNA sequence.",
+  "type": "function",
+  "keywords": ["CRISPR", "Cas9", "gRNA", "guide RNA", "PAM", "NGG", "protospacer", "Doench"],
+  "date_created": null,
+  "date_last_modified": null,
+
+  "inputs": [
+    {
+      "name": "seq",
+      "type": "string",
+      "description": "DNA target sequence to scan for Cas9 gRNA candidates. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves the format automatically."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dictionary with grna_sequence (full RNA gRNA), protospacer (20 bp DNA), pam_site (NGG), gc_fraction, efficiency_score (0-3 per Doench et al. 2016), warnings (list of rule violations), and candidates_evaluated (int)."
+    }
+  ],
+
+  "examples": [
+    {
+      "input":  { "seq": "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" },
+      "output": { "result": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "pam_site": "TGG", "efficiency_score": 3, "warnings": [] } }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/design_cas9_grna.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_design_cas9_grna",
+    "seq_params": ["seq"]
+  }
+}

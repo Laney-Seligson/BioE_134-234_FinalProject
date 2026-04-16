@@ -203,6 +203,62 @@ Use when the user asks:
 
 Also use after generating a construction file IF the user asks for confirmation.
 
+### `crispr_cas_selector`
+Analyzes the GC and AT content of a DNA sequence and recommends Cas9 or Cas12a.
+
+Use when the user asks:
+- "which CRISPR system should I use for this organism?"
+- "should I use Cas9 or Cas12a?"
+- "what is the GC content of this genome?"
+- "is this sequence GC-rich or AT-rich?"
+
+Output includes gc_fraction, at_fraction, recommendation ("Cas9" or "Cas12a"),
+and a one-sentence rationale. GC >= 50% → Cas9 (NGG PAM abundant);
+GC < 50% → Cas12a (TTTV PAM abundant).
+
+---
+
+### `crispr_design_cas9_grna`
+Scans a DNA sequence for all NGG PAM sites, scores each candidate protospacer
+using Doench et al. 2016 efficiency rules, and returns the optimal Cas9 gRNA.
+
+Use when the user asks:
+- "design a Cas9 gRNA for this sequence"
+- "what is the best guide RNA for Cas9?"
+- "find a Cas9 target site in pBR322"
+
+Scoring rules (each worth 1 point, max score 3):
+- GC content of protospacer between 40-70%
+- No poly-T run (TTTT+) in protospacer
+- Final base of protospacer (position 20) is G
+
+Output includes the full RNA gRNA sequence, protospacer, PAM site,
+efficiency_score (0-3), and any warnings.
+
+---
+
+### `crispr_design_cas12a_crrna`
+Scans a DNA sequence for all TTTV PAM sites, scores each candidate protospacer
+using Zetsche et al. 2015 and Pausch et al. 2020 efficiency rules, and returns
+the optimal FnCas12a crRNA.
+
+Use when the user asks:
+- "design a Cas12a crRNA for this sequence"
+- "what is the best guide RNA for Cas12a?"
+- "find a Cas12a target site in pBR322"
+
+Key difference from Cas9: PAM is TTTV (not NGG), protospacer is 23 bp and lies
+DOWNSTREAM of the PAM (not upstream), and the scaffold is a direct repeat
+(not tracrRNA).
+
+Scoring rules (each worth 1 point, max score 3):
+- GC content of protospacer between 30-70%
+- No poly-T run (TTTT+) in protospacer
+- First base of protospacer (PAM-proximal) is C or G
+
+Output includes the full RNA crRNA sequence, protospacer, PAM site,
+efficiency_score (0-3), and any warnings.
+
 ---
 
 ## Required execution rules (validation)

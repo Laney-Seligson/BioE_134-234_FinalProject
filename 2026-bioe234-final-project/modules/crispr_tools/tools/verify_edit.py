@@ -67,20 +67,20 @@ class VerifyEdit:
     """
     Description:
         After the CRISPR experiment is done, this tool helps the user figure out
-        where Cas9 cut and gives you everything they need to verify whether the
+        where Cas9 cut and gives them everything they need to verify whether the
         edit actually worked.
 
-        The idea: Cas9 always cuts at the same predictable position — between
+        The idea: Cas9 always cuts at the same predictable position, between
         nucleotides 17 and 18 of the protospacer, counting from the PAM-distal
-        end. That's 3bp upstream of the PAM. So if I know the protospacer and
+        end (3bp upstream of the PAM). So if I know the protospacer and
         the reference sequence, I can calculate the exact cut site.
 
-        Then I design two sequencing primers flanking that cut site (~150bp on
-        each side). You PCR-amplify that region from your edited cells, send it
-        for Sanger sequencing, and upload the trace to ICE (Synthego) or TIDE
-        (Brinkman et al. 2014). Those tools look for the characteristic "noisy"
-        signal that appears downstream of the cut when a mix of edited and
-        unedited cells is sequenced together.
+        Then, design two sequencing primers flanking that cut site (~150bp on
+        each side). PCR-amplify that region from your edited cells, send it
+        for Sanger sequencing, and upload the trace to ICE (Synthego) or TIDE. 
+        Those tools look for the characteristic "noisy" signal that appears 
+        downstream of the cut when a mix of edited and unedited cells is 
+        sequenced together.
 
         Steps this function does:
           1. finds the protospacer in the reference (forward or reverse strand)
@@ -290,8 +290,7 @@ class VerifyEdit:
         }
 
 
-# module-level alias — same pattern used in all the other tools in this project.
-# means you can do either:
+# module-level alias: same pattern used in all the other tools in this project. either:
 #   from modules.crispr_tools.tools.verify_edit import verify_edit
 #   result = verify_edit(protospacer, reference)
 # or use the class directly if you need more control.

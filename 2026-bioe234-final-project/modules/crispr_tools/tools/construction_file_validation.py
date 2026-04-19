@@ -475,9 +475,13 @@ def validate_goldengate_step(
     insert_name = inputs[1]
 
     if vector_name not in produced_sequences:
-        raise ConstructionValidationError(f"GoldenGate input '{vector_name}' has no available validated sequence.")
+        raise ConstructionValidationError(
+            f"GoldenGate input '{vector_name}' has no available validated sequence."
+        )
     if insert_name not in produced_sequences:
-        raise ConstructionValidationError(f"GoldenGate input '{insert_name}' has no available validated sequence.")
+        raise ConstructionValidationError(
+            f"GoldenGate input '{insert_name}' has no available validated sequence."
+        )
 
     vector_seq = produced_sequences[vector_name]
     insert_seq = produced_sequences[insert_name]
@@ -485,8 +489,10 @@ def validate_goldengate_step(
     vector_ends = extract_goldengate_overhangs(vector_seq, enzyme)
     insert_ends = extract_goldengate_overhangs(insert_seq, enzyme)
 
-    junction_1_ok = vector_ends["right_overhang"] == reverse_complement(insert_ends["left_overhang"])
-    junction_2_ok = insert_ends["right_overhang"] == reverse_complement(vector_ends["left_overhang"])
+    # The extracted overhangs are already in junction-facing form.
+    # Compare them directly instead of reverse-complementing again.
+    junction_1_ok = vector_ends["right_overhang"] == insert_ends["left_overhang"]
+    junction_2_ok = insert_ends["right_overhang"] == vector_ends["left_overhang"]
 
     if not junction_1_ok or not junction_2_ok:
         raise ConstructionValidationError(

@@ -139,16 +139,204 @@ class CreateConstructionFile:
             temperature_c=temperature_c,
         )
 
+        # validated_operations = self._validate_operations(operations, validated_parts)
+        # construction_file_txt = self._render_construction_file(
+        #     validated_parts,
+        #     validated_operations
+        # )
+        # host_organism = self._normalize_host_organism(host_organism)
+
+        # # return {
+        # #     "construction_file_txt": construction_file_txt
+        # # }
+        # return {
+        #     "construct_name": construct_name,
+        #     "assembly_strategy": assembly_strategy,
+        #     "structured_construction_file": structured_construction_file,
+        #     "construction_file_txt": construction_file_txt,
+        # }
+class CreateConstructionFile:
+    """
+    Description:
+        Generate a construction file for a simple E_coli cloning workflow.
+        This tool accepts user-facing build inputs and internally creates the
+        structured parts list, workflow operations, and rendered construction file.
+
+    Input:
+        construct_name (str): Name of the final construct.
+        host_organism (str): Host organism. Version 1 supports E_coli only.
+        assembly_strategy (str): Main assembly strategy. Supported:
+            GoldenGate, Gibson, DirectSynthesis.
+        backbone_name (str): Name of the backbone plasmid.
+        backbone_sequence (str): Backbone plasmid sequence.
+        insert_name (str): Name of the insert or donor.
+        insert_sequence (str): Insert or donor sequence.
+
+        insert_forward_primer_name (str): Name of insert forward primer.
+        insert_forward_primer_sequence (str): Sequence of insert forward primer.
+        insert_reverse_primer_name (str): Name of insert reverse primer.
+        insert_reverse_primer_sequence (str): Sequence of insert reverse primer.
+
+        vector_forward_primer_name (str): Name of vector forward primer.
+        vector_forward_primer_sequence (str): Sequence of vector forward primer.
+        vector_reverse_primer_name (str): Name of vector reverse primer.
+        vector_reverse_primer_sequence (str): Sequence of vector reverse primer.
+
+        enzyme (str): Assembly enzyme, used for GoldenGate.
+        cell_strain (str): Transformation strain.
+        selection (str): Selection marker, such as Kan or Amp.
+        temperature_c (int): Transformation temperature in Celsius.
+        notes (str): Optional notes.
+
+    Output:
+        dict: A structured construction file and a rendered text-based construction file.
+    """
+
+    def initiate(self) -> None:
+        self.supported_organisms = {"E_coli"}
+        self.allowed_strategies = {"GoldenGate", "Gibson", "DirectSynthesis"}
+        self.allowed_part_types = {"oligo", "primer", "dsdna", "plasmid", "fragment"}
+        self.allowed_step_types = {"PCR", "GoldenGate", "Gibson", "DirectSynthesis", "Transform"}
+
+    def run(
+        self,
+        construct_name: str,
+        host_organism: str,
+        assembly_strategy: str,
+        backbone_name: str,
+        backbone_sequence: str,
+        insert_name: str,
+        insert_sequence: str,
+        insert_forward_primer_name: str = "",
+        insert_forward_primer_sequence: str = "",
+        insert_reverse_primer_name: str = "",
+        insert_reverse_primer_sequence: str = "",
+        vector_forward_primer_name: str = "",
+        vector_forward_primer_sequence: str = "",
+        vector_reverse_primer_name: str = "",
+        vector_reverse_primer_sequence: str = "",
+        enzyme: str = "",
+        cell_strain: str = "",
+        selection: str = "",
+        temperature_c: int = 37,
+        notes: str = ""
+    ) -> dict:
+
+        self._require_nonempty_string(construct_name, "construct_name")
+        self._require_nonempty_string(host_organism, "host_organism")
+        self._require_nonempty_string(assembly_strategy, "assembly_strategy")
+        self._require_nonempty_string(backbone_name, "backbone_name")
+        self._require_nonempty_string(backbone_sequence, "backbone_sequence")
+        self._require_nonempty_string(insert_name, "insert_name")
+        self._require_nonempty_string(insert_sequence, "insert_sequence")
+
+        host_organism = self._normalize_host_organism(host_organism)
+        assembly_strategy = self._normalize_assembly_strategy(assembly_strategy)
+
+        if host_organism not in self.supported_organisms:
+            raise ValueError("host_organism must be E_coli for version 1.")
+
+# Fail early if seq_params did not resolve properly
+        for field_name, seq_value in (
+            ("backbone_sequence", backbone_sequence),
+            ("insert_sequence", insert_sequence),
+        ):
+            if isinstance(seq_value, str) and seq_value.strip().startswith("resource://"):
+                raise ValueError(
+                    f"{field_name} was not resolved from the resource before validation."
+                )
+
+        if assembly_strategy not in self.allowed_strategies:
+            raise ValueError(
+                f"assembly_strategy must be one of {sorted(self.allowed_strategies)}."
+            )
+
+        self._validate_user_inputs(
+            assembly_strategy=assembly_strategy,
+            insert_forward_primer_name=insert_forward_primer_name,
+            insert_forward_primer_sequence=insert_forward_primer_sequence,
+            insert_reverse_primer_name=insert_reverse_primer_name,
+            insert_reverse_primer_sequence=insert_reverse_primer_sequence,
+            vector_forward_primer_name=vector_forward_primer_name,
+            vector_forward_primer_sequence=vector_forward_primer_sequence,
+            vector_reverse_primer_name=vector_reverse_primer_name,
+            vector_reverse_primer_sequence=vector_reverse_primer_sequence,
+            enzyme=enzyme,
+        )
+
+        parts = self._build_parts(
+            backbone_name=backbone_name,
+            backbone_sequence=backbone_sequence,
+            insert_name=insert_name,
+            insert_sequence=insert_sequence,
+            insert_forward_primer_name=insert_forward_primer_name,
+            insert_forward_primer_sequence=insert_forward_primer_sequence,
+            insert_reverse_primer_name=insert_reverse_primer_name,
+            insert_reverse_primer_sequence=insert_reverse_primer_sequence,
+            vector_forward_primer_name=vector_forward_primer_name,
+            vector_forward_primer_sequence=vector_forward_primer_sequence,
+            vector_reverse_primer_name=vector_reverse_primer_name,
+            vector_reverse_primer_sequence=vector_reverse_primer_sequence,
+        )
+
+        validated_parts = self._validate_parts(parts)
+
+        operations = self._build_operations(
+            construct_name=construct_name,
+            assembly_strategy=assembly_strategy,
+            backbone_name=backbone_name,
+            insert_name=insert_name,
+            insert_forward_primer_name=insert_forward_primer_name,
+            insert_reverse_primer_name=insert_reverse_primer_name,
+            vector_forward_primer_name=vector_forward_primer_name,
+            vector_reverse_primer_name=vector_reverse_primer_name,
+            enzyme=enzyme,
+            cell_strain=cell_strain,
+            selection=selection,
+            temperature_c=temperature_c,
+        )
+
+        # validated_operations = self._validate_operations(operations, validated_parts)
+        # construction_file_txt = self._render_construction_file(
+        #     validated_parts,
+        #     validated_operations
+        # )
+        # host_organism = self._normalize_host_organism(host_organism)
+
+        # # return {
+        # #     "construction_file_txt": construction_file_txt
+        # # }
+        # return {
+        #     "construct_name": construct_name,
+        #     "assembly_strategy": assembly_strategy,
+        #     "structured_construction_file": structured_construction_file,
+        #     "construction_file_txt": construction_file_txt,
+        # }
         validated_operations = self._validate_operations(operations, validated_parts)
         construction_file_txt = self._render_construction_file(
             validated_parts,
             validated_operations
         )
-        host_organism = self._normalize_host_organism(host_organism)
+
+        structured_construction_file = {
+            "construct_name": construct_name,
+            "assembly_strategy": assembly_strategy,
+            "parts": validated_parts,
+            "operations": validated_operations,
+            "notes": notes,
+        }
+
+        file_name = f"{construct_name}_construction.txt"
 
         return {
-            "construction_file_txt": construction_file_txt
+            "construct_name": construct_name,
+            "assembly_strategy": assembly_strategy,
+            "file_name": file_name,
+            "structured_construction_file": structured_construction_file,
+            "construction_file_txt": construction_file_txt,
+            "text": construction_file_txt,
         }
+    
 
     def _require_nonempty_string(self, value: str, field_name: str) -> None:
         if not isinstance(value, str) or not value.strip():

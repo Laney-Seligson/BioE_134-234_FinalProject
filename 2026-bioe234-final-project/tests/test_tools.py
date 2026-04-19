@@ -16,8 +16,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from modules.seq_basics.tools.translate import translate
 from modules.seq_basics.tools.reverse_complement import reverse_complement
-from modules.seq_basics.tools.create_construction_file import create_construction_file
-from modules.seq_basics.tools.construction_file_validation import (
+from modules.crispr_tools.tools.create_construction_file import create_construction_file
+from modules.crispr_tools.tools.construction_file_validation import (
     validate_construction_record,
 )
 

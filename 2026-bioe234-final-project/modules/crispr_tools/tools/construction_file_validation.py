@@ -691,7 +691,6 @@ class ValidateConstructionFile:
     def run(
         self,
         construct_name: str,
-        host_organism: str,
         assembly_strategy: str,
         backbone_name: str,
         backbone_sequence: str,
@@ -727,19 +726,14 @@ class ValidateConstructionFile:
         if not isinstance(strict, bool):
             raise ConstructionValidationError("strict must be a boolean.")
 
-        host_organism = self.builder._normalize_host_organism(host_organism)
         assembly_strategy = self.builder._normalize_assembly_strategy(assembly_strategy)
 
         self.builder._require_nonempty_string(construct_name, "construct_name")
-        self.builder._require_nonempty_string(host_organism, "host_organism")
         self.builder._require_nonempty_string(assembly_strategy, "assembly_strategy")
         self.builder._require_nonempty_string(backbone_name, "backbone_name")
         self.builder._require_nonempty_string(backbone_sequence, "backbone_sequence")
         self.builder._require_nonempty_string(insert_name, "insert_name")
         self.builder._require_nonempty_string(insert_sequence, "insert_sequence")
-
-        if host_organism not in self.builder.supported_organisms:
-            raise ConstructionValidationError("host_organism must be E_coli for version 1.")
 
         if assembly_strategy not in self.builder.allowed_strategies:
             raise ConstructionValidationError(
@@ -793,7 +787,6 @@ class ValidateConstructionFile:
 
         structured_construction_file = {
             "construct_name": construct_name,
-            "host_organism": host_organism,
             "assembly_strategy": assembly_strategy,
             "parts": validated_parts,
             "operations": validated_operations,

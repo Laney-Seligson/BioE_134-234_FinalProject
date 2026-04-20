@@ -66,7 +66,6 @@ This tool generates a cloning construction workflow.
 For all workflows:
 
 * construct_name
-* host_organism
 * backbone_name
 * backbone_sequence
 * insert_name

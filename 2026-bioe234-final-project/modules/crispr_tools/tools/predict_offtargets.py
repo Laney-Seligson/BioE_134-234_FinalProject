@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-# I needed this for the type hints below — without it Python 3.9 complains
-# about using list[dict] instead of List[dict].
 from typing import Optional
 
 
-# helper function I use in two places: once to scan the minus strand,
-# and once to map positions back to forward-strand coordinates.
-# kept it outside the class so it's easy to reuse.
 def _reverse_complement(seq: str) -> str:
     complement = {"A": "T", "T": "A", "C": "G", "G": "C"}
-    # reversed() goes right to left, then complement maps each base
     return "".join(complement[b] for b in reversed(seq))
 
 
@@ -23,19 +17,23 @@ class PredictOfftargets:
         how many bases don't match at each position.
 
         Any site with mismatches at or below the threshold (default <= 3) gets
-        flagged. Logic: if guide is similar enough to another region of the genome, 
+        flagged. Logic: if guide is similar enough to another region of the genome,
         it can cut there too, which we do not want.
 
-        The scoring uses seed-region logic --> the "seed region"
-        is positions 1-12 counting from the PAM end of the guide. Mismatches
+        The scoring uses seed-region logic — the "seed region" is positions 1-12
+        counting from the PAM end of the guide (Hsu et al. 2013). Mismatches
         there are much more dangerous than mismatches at the far end, because
         that's where Cas9 first contacts the DNA.
 
         Also checks for an NGG PAM after each candidate site, since without a
-        PAM Cas9 basically can't cut (PAM-independent cleavage is very rare).
+        PAM Cas9 basically can't cut.
 
         The reference can be passed as a resource name like "pBR322", a raw
         sequence, FASTA, or GenBank — the framework handles the conversion.
+
+        Supports circular references (e.g. plasmids) via is_circular=True,
+        which wraps the sequence before scanning so sites spanning the origin
+        are not missed.
 
     Input:
         protospacer (str): the 20bp DNA protospacer sequence WITHOUT the PAM.
@@ -44,8 +42,9 @@ class PredictOfftargets:
         reference (str):   the DNA sequence to scan for off-target sites.
                            can be a resource name, raw string, FASTA, or GenBank.
         max_mismatches (int): how many mismatches to still flag as a potential
-                              off-target. default is 3. anything above 4 starts
-                              generating a lot of noise.
+                              off-target. default is 3.
+        is_circular (bool): if True, wraps the reference before scanning so
+                            sites spanning the origin are captured. default False.
 
     Output:
         dict with keys:
@@ -86,15 +85,16 @@ class PredictOfftargets:
             Input: protospacer="ATGATGATGATGATGATGAT", reference="ATGATGATGATGATGATGATAGG", max_mismatches=0
             Expected Output: only the exact-match site is returned
             Description: max_mismatches=0 means only perfect matches come through.
+        - Case:
+            Input: protospacer="ATGATGATGATGATGATGAT", reference="CCCCCCCCCCCCCCCCATGA", max_mismatches=3
+            Expected Output: site at position 19 has has_pam=False
+            Description: protospacer at last valid window with no room for PAM.
     """
 
-    # type annotation required by the course spec for class variables
     _seed_region_length: int
 
     def initiate(self) -> None:
-        # positions 1–12 from the PAM end are the seed region per Hsu et al. 2013.
-        # I'm storing this as an instance variable so I can reference it clearly
-        # in run() instead of just using a magic number 12 everywhere.
+        # positions 1-12 from the PAM end are the seed region per Hsu et al. 2013
         self._seed_region_length = 12
 
     def run(
@@ -102,20 +102,17 @@ class PredictOfftargets:
         protospacer: str,
         reference: str,
         max_mismatches: int = 3,
+        is_circular: bool = False,
     ) -> dict:
 
-        # clean up input just in case there's whitespace or lowercase
         protospacer = protospacer.upper().strip()
         reference = reference.upper().strip()
 
-        # basic validation before doing anything else
         if not protospacer:
             raise ValueError("Protospacer must not be empty.")
         if not reference:
             raise ValueError("Reference sequence must not be empty.")
 
-        # check that the protospacer only has standard bases, non-bases
-        # like N don't make sense in a guide sequence
         invalid_ps = [b for b in set(protospacer) if b not in "ATGC"]
         if invalid_ps:
             raise ValueError(
@@ -123,8 +120,6 @@ class PredictOfftargets:
                 "Only standard bases A, T, G, C are accepted."
             )
 
-        # reference can have N (unknown base) in a genome sequence,
-        # we just skip any window that contains one
         invalid_ref = [b for b in set(reference) if b not in "ATGCN"]
         if invalid_ref:
             raise ValueError(
@@ -133,50 +128,40 @@ class PredictOfftargets:
             )
 
         guide_len = len(protospacer)
+        ref_len = len(reference)
+
+        # for circular references, append enough bases to catch sites spanning the origin
+        wrap_len = guide_len + 3  # protospacer + PAM
+        scan_ref = reference + reference[:wrap_len] if is_circular else reference
 
         offtarget_sites = []
         sites_evaluated = 0
 
-        # scan both strands since CRISPR can target either one.
-        # for the minus strand I just take the reverse complement of the whole
-        # reference and scan that, then convert positions back at the end.
-        for strand, seq in [("+", reference), ("-", _reverse_complement(reference))]:
+        for strand, seq in [("+", scan_ref), ("-", _reverse_complement(scan_ref))]:
             for i in range(len(seq) - guide_len + 1):
                 window = seq[i : i + guide_len]
 
-                # skip windows with N (can't meaningfully compare an unknown base)
                 if "N" in window:
                     continue
 
                 sites_evaluated += 1
 
-                # count how many positions differ between the guide and this window
-                mismatches = sum(
-                    1 for a, b in zip(protospacer, window) if a != b
-                )
+                mismatches = sum(1 for a, b in zip(protospacer, window) if a != b)
 
-                # if it's too different, don't bother recording it
                 if mismatches > max_mismatches:
                     continue
 
-                # figure out WHICH positions have mismatches.
-                # position numbering: 1 = PAM-proximal end (the dangerous end),
-                # 20 = PAM-distal end (less dangerous).
-                # so position 1 = last base of the protospacer string (index 19)
+                # position numbering: 1 = PAM-proximal end (most dangerous)
                 mismatch_positions = []
                 for j in range(guide_len):
-                    # pam_proximal_idx maps j=0 → last base, j=1 → second-to-last, etc.
                     pam_proximal_idx = guide_len - 1 - j
                     if protospacer[pam_proximal_idx] != window[pam_proximal_idx]:
-                        mismatch_positions.append(j + 1)  # 1-indexed
+                        mismatch_positions.append(j + 1)
 
-                # how many of those mismatches are in the seed region (positions 1–12)?
                 seed_mismatches = sum(
                     1 for p in mismatch_positions if p <= self._seed_region_length
                 )
 
-                # check if there's an NGG PAM right after this window.
-                # NGG means position 1 can be anything, but positions 2 and 3 must be G.
                 pam_start = i + guide_len
                 has_pam = False
                 if pam_start + 2 < len(seq):
@@ -184,12 +169,6 @@ class PredictOfftargets:
                     if len(pam_candidate) == 3 and pam_candidate[1] == "G" and pam_candidate[2] == "G":
                         has_pam = True
 
-                # assign a risk level: 
-                # - exact match = always HIGH (this is probably the on-target site)
-                # - no seed mismatches + PAM present = HIGH (very likely to cut)
-                # - one seed mismatch + PAM = MEDIUM
-                # - 2 mismatches + PAM = MEDIUM
-                # - everything else = LOW
                 if mismatches == 0:
                     risk = "HIGH"
                 elif seed_mismatches == 0 and has_pam:
@@ -201,15 +180,12 @@ class PredictOfftargets:
                 else:
                     risk = "LOW"
 
-                # convert position back to forward-strand coordinates.
-                # on the forward strand this is just i.
-                # on the reverse strand I need to flip it: the window starting
-                # at position i in the RC sequence corresponds to the region
-                # ending at (len - i) in the original sequence.
+                # convert back to forward-strand coordinates in the original reference;
+                # for circular sequences, positions >= ref_len wrap back to 0-based origin
                 if strand == "+":
-                    reported_position = i
+                    reported_position = i % ref_len
                 else:
-                    reported_position = len(reference) - i - guide_len
+                    reported_position = (ref_len - i - guide_len) % ref_len
 
                 offtarget_sites.append({
                     "position": reported_position,
@@ -222,19 +198,16 @@ class PredictOfftargets:
                     "risk": risk,
                 })
 
-        # sort so the most dangerous sites (fewest mismatches, most seed mismatches) come first
         offtarget_sites.sort(key=lambda s: (s["mismatches"], -s["seed_mismatches"]))
 
         high_risk_count = sum(1 for s in offtarget_sites if s["risk"] == "HIGH")
 
-        # write a human-readable summary depending on what we found
         if not offtarget_sites:
             specificity_summary = (
                 f"No off-target sites found within {max_mismatches} mismatches, "
                 "the guide appears highly specific for this reference."
             )
         elif high_risk_count == 1 and offtarget_sites[0]["mismatches"] == 0:
-            # exactly one perfect match = that's just the on-target site
             specificity_summary = (
                 f"1 on-target site found (0 mismatches). "
                 f"{len(offtarget_sites) - 1} additional site(s) within "
@@ -249,7 +222,7 @@ class PredictOfftargets:
 
         return {
             "protospacer": protospacer,
-            "reference_length": len(reference),
+            "reference_length": ref_len,
             "strands_scanned": 2,
             "sites_evaluated": sites_evaluated,
             "offtarget_sites": offtarget_sites,
@@ -258,9 +231,6 @@ class PredictOfftargets:
         }
 
 
-# this is the pattern used throughout the project — instantiate the class once
-# at import time so you can also call predict_offtargets(...) directly without
-# having to create the class yourself every time
 _instance = PredictOfftargets()
 _instance.initiate()
 predict_offtargets = _instance.run

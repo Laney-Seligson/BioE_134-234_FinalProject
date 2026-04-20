@@ -3,28 +3,22 @@ from __future__ import annotations
 from typing import Optional
 
 
-# same helper as in predict_offtargets.
-# keeping it as a module-level function so the class stays clean.
 def _reverse_complement(seq: str) -> str:
     complement = {"A": "T", "T": "A", "C": "G", "G": "C"}
     return "".join(complement[b] for b in reversed(seq))
 
 
 def _find_protospacer_in_reference(protospacer: str, reference: str) -> tuple[int, str]:
-    # try forward strand first — just a simple string search
     pos = reference.find(protospacer)
     if pos != -1:
         return pos, "+"
 
-    # if not found, try the reverse complement of the protospacer.
-    # this handles the case where the guide targets the minus strand —
-    # the protospacer itself would appear as its RC in the forward sequence.
+    # guide targets the minus strand — protospacer appears as its RC in the forward sequence
     rc = _reverse_complement(protospacer)
     pos = reference.find(rc)
     if pos != -1:
         return pos, "-"
 
-    # if still not found, something is wrong — guide and reference don't match
     raise ValueError(
         f"Protospacer not found in reference sequence on either strand. "
         "Ensure the protospacer was designed from this reference."
@@ -38,22 +32,15 @@ def _design_sequencing_primer(
     primer_len: int = 20,
     offset: int = 150,
 ) -> tuple[str, int]:
-    # for the forward primer: go upstream (left) of the cut site by ~offset bp,
-    # then take primer_len bases going right. this gives a primer that reads
-    # toward the cut site during sequencing.
     if direction == "forward":
-        start = max(0, cut_position - offset)  # don't go below position 0
+        start = max(0, cut_position - offset)
         end = start + primer_len
-        # handle edge case if we're near the end of the sequence
         if end > len(reference):
             end = len(reference)
             start = max(0, end - primer_len)
         primer = reference[start:end]
         return primer, start
-
-    else:  # reverse primer
-        # go downstream (right) of the cut site by ~offset bp, take primer_len
-        # bases, then reverse complement — so it reads back toward the cut site
+    else:
         start = min(len(reference), cut_position + offset)
         end = start + primer_len
         if end > len(reference):
@@ -70,40 +57,32 @@ class VerifyEdit:
         where Cas9 cut and gives them everything they need to verify whether the
         edit actually worked.
 
-        The idea: Cas9 always cuts at the same predictable position, between
-        nucleotides 17 and 18 of the protospacer, counting from the PAM-distal
-        end (3bp upstream of the PAM). So if I know the protospacer and
-        the reference sequence, I can calculate the exact cut site.
+        Cas9 always cuts at the same predictable position: between nucleotides 17
+        and 18 of the protospacer (3bp upstream of the PAM). Given the protospacer
+        and reference sequence, this tool calculates the exact cut site, designs
+        two sequencing primers flanking it (~150bp each side), and returns a
+        step-by-step ICE/TIDE protocol.
 
-        Then, design two sequencing primers flanking that cut site (~150bp on
-        each side). PCR-amplify that region from your edited cells, send it
-        for Sanger sequencing, and upload the trace to ICE (Synthego) or TIDE. 
-        Those tools look for the characteristic "noisy" signal that appears 
-        downstream of the cut when a mix of edited and unedited cells is 
-        sequenced together.
-
-        Steps this function does:
-          1. finds the protospacer in the reference (forward or reverse strand)
-          2. checks the NGG PAM is actually there after it
-          3. calculates the cut position (between nt 17 and 18)
-          4. designs a forward sequencing primer ~150bp upstream
-          5. designs a reverse sequencing primer ~150bp downstream
-          6. extracts the expected amplicon sequence between those primers
-          7. returns a step-by-step ICE/TIDE protocol with the exact coordinates
+        ICE (Synthego) and TIDE (Brinkman et al. 2014) both work by detecting the
+        mixed/noisy Sanger signal that appears downstream of the cut when edited
+        and unedited alleles are sequenced together.
 
         Reference input can be a resource name like "pBR322", a raw sequence,
         FASTA, or GenBank — the framework resolves it automatically.
 
+        Supports circular references via is_circular=True so the protospacer
+        can be found even when it spans the origin of a plasmid.
+
     Input:
         protospacer (str): the 20bp DNA protospacer (no PAM) used in the edit.
                            e.g. "TCAGAAACCTGCCAGTTTGC"
-        reference (str):   the original unedited reference sequence — used to
-                           find the cut site and design primers. accepts resource
-                           name, raw string, FASTA, or GenBank.
+        reference (str):   the original unedited reference sequence. accepts
+                           resource name, raw string, FASTA, or GenBank.
         primer_offset (int): how far from the cut site to place the primers.
-                             default 150bp. if your reference is short (like a
-                             test sequence), reduce this to like 10 or 20.
+                             default 150bp.
         primer_len (int): length of the sequencing primers. default 20bp.
+        is_circular (bool): if True, wraps the reference before searching so
+                            protospacers spanning the origin are found. default False.
 
     Output:
         dict with these keys:
@@ -124,8 +103,12 @@ class VerifyEdit:
     Tests:
         - Case:
             Input: protospacer="TCAGAAACCTGCCAGTTTGC", reference="CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC"
-            Expected Output: cut_position is an int >= 0, pam_sequence == "TGG"
-            Description: standard BioE134 test sequence — should find protospacer at position 15, PAM TGG, cut at 32.
+            Expected Output: cut_position=32, pam_sequence="TGG", strand="+"
+            Description: standard forward-strand case.
+        - Case:
+            Input: protospacer="GCAAACTGGCAGGTTTCTGA", reference="CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACG..."
+            Expected Output: strand="-"
+            Description: reverse-complement protospacer — tool should find it on the minus strand.
         - Case:
             Input: protospacer="AAAAAAAAAAAAAAAAAAAA", reference="ATGCATGCATGC"
             Expected Exception: ValueError
@@ -141,7 +124,6 @@ class VerifyEdit:
     """
 
     def initiate(self) -> None:
-        # nothing to set up here — all the logic lives in run()
         pass
 
     def run(
@@ -150,9 +132,9 @@ class VerifyEdit:
         reference: str,
         primer_offset: int = 150,
         primer_len: int = 20,
+        is_circular: bool = False,
     ) -> dict:
 
-        # clean up input
         protospacer = protospacer.upper().strip()
         reference = reference.upper().strip()
 
@@ -161,7 +143,6 @@ class VerifyEdit:
         if not reference:
             raise ValueError("Reference sequence must not be empty.")
 
-        # protospacer should only have standard bases
         invalid_ps = [b for b in set(protospacer) if b not in "ATGC"]
         if invalid_ps:
             raise ValueError(
@@ -169,33 +150,30 @@ class VerifyEdit:
                 "Only standard bases A, T, G, C are accepted."
             )
 
-        # step 1: find where the protospacer is in the reference sequence.
-        # it could be on the forward strand or the reverse strand —
-        # _find_protospacer_in_reference checks both and tells us which.
-        ps_position, strand = _find_protospacer_in_reference(protospacer, reference)
+        # for circular references, wrap enough bases to catch sites spanning the origin
+        search_ref = reference + reference[:len(protospacer) + 3] if is_circular else reference
+        ps_position, strand = _find_protospacer_in_reference(protospacer, search_ref)
 
-        # step 2: verify the PAM is actually there.
-        # for the forward strand: PAM is the 3 bases immediately after the protospacer.
-        # for the reverse strand: it's more confusing — on the forward reference the
-        # PAM would appear as CCN (the RC of NGG) in the 3 bases BEFORE the RC protospacer.
+        # keep reported position within the original reference length
+        ref_len = len(reference)
+        ps_position = ps_position % ref_len
+
+        # verify PAM; on the minus strand the NGG appears as CCN before the RC protospacer
         if strand == "+":
             pam_start = ps_position + len(protospacer)
-            if pam_start + 3 > len(reference):
+            if pam_start + 3 > ref_len:
                 raise ValueError(
                     "Protospacer is at the very end of the reference — no room for a PAM. "
                     "Provide a longer reference sequence."
                 )
             pam_sequence = reference[pam_start : pam_start + 3]
-            # PAM must be xGG (NGG pattern — any base then two G's)
             if pam_sequence[1] != "G" or pam_sequence[2] != "G":
                 raise ValueError(
                     f"Expected NGG PAM after protospacer but found '{pam_sequence}'. "
                     "Ensure the protospacer was designed with an NGG PAM."
                 )
         else:
-            # on the minus strand, the PAM sits just to the left of the RC protospacer
-            # on the forward strand. it looks like CCN there, but converting it to RC
-            # gives us the NGG representation.
+            # on the minus strand, CCN (= RC of NGG) sits just left of the RC protospacer
             pam_start_fwd = ps_position - 3
             if pam_start_fwd < 0:
                 raise ValueError(
@@ -203,26 +181,16 @@ class VerifyEdit:
                     "Provide a longer reference sequence."
                 )
             pam_fwd = reference[pam_start_fwd : ps_position]
-            pam_sequence = _reverse_complement(pam_fwd)  # convert CCN → NGG view
+            pam_sequence = _reverse_complement(pam_fwd)
 
-        # step 3: calculate the cut position.
-        # Cas9 creates a blunt-end cut between positions 17 and 18 of the protospacer,
-        # which is 3bp upstream of the PAM. this is well established in the literature.
-        # on the forward strand: cut = start of protospacer + 17
-        # on the reverse strand: the math flips because everything is RC'd
+        # Cas9 cuts between nt 17 and 18, i.e. 3bp upstream of the PAM (well established)
         if strand == "+":
             cut_position = ps_position + 17
         else:
             cut_position = ps_position + len(protospacer) - 17
 
-        # clamp to valid range just in case (shouldn't happen with real sequences)
-        cut_position = max(0, min(cut_position, len(reference) - 1))
+        cut_position = max(0, min(cut_position, ref_len - 1))
 
-        # step 4: design the two sequencing primers flanking the cut site.
-        # forward primer goes upstream (left), reverse primer goes downstream (right).
-        # the offset controls how far from the cut site they start —
-        # 150bp is standard for Sanger sequencing window, but for short test sequences
-        # you'd pass a smaller number.
         fwd_primer, fwd_primer_pos = _design_sequencing_primer(
             reference, cut_position, "forward", primer_len=primer_len, offset=primer_offset
         )
@@ -230,18 +198,12 @@ class VerifyEdit:
             reference, cut_position, "reverse", primer_len=primer_len, offset=primer_offset
         )
 
-        # step 5: extract the amplicon — everything between the two primers.
-        # also calculate where the cut falls inside the amplicon (needed for ICE/TIDE).
         amplicon_start = fwd_primer_pos
-        amplicon_end = min(rev_primer_pos + primer_len, len(reference))
+        amplicon_end = min(rev_primer_pos + primer_len, ref_len)
         amplicon_sequence = reference[amplicon_start:amplicon_end]
         amplicon_length = len(amplicon_sequence)
         cut_offset_in_amplicon = cut_position - amplicon_start
 
-        # step 6: build the ICE/TIDE protocol with all the coordinates filled in.
-        # ICE = Synthego's web tool, TIDE = the original Brinkman et al. 2014 method.
-        # both work by looking at how the Sanger trace gets "noisy" at the cut site
-        # when you have a mix of edited and unedited alleles.
         interpretation_guide = (
             f"Edit Verification Protocol (ICE/TIDE):\n"
             f"\n"
@@ -290,10 +252,6 @@ class VerifyEdit:
         }
 
 
-# module-level alias: same pattern used in all the other tools in this project. either:
-#   from modules.crispr_tools.tools.verify_edit import verify_edit
-#   result = verify_edit(protospacer, reference)
-# or use the class directly if you need more control.
 _instance = VerifyEdit()
 _instance.initiate()
 verify_edit = _instance.run

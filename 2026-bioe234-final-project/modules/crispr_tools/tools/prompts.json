@@ -34,5 +34,29 @@
     "expected_tool": "crispr_design_cas12a_crrna",
     "expected_args": { "seq": "pBR322" },
     "notes": "Resource name input — scans full pBR322 sequence for best TTTV site."
+  },
+  {
+    "prompt": "Check if the guide TCAGAAACCTGCCAGTTTGC has any off-target sites in pBR322.",
+    "expected_tool": "crispr_predict_offtargets",
+    "expected_args": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "reference": "pBR322" },
+    "notes": "Resource name input — framework resolves pBR322 automatically. Tests off-target scan on a real plasmid."
+  },
+  {
+    "prompt": "Are there any off-target sites for ATGATGATGATGATGATGAT in the sequence ATGATGATGATGATGATGATAGG with up to 2 mismatches?",
+    "expected_tool": "crispr_predict_offtargets",
+    "expected_args": { "protospacer": "ATGATGATGATGATGATGAT", "reference": "ATGATGATGATGATGATGATAGG", "max_mismatches": 2 },
+    "notes": "Raw sequence input with explicit max_mismatches override."
+  },
+  {
+    "prompt": "I edited pBR322 using the guide TCAGAAACCTGCCAGTTTGC. How do I verify the edit worked?",
+    "expected_tool": "crispr_verify_edit",
+    "expected_args": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "reference": "pBR322" },
+    "notes": "Resource name input — returns cut site, sequencing primers, and ICE/TIDE protocol."
+  },
+  {
+    "prompt": "Design an ICE/TIDE verification plan for protospacer TCAGAAACCTGCCAGTTTGC in the sequence CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC.",
+    "expected_tool": "crispr_verify_edit",
+    "expected_args": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "reference": "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" },
+    "notes": "Raw sequence input — should find protospacer at position 15, PAM TGG, cut at 32."
   }
 ]

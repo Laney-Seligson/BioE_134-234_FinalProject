@@ -68,12 +68,12 @@ Use when the user asks to:
 Before calling this tool, gather all required fields for the selected assembly strategy.
 
 For all workflows:
-- construct_name
-- host_organism
-- backbone_name
-- backbone_sequence
-- insert_name
-- insert_sequence
+
+* construct_name
+* backbone_name
+* backbone_sequence
+* insert_name
+* insert_sequence
 
 For GoldenGate:
 - insert_forward_primer_name

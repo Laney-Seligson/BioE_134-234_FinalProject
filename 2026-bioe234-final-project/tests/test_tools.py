@@ -53,7 +53,6 @@ def test_translate_with_coordinates_and_frame():
 
 VALID_CONSTRUCTION_INPUT = {
     "construct_name": "pET28a_REP24",
-    "host_organism": "E_coli",
     "assembly_strategy": "GoldenGate",
     "backbone_name": "pET28a",
     "backbone_sequence": (
@@ -214,3 +213,49 @@ def test_verify_edit_empty_protospacer_raises():
 def test_verify_edit_empty_reference_raises():
     with pytest.raises(ValueError):
         verify_edit(protospacer=_VERIFY_PROTOSPACER, reference="")
+
+
+def test_verify_edit_reverse_strand():
+    # RC of _VERIFY_PROTOSPACER is GCAAACTGGCAGGTTTCTGA
+    # Build a reference that contains the RC (so the tool must search the minus strand)
+    rc_protospacer = "GCAAACTGGCAGGTTTCTGA"
+    # CCN before RC protospacer = PAM on minus strand (NGG when RC'd)
+    # prepend CCT (RC = AGG, an NGG) so the PAM is valid
+    reference = "AAAAAAAAAAAAAAAAAAAAACCT" + rc_protospacer + "AAAAAAAAAAAAAAAAAAAAAA"
+    result = verify_edit(protospacer=_VERIFY_PROTOSPACER, reference=reference)
+    assert result["strand"] == "-"
+    assert result["pam_sequence"][1] == "G"
+    assert result["pam_sequence"][2] == "G"
+    assert isinstance(result["cut_position"], int)
+
+
+# ---------------------------------------------------------------------------
+# Additional edge case tests
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_no_pam_at_end_of_reference():
+    # protospacer fits at position 0 but there is no room for a PAM after it
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = protospacer  # exactly 20 bp, no trailing bases
+    result = predict_offtargets(protospacer=protospacer, reference=reference, max_mismatches=0)
+    # the site should be found but has_pam must be False (no bases after the window)
+    assert len(result["offtarget_sites"]) >= 1
+    assert result["offtarget_sites"][0]["has_pam"] is False
+
+
+def test_predict_offtargets_circular_wraps_origin():
+    # Arrange so the protospacer straddles the circular origin:
+    #   reference = [protospacer[10:]] [AGG PAM] [filler] [protospacer[:10]]
+    # When the reference wraps, position 33 onward reads protospacer[:10] + protospacer[10:]
+    # = the full protospacer, with AGG at position 10 as the PAM.
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = protospacer[10:] + "AGG" + "CCCCCCCCCCCCCCCCCCCC" + protospacer[:10]
+    result_circular = predict_offtargets(
+        protospacer=protospacer, reference=reference, max_mismatches=0, is_circular=True
+    )
+    result_linear = predict_offtargets(
+        protospacer=protospacer, reference=reference, max_mismatches=0, is_circular=False
+    )
+    # circular scan should find the wrapped site; linear scan should miss it
+    assert len(result_circular["offtarget_sites"]) > len(result_linear["offtarget_sites"])
+

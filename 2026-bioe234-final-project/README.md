@@ -525,3 +525,77 @@ Activate your virtual environment first: `source .venv/bin/activate`.
 ## Still stuck?
 
 Email your TA: **javadamn@berkeley.edu**
+
+---
+
+## Individual Contributions — Jillian Ho
+
+This section documents the two tools I built for the `crispr_tools` module as my individual contribution to the group project.
+
+---
+
+### Tool 1: `crispr_predict_offtargets`
+
+**Files:** `modules/crispr_tools/tools/predict_offtargets.py`, `predict_offtargets.json`
+
+**What it does:**  
+Scans a reference DNA sequence for potential CRISPR off-target sites — locations where the guide RNA could accidentally bind and cause Cas9 to cut somewhere unintended. It slides a window across both strands of the reference, counts mismatches against the 20 bp protospacer, and scores each candidate site using seed-region weighting (Hsu et al. 2013) and PAM presence.
+
+**Inputs:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `protospacer` | string | yes | 20 bp DNA protospacer from gRNA design (no PAM) |
+| `reference` | string | yes | Reference sequence to scan — resource name, raw string, FASTA, or GenBank |
+| `max_mismatches` | integer | no | Max mismatches to report (default: 3) |
+
+**Output:**  
+A ranked list of off-target sites, each with position, strand, mismatch count, seed-region mismatches, PAM presence, and risk level (HIGH / MEDIUM / LOW), plus a one-sentence specificity summary.
+
+**Risk classification logic:**
+- HIGH: 0 mismatches, or seed-region mismatches = 0 and PAM present
+- MEDIUM: ≤1 seed mismatch + PAM, or ≤2 total mismatches + PAM
+- LOW: all other flagged sites
+
+The seed region is positions 1–12 from the PAM-proximal end, where Cas9 makes initial contact with DNA — mismatches there are more likely to still permit cutting.
+
+**Example usage (in the Gemini client):**
+```
+Check if the guide TCAGAAACCTGCCAGTTTGC has any off-target sites in pBR322.
+```
+
+---
+
+### Tool 2: `crispr_verify_edit`
+
+**Files:** `modules/crispr_tools/tools/verify_edit.py`, `verify_edit.json`
+
+**What it does:**  
+After a CRISPR experiment, calculates the expected Cas9 cut site for a given protospacer and designs flanking Sanger sequencing primers for ICE/TIDE analysis. This lets you verify whether editing actually occurred and estimate editing efficiency from sequencing trace data.
+
+**Inputs:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `protospacer` | string | yes | 20 bp DNA protospacer used during editing (no PAM) |
+| `reference` | string | yes | Original unedited reference sequence — resource name, raw string, FASTA, or GenBank |
+| `primer_offset` | integer | no | Distance in bp from cut site to each primer (default: 150) |
+| `primer_len` | integer | no | Sequencing primer length in bp (default: 20) |
+
+**Output:**
+- `cut_position`: where Cas9 cuts (between nt 17–18 of protospacer, 3 bp upstream of PAM)
+- `forward_primer` / `reverse_primer`: sequencing primer sequences and positions
+- `amplicon_sequence` / `amplicon_length`: the PCR product to sequence
+- `cut_offset_in_amplicon`: where the cut falls inside the amplicon (needed by ICE/TIDE)
+- `interpretation_guide`: step-by-step ICE/TIDE protocol with all coordinates filled in
+
+**Workflow:**
+1. Run the tool to get cut site, primers, and amplicon
+2. PCR-amplify the amplicon with the returned primers
+3. Sanger-sequence the PCR product
+4. Upload the `.ab1` trace to [ICE (Synthego)](https://ice.synthego.com) or TIDE with the amplicon sequence and cut offset
+
+**Example usage (in the Gemini client):**
+```
+I edited pBR322 using the guide TCAGAAACCTGCCAGTTTGC. How do I verify the edit worked?
+```

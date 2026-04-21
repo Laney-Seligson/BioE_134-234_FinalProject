@@ -1,0 +1,61 @@
+{
+  "id": "org.bioe134-234.function.crispr.species_recommender.v1",
+  "name": "Species-Aware CRISPR Recommender",
+  "description": "Given a target organism, recommends which CRISPR nuclease (Cas9 or Cas12a) and delivery method to use, with biological rationale. Covers 8 common model organisms including human, mouse, zebrafish, Drosophila, yeast, plant, E. coli, and rat.",
+  "type": "function",
+  "seq_params": [],
+  "keywords": [
+    "CRISPR",
+    "nuclease",
+    "delivery",
+    "species",
+    "Cas9",
+    "Cas12a",
+    "RNP",
+    "AAV",
+    "model organism",
+    "recommendation"
+  ],
+  "date_created": null,
+  "date_last_modified": null,
+  "inputs": [
+    {
+      "name": "species",
+      "type": "string",
+      "description": "Common name or Latin name of the target organism. e.g. 'mouse', 'Mus musculus', 'zebrafish', 'plant', 'E. coli'."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "object",
+      "description": "Nuclease and delivery recommendation for the given species.",
+      "properties": {
+        "species": { "type": "string" },
+        "nuclease": { "type": "string", "description": "Recommended CRISPR nuclease (Cas9 or Cas12a)." },
+        "delivery": { "type": "string", "description": "Recommended delivery method." },
+        "rationale": { "type": "string", "description": "Biological justification for the recommendation." },
+        "supported": { "type": "boolean" },
+        "note": { "type": "string", "description": "Present only when species is not in the database." }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "input": { "species": "mouse" },
+      "output": {
+        "species": "mouse",
+        "nuclease": "Cas9",
+        "delivery": "RNP microinjection (zygote) or AAV (somatic)",
+        "supported": true
+      }
+    }
+  ],
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/species_recommender.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "crispr_species_recommender"
+  }
+}

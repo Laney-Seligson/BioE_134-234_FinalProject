@@ -1,0 +1,72 @@
+{
+  "id": "org.bioe134-234.function.cloning.lab_sheet.v1",
+  "name": "Lab Sheet Generator",
+  "description": "Renders a bench-ready markdown protocol from a structured construction file. Outputs a printable lab sheet with reagent tables, volumes, and thermocycler programs for each cloning step (PCR, GoldenGate, Gibson, Transform).",
+  "type": "function",
+  "seq_params": [],
+  "keywords": [
+    "lab sheet",
+    "bench protocol",
+    "PCR",
+    "GoldenGate",
+    "Gibson",
+    "transformation",
+    "cloning",
+    "reagents",
+    "construction file"
+  ],
+  "date_created": null,
+  "date_last_modified": null,
+  "inputs": [
+    {
+      "name": "construction_record",
+      "type": "object",
+      "description": "The structured construction file dict from create_construction_file (the 'structured_construction_file' key). Must contain construct_name, assembly_strategy, and operations."
+    },
+    {
+      "name": "include_notes",
+      "type": "boolean",
+      "description": "If true, appends notes from the construction file at the bottom of the lab sheet. Default true."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "object",
+      "description": "Bench-ready lab sheet as markdown text.",
+      "properties": {
+        "construct_name": { "type": "string" },
+        "assembly_strategy": { "type": "string" },
+        "lab_sheet_md": { "type": "string", "description": "Full markdown text of the bench protocol." },
+        "step_count": { "type": "integer" }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "input": {
+        "construction_record": {
+          "construct_name": "pET28a_REP24",
+          "assembly_strategy": "GoldenGate",
+          "operations": [
+            { "type": "PCR", "template": "REP24", "primers": ["my_insert_fwd", "my_insert_rev"], "output": "ins_pcr" },
+            { "type": "GoldenGate", "enzyme": "BsaI", "inputs": ["ins_pcr", "vec_pcr"], "output": "pET28a_REP24" },
+            { "type": "Transform", "strain": "Mach1", "selection": "Kan", "temperature_c": 37 }
+          ]
+        }
+      },
+      "output": {
+        "construct_name": "pET28a_REP24",
+        "assembly_strategy": "GoldenGate",
+        "step_count": 3
+      }
+    }
+  ],
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/lab_sheet.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "generate_lab_sheet"
+  }
+}

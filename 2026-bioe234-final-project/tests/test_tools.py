@@ -20,6 +20,8 @@ from modules.crispr_tools.tools.create_construction_file import create_construct
 from modules.crispr_tools.tools.construction_file_validation import (
     validate_construction_record,
 )
+from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
+from modules.crispr_tools.tools.verify_edit import verify_edit
 
 
 def test_reverse_complement_basic():
@@ -51,7 +53,6 @@ def test_translate_with_coordinates_and_frame():
 
 VALID_CONSTRUCTION_INPUT = {
     "construct_name": "pET28a_REP24",
-    "host_organism": "E_coli",
     "assembly_strategy": "GoldenGate",
     "backbone_name": "pET28a",
     "backbone_sequence": (
@@ -123,3 +124,138 @@ def test_validate_construction_record_fails_with_bad_primer():
     assert report["step_results"][0]["step_type"] == "PCR"
     assert report["step_results"][0]["is_valid"] is False
     assert len(report["errors"]) >= 1
+
+
+# ---------------------------------------------------------------------------
+# predict_offtargets tests
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_exact_match_high_risk():
+    # exact match + NGG PAM → should be flagged HIGH risk
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference="ATGATGATGATGATGATGATAGG",
+    )
+    assert len(result["offtarget_sites"]) >= 1
+    top = result["offtarget_sites"][0]
+    assert top["mismatches"] == 0
+    assert top["has_pam"] is True
+    assert top["risk"] == "HIGH"
+
+
+def test_predict_offtargets_no_match_returns_empty():
+    # no similarity → no sites within default 3-mismatch threshold
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference="CCCCCCCCCCCCCCCCCCCCAGG",
+    )
+    # all sites should have mismatches > 0 (or list is empty)
+    for site in result["offtarget_sites"]:
+        assert site["mismatches"] > 0
+
+
+def test_predict_offtargets_empty_protospacer_raises():
+    with pytest.raises(ValueError):
+        predict_offtargets(protospacer="", reference="ATGATGATG")
+
+
+def test_predict_offtargets_empty_reference_raises():
+    with pytest.raises(ValueError):
+        predict_offtargets(protospacer="ATGATGATGATGATGATGAT", reference="")
+
+
+def test_predict_offtargets_max_mismatches_zero():
+    # with max_mismatches=0, only the perfect-match site should come back
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference="ATGATGATGATGATGATGATAGG",
+        max_mismatches=0,
+    )
+    for site in result["offtarget_sites"]:
+        assert site["mismatches"] == 0
+
+
+# ---------------------------------------------------------------------------
+# verify_edit tests
+# ---------------------------------------------------------------------------
+
+_VERIFY_REFERENCE = (
+    "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTT"
+    "AGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC"
+)
+_VERIFY_PROTOSPACER = "TCAGAAACCTGCCAGTTTGC"
+
+
+def test_verify_edit_standard_case():
+    # protospacer at position 15, PAM = TGG, cut at position 32
+    result = verify_edit(protospacer=_VERIFY_PROTOSPACER, reference=_VERIFY_REFERENCE)
+    assert isinstance(result["cut_position"], int)
+    assert result["cut_position"] >= 0
+    assert result["pam_sequence"] == "TGG"
+    assert result["strand"] == "+"
+    assert result["protospacer_position"] == 15
+    assert result["cut_position"] == 32
+
+
+def test_verify_edit_protospacer_not_in_reference_raises():
+    with pytest.raises(ValueError):
+        verify_edit(
+            protospacer="AAAAAAAAAAAAAAAAAAAA",
+            reference="ATGCATGCATGC",
+        )
+
+
+def test_verify_edit_empty_protospacer_raises():
+    with pytest.raises(ValueError):
+        verify_edit(protospacer="", reference="ATGCATGCATGC")
+
+
+def test_verify_edit_empty_reference_raises():
+    with pytest.raises(ValueError):
+        verify_edit(protospacer=_VERIFY_PROTOSPACER, reference="")
+
+
+def test_verify_edit_reverse_strand():
+    # RC of _VERIFY_PROTOSPACER is GCAAACTGGCAGGTTTCTGA
+    # Build a reference that contains the RC (so the tool must search the minus strand)
+    rc_protospacer = "GCAAACTGGCAGGTTTCTGA"
+    # CCN before RC protospacer = PAM on minus strand (NGG when RC'd)
+    # prepend CCT (RC = AGG, an NGG) so the PAM is valid
+    reference = "AAAAAAAAAAAAAAAAAAAAACCT" + rc_protospacer + "AAAAAAAAAAAAAAAAAAAAAA"
+    result = verify_edit(protospacer=_VERIFY_PROTOSPACER, reference=reference)
+    assert result["strand"] == "-"
+    assert result["pam_sequence"][1] == "G"
+    assert result["pam_sequence"][2] == "G"
+    assert isinstance(result["cut_position"], int)
+
+
+# ---------------------------------------------------------------------------
+# Additional edge case tests
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_no_pam_at_end_of_reference():
+    # protospacer fits at position 0 but there is no room for a PAM after it
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = protospacer  # exactly 20 bp, no trailing bases
+    result = predict_offtargets(protospacer=protospacer, reference=reference, max_mismatches=0)
+    # the site should be found but has_pam must be False (no bases after the window)
+    assert len(result["offtarget_sites"]) >= 1
+    assert result["offtarget_sites"][0]["has_pam"] is False
+
+
+def test_predict_offtargets_circular_wraps_origin():
+    # Arrange so the protospacer straddles the circular origin:
+    #   reference = [protospacer[10:]] [AGG PAM] [filler] [protospacer[:10]]
+    # When the reference wraps, position 33 onward reads protospacer[:10] + protospacer[10:]
+    # = the full protospacer, with AGG at position 10 as the PAM.
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = protospacer[10:] + "AGG" + "CCCCCCCCCCCCCCCCCCCC" + protospacer[:10]
+    result_circular = predict_offtargets(
+        protospacer=protospacer, reference=reference, max_mismatches=0, is_circular=True
+    )
+    result_linear = predict_offtargets(
+        protospacer=protospacer, reference=reference, max_mismatches=0, is_circular=False
+    )
+    # circular scan should find the wrapped site; linear scan should miss it
+    assert len(result_circular["offtarget_sites"]) > len(result_linear["offtarget_sites"])
+

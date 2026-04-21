@@ -1,0 +1,55 @@
+{
+  "id": "org.bioe234.function.crispr.design_cloning_oligos.v1",
+  "name": "CRISPR Cloning Oligo Designer",
+  "description": "Designs the top and bottom strand DNA oligos needed to clone a CRISPR protospacer into a restriction-digested expression vector. Works for any Cas system — overhangs are vector-specific inputs, defaulting to CACC/AAAC for BbsI-digested Cas9 vectors (pX330, Ran et al. 2013).",
+  "type": "function",
+  "keywords": ["CRISPR", "cloning", "oligo", "protospacer", "BbsI", "pX330", "ligation", "guide RNA", "Ran"],
+  "date_created": null,
+  "date_last_modified": null,
+
+  "inputs": [
+    {
+      "name": "protospacer",
+      "type": "string",
+      "description": "The DNA protospacer sequence to clone (20 bp for Cas9, 23 bp for Cas12a). Raw DNA string only — A, T, G, C bases."
+    },
+    {
+      "name": "top_overhang",
+      "type": "string",
+      "description": "5' overhang for the top strand oligo, determined by the restriction enzyme used to linearize the vector. Default is 'CACC' for BbsI-digested pX330."
+    },
+    {
+      "name": "bottom_overhang",
+      "type": "string",
+      "description": "5' overhang for the bottom strand oligo. Default is 'AAAC' for BbsI-digested pX330."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dictionary with top_oligo (str), bottom_oligo (str), g_prepended (bool, True if G was added for U6 promoter compatibility), and notes (str)."
+    }
+  ],
+
+  "examples": [
+    {
+      "input":  { "protospacer": "TCAGAAACCTGCCAGTTTGC", "top_overhang": "CACC", "bottom_overhang": "AAAC" },
+      "output": { "result": { "top_oligo": "CACCTCAGAAACCTGCCAGTTTGC", "bottom_oligo": "AAACGCAAACTGGCAGGTTTCTGA", "g_prepended": false } }
+    },
+    {
+      "input":  { "protospacer": "ACAGAAACCTGCCAGTTTGC", "top_overhang": "CACC", "bottom_overhang": "AAAC" },
+      "output": { "result": { "top_oligo": "CACCGACAGAAACCTGCCAGTTTGC", "bottom_oligo": "AAACGCAAACTGGCAGGTTTCTGT", "g_prepended": true } }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/design_cloning_oligos.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_design_cloning_oligos"
+  }
+}

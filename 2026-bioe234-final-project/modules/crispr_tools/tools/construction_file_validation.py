@@ -872,10 +872,6 @@ def find_all_forward_matches(
     template: str,
     min_anneal_len: int = 12,
 ) -> List[dict]:
-    """
-    Find all possible forward-primer annealing matches.
-    A forward primer anneals via a suffix at its 3' end.
-    """
     primer = normalize_sequence(primer)
     template = normalize_sequence(template)
 
@@ -917,10 +913,6 @@ def find_all_reverse_matches(
     template: str,
     min_anneal_len: int = 12,
 ) -> List[dict]:
-    """
-    Find all possible reverse-primer annealing matches on the template.
-    The reverse primer binds via the reverse complement of its 3' suffix.
-    """
     reverse_primer = normalize_sequence(reverse_primer)
     template = normalize_sequence(template)
 
@@ -1031,6 +1023,8 @@ def choose_best_pcr_product(
                     }
                 )
             else:
+                # For circular templates, require the reverse site to be downstream
+                # of the forward site on the doubled template.
                 if rev_start <= fwd_start:
                     continue
                 if fwd_end > rev_start:
@@ -1178,11 +1172,10 @@ def validate_pcr_step(
                 f"PCR output '{output_name}' does not match the expected sequence."
             )
 
-    message = (
-        "PCR step validated successfully on circular plasmid template."
-        if is_circular
-        else "PCR step validated successfully."
-    )
+    if is_circular:
+        message = "PCR step validated successfully on circular plasmid template."
+    else:
+        message = "PCR step validated successfully."
 
     return {
         "step_number": step.get("step_number"),
@@ -1420,7 +1413,6 @@ def validate_construction_record(
         )
 
     part_lookup = build_part_lookup(parts)
-    produced_sequences: Dict[str, str] = {}
 
     report = {
         "construct_name": structured_construction_file.get("construct_name"),
@@ -1434,15 +1426,14 @@ def validate_construction_record(
     for step in operations:
         step_type = step.get("step_type")
 
-        try:
-            if step_type == "PCR":
+        if step_type == "PCR":
+            try:
                 step_result = validate_pcr_step(
                     step=step,
                     part_lookup=part_lookup,
                     expected_sequences=expected_sequences,
                     min_anneal_len=min_anneal_len,
                 )
-                produced_sequences[step_result["output_name"]] = step_result["details"]["predicted_sequence"]
                 report["step_results"].append(step_result)
 
             elif step_type == "GoldenGate":

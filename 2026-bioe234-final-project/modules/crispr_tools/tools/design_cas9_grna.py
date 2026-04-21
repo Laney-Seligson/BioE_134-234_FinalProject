@@ -146,6 +146,7 @@ class DesignCas9Grna:
 
         return {
             "grna_sequence": grna_rna,
+            "grna_dna": grna_dna,
             "protospacer": best["protospacer"],
             "pam_site": best["pam"],
             "gc_fraction": best["gc_fraction"],

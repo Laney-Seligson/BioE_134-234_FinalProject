@@ -22,8 +22,9 @@ _RESOURCE_PATHS: dict[str, Path] = {}
 
 
 def register_resource(name: str, path: Path) -> None:
-    """Register a resource name -> file path mapping."""
-    _RESOURCE_PATHS[name] = path
+    """Register a resource name -> file path mapping. First registration wins."""
+    if name not in _RESOURCE_PATHS:
+        _RESOURCE_PATHS[name] = path
 
 
 def get_resource_path(name: str) -> Optional[Path]:

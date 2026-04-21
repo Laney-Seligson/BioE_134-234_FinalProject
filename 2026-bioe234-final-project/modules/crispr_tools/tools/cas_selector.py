@@ -1,23 +1,27 @@
 class CasSelector:
     """
     Description:
-        Analyzes the GC and AT content of a DNA sequence and recommends
-        whether to use Cas9 or Cas12a for CRISPR editing in that organism.
+        Counts the available PAM sites in a DNA sequence and recommends
+        whether to use Cas9 or Cas12a for CRISPR editing.
 
-        Cas9 (e.g. SpCas9) uses an NGG PAM site. NGG PAM sites occur more
-        frequently in GC-rich genomes, making Cas9 the better choice when
-        GC content >= 50%.
+        Rather than using a fixed GC% threshold, this tool directly counts
+        how many target sites each nuclease can reach in the sequence:
 
-        Cas12a (e.g. AsCas12a / LbCas12a) uses a TTTV PAM site (where V is
-        A, C, or G). TTTV PAM sites are more abundant in AT-rich genomes,
-        making Cas12a the better choice when AT content > GC content
-        (i.e. GC content < 50%).
+            Cas9 (SpCas9) requires an NGG PAM site (G-rich, 3' of protospacer).
+            Cas12a (LbCas12a) requires a TTTV PAM site (T-rich, 5' of protospacer,
+            where V = A, C, or G).
+
+        The nuclease with more available PAM sites in the sequence is recommended.
+        This approach is grounded in the literature: PAM site density directly
+        determines how many genomic loci each system can target (Zetsche et al.
+        2015, Nature Biotechnology; Addgene CRISPR Guide).
+
+        Both strands are scanned since either strand can serve as the target.
+        Ties default to Cas9 as the more broadly validated system.
 
         The framework resolves the input before calling run(): a GenBank file,
         FASTA string, resource name (e.g. "pBR322"), or a raw sequence string
         are all accepted and converted to a clean uppercase sequence automatically.
-        IUPAC ambiguity bases (e.g. N) are ignored and not counted toward
-        either GC or AT totals.
 
     Input:
         seq (str): DNA sequence. Accepts a resource name, a raw sequence
@@ -26,28 +30,20 @@ class CasSelector:
 
     Output:
         dict: A dictionary with keys:
-            - gc_fraction (float): Fraction of G/C bases out of counted bases (0.0 to 1.0).
-            - at_fraction (float): Fraction of A/T bases out of counted bases (0.0 to 1.0).
+            - ngg_count (int): Number of NGG PAM sites found (both strands).
+            - tttv_count (int): Number of TTTV PAM sites found (both strands).
             - recommendation (str): "Cas9" or "Cas12a".
             - rationale (str): One-sentence explanation of the recommendation.
 
     Tests:
         - Case:
-            Input: seq="GCGCGCGCGC"
-            Expected Output: {"gc_fraction": 1.0, "at_fraction": 0.0, "recommendation": "Cas9"}
-            Description: All-GC sequence should recommend Cas9.
+            Input: seq="GCGCGCGCGCGG"
+            Expected Output: {"recommendation": "Cas9"}
+            Description: GC-rich sequence has more NGG PAM sites.
         - Case:
-            Input: seq="ATATATATAT"
-            Expected Output: {"gc_fraction": 0.0, "at_fraction": 1.0, "recommendation": "Cas12a"}
-            Description: All-AT sequence should recommend Cas12a.
-        - Case:
-            Input: seq="ATGCATGC"
-            Expected Output: {"gc_fraction": 0.5, "at_fraction": 0.5, "recommendation": "Cas9"}
-            Description: Exactly 50% GC defaults to Cas9.
-        - Case:
-            Input: seq="ATGCNNNN"
-            Expected Output: {"gc_fraction": 0.5, "at_fraction": 0.5, "recommendation": "Cas9"}
-            Description: Ambiguous N bases are ignored; fractions computed from ATGC only.
+            Input: seq="ATTTAATTTAATTTC"
+            Expected Output: {"recommendation": "Cas12a"}
+            Description: AT-rich sequence has more TTTV PAM sites.
         - Case:
             Input: seq=""
             Expected Exception: ValueError
@@ -55,43 +51,60 @@ class CasSelector:
     """
 
     def initiate(self) -> None:
-        pass  # no setup needed
+        pass
+
+    def _reverse_complement(self, seq: str) -> str:
+        complement = {"A": "T", "T": "A", "G": "C", "C": "G"}
+        return "".join(complement.get(b, "N") for b in reversed(seq))
 
     def run(self, seq: str) -> dict:
-        """Return GC/AT fractions and a Cas9-vs-Cas12a recommendation."""
+        """Count NGG and TTTV PAM sites on both strands and recommend a Cas system."""
         seq = seq.upper()
 
         if not seq:
             raise ValueError("Sequence must not be empty.")
 
-        gc = sum(1 for b in seq if b in "GC")
-        at = sum(1 for b in seq if b in "AT")
-        counted = gc + at  # ignore IUPAC ambiguity bases
+        if len(seq) < 4:
+            raise ValueError("Sequence is too short to contain any PAM sites.")
 
-        if counted == 0:
-            raise ValueError(
-                "Sequence contains no countable A/T/G/C bases."
-            )
+        rc = self._reverse_complement(seq)
 
-        gc_fraction = gc / counted
-        at_fraction = at / counted
+        # Count NGG PAM sites on both strands (Cas9)
+        ngg_count = sum(
+            1 for i in range(len(seq) - 2)
+            if seq[i + 1] == "G" and seq[i + 2] == "G"
+        ) + sum(
+            1 for i in range(len(rc) - 2)
+            if rc[i + 1] == "G" and rc[i + 2] == "G"
+        )
 
-        if gc_fraction >= 0.5:
+        # Count TTTV PAM sites on both strands (LbCas12a, V = A/C/G)
+        tttv_count = sum(
+            1 for i in range(len(seq) - 3)
+            if seq[i] == "T" and seq[i + 1] == "T" and seq[i + 2] == "T"
+            and seq[i + 3] in "ACG"
+        ) + sum(
+            1 for i in range(len(rc) - 3)
+            if rc[i] == "T" and rc[i + 1] == "T" and rc[i + 2] == "T"
+            and rc[i + 3] in "ACG"
+        )
+
+        if ngg_count >= tttv_count:
             recommendation = "Cas9"
             rationale = (
-                f"GC content is {gc_fraction:.1%}, so NGG PAM sites (used by Cas9) "
-                "are relatively abundant — Cas9 is the preferred CRISPR nuclease."
+                f"Found {ngg_count} NGG PAM sites vs {tttv_count} TTTV PAM sites — "
+                "Cas9 has more targetable sites in this sequence."
             )
         else:
             recommendation = "Cas12a"
             rationale = (
-                f"AT content is {at_fraction:.1%}, so TTTV PAM sites (used by Cas12a) "
-                "are relatively abundant — Cas12a is the preferred CRISPR nuclease."
+                f"Found {tttv_count} TTTV PAM sites vs {ngg_count} NGG PAM sites — "
+                "Cas12a (LbCas12a) has more targetable sites in this sequence."
             )
 
         return {
-            "gc_fraction": round(gc_fraction, 4),
-            "at_fraction": round(at_fraction, 4),
+            "ngg_count": ngg_count,
+            "tttv_count": tttv_count,
             "recommendation": recommendation,
             "rationale": rationale,
         }
@@ -99,4 +112,4 @@ class CasSelector:
 
 _instance = CasSelector()
 _instance.initiate()
-cas_selector = _instance.run   # cas_selector("ATGCATGC") → dict
+cas_selector = _instance.run

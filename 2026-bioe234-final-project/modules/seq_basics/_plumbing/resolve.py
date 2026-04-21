@@ -95,7 +95,15 @@ def _parse_file(path: Path) -> str:
         except Exception:
             raise ValueError(f"Could not parse file: {path}")
 
-    record = SeqIO.read(path, fmt)
+    # SeqIO.parse() returns a lazy generator — it reads one record at a time
+    # without loading the entire file into memory. This handles multi-record
+    # files (e.g. FASTA with multiple isoforms) where SeqIO.read() would fail.
+    # next() pulls just the first record from the generator; the second argument
+    # (None) is the default returned if the file is empty instead of raising
+    # StopIteration.
+    record = next(SeqIO.parse(path, fmt), None)
+    if record is None:
+        raise ValueError(f"No records found in file: {path}")
     return str(record.seq).upper()
 
 

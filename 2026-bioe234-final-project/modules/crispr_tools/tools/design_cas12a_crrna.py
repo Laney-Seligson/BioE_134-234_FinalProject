@@ -1,14 +1,14 @@
 class DesignCas12aCrrna:
     """
     Description:
-        Designs an optimal FnCas12a CRISPR RNA (crRNA) for a given DNA target sequence.
+        Designs an optimal LbCas12a CRISPR RNA (crRNA) for a given DNA target sequence.
 
         Finds every valid TTTV PAM site in the sequence (where V = A, C, or G),
         extracts the 23 bp protospacer immediately DOWNSTREAM of each PAM, and
         scores each candidate using efficiency rules drawn from two papers:
 
             Zetsche et al. 2015 (Nature Biotechnology 33, 551-557.
-            DOI: 10.1038/nbt.3347) — established the FnCas12a PAM (TTTV),
+            DOI: 10.1038/nbt.3347) — established the LbCas12a PAM (TTTV),
             protospacer orientation (downstream of PAM), and crRNA structure
             (direct repeat + 23 bp spacer).
 
@@ -30,7 +30,7 @@ class DesignCas12aCrrna:
         Each rule contributes 1 point to an efficiency score (0-3). The
         candidate with the highest score is selected. If multiple candidates
         tie, the first occurrence is returned. The selected protospacer is
-        prepended with the FnCas12a direct repeat and converted from DNA to
+        prepended with the LbCas12a direct repeat and converted from DNA to
         RNA (T -> U).
 
         Key difference from Cas9: the protospacer lies DOWNSTREAM of the PAM
@@ -75,13 +75,15 @@ class DesignCas12aCrrna:
     _valid_v_bases: str
 
     def initiate(self) -> None:
-        # FnCas12a direct repeat sequence — from Zetsche et al. 2015
-        self._direct_repeat = "AATTTCTACTGTTGTAGAT"
+        # LbCas12a direct repeat sequence — from Zetsche et al. 2015
+        # LbCas12a direct repeat — from Zetsche et al. 2015 (20 nt, differs from FnCas12a's 19 nt)
+        self._direct_repeat = "AATTTCTACTAAGTGTAGAT"
         # V in TTTV = any base except T
         self._valid_v_bases = "ACG"
 
     def run(self, seq: str) -> dict:
-        """Find the best FnCas12a protospacer in seq and return the full crRNA."""
+        """Find the best LbCas12a protospacer in seq and return the full crRNA."""
+
         seq = seq.upper()  # from BioE134 homework: uppercase input before processing
 
         if not seq:
@@ -153,7 +155,7 @@ class DesignCas12aCrrna:
                 "be reduced at the PAM-proximal position (Pausch et al. 2020)."
             )
 
-        # Build full crRNA: direct repeat + protospacer spacer — from BioE134 homework: design_FnCas12a_crRNA logic
+        # Build full crRNA: LbCas12a direct repeat + protospacer — from BioE134 homework: design_crRNA logic
         crrna_dna = self._direct_repeat + best["protospacer"]
 
         # Convert T -> U to produce RNA — from BioE134 homework: design_cas9_gRNA T->U logic

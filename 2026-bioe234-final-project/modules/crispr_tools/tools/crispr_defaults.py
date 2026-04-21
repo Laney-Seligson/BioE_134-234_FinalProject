@@ -26,6 +26,5 @@ E_COLI_PCRISPR_DEFAULTS = {
 
 
 DEFAULT_VECTOR_BY_REFERENCE = {
-    "mouse_apoe": "px330",
-    "ecoli_ebgr": E_COLI_PCRISPR_DEFAULTS["vector_key"],
+    "ecoli_rpsl": E_COLI_PCRISPR_DEFAULTS["vector_key"],
 }

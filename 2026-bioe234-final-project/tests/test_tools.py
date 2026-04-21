@@ -17,6 +17,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from modules.seq_basics.tools.translate import translate
 from modules.seq_basics.tools.reverse_complement import reverse_complement
 from modules.crispr_tools.tools.create_construction_file import create_construction_file
+from modules.crispr_tools.tools.design_cloning_oligos import design_cloning_oligos
 from modules.crispr_tools.tools.construction_file_validation import (
     validate_construction_record,
 )
@@ -85,6 +86,33 @@ def test_create_construction_file_basic():
     assert result["assembly_strategy"] == "GoldenGate"
     assert "structured_construction_file" in result
     assert "construction_file_txt" in result
+
+
+def test_design_cloning_oligos_defaults_to_ecoli_pcrispr_reference():
+    result = design_cloning_oligos(
+        protospacer="TACTTTACGCAGCGCGGAGT",
+        organism="E. coli",
+        target_reference="ecoli_rpsl",
+    )
+
+    assert result["vector"] == "pcrispr"
+    assert result["enzyme"] == "BsaI"
+    assert result["source"].startswith("Jiang et al. Nat Biotechnol 2013")
+    assert result["target_verification"]["verified"] is True
+    assert result["target_verification"]["reference"] == "ecoli_rpsl"
+    assert result["top_oligo"] == "AAACTACTTTACGCAGCGCGGAGT"
+    assert result["bottom_oligo"] == "AAAACACTCCGCGCTGCGTAAAGTA"
+    assert result["construction_file_inputs"]["cell_strain"] == "HME63 or MG1655 carrying pCas9"
+    assert result["construction_file_inputs"]["selection"] == "Kan"
+
+
+def test_design_cloning_oligos_rejects_unsupported_organism_verification():
+    with pytest.raises(ValueError, match="downloaded local references"):
+        design_cloning_oligos(
+            protospacer="CCGGATGCTCCTCAGCTCTG",
+            vector="pET28a",
+            organism="zebrafish",
+        )
 
 
 def test_validate_construction_record_name_agnostic():
@@ -258,4 +286,3 @@ def test_predict_offtargets_circular_wraps_origin():
     )
     # circular scan should find the wrapped site; linear scan should miss it
     assert len(result_circular["offtarget_sites"]) > len(result_linear["offtarget_sites"])
-

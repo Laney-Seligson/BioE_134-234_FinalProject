@@ -1,0 +1,78 @@
+{
+  "id": "org.bioe234.function.crispr.design_crispr_cloning_workflow.v1",
+  "name": "CRISPR Guide And Cloning Workflow",
+  "description": "Runs the full local CRISPR workflow for a target sequence: first calls the PAM-density Cas selector to choose Cas9 or Cas12a, then designs the matching guide, verifies the protospacer against a local downloaded reference when supplied, and returns cloning oligos plus construction_file_inputs. Use this when the user asks for guide design and cloning oligos without explicitly specifying Cas9 or Cas12a.",
+  "type": "function",
+  "keywords": [
+    "CRISPR",
+    "Cas selector",
+    "Cas9",
+    "Cas12a",
+    "guide RNA",
+    "cloning oligos",
+    "construction file",
+    "local reference"
+  ],
+  "date_created": null,
+  "date_last_modified": null,
+  "inputs": [
+    {
+      "name": "seq",
+      "type": "string",
+      "description": "Target DNA sequence to analyze. Accepts a resource name such as ecoli_rpsl, a raw sequence string, FASTA content, or GenBank content. The MCP framework resolves this to a clean DNA sequence before execution."
+    },
+    {
+      "name": "organism",
+      "type": "string",
+      "description": "Optional organism alias used for target verification and vector defaults, such as e_coli."
+    },
+    {
+      "name": "target_reference",
+      "type": "string",
+      "description": "Optional explicit local reference name used to verify the selected protospacer. Supported value is ecoli_rpsl."
+    },
+    {
+      "name": "vector",
+      "type": "string",
+      "description": "Optional vector override. If omitted, local references choose defaults when available: ecoli_rpsl uses pcrispr."
+    },
+    {
+      "name": "construct_name",
+      "type": "string",
+      "description": "Optional final construct name to include in construction_file_inputs."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A workflow result containing cas_selection, selected_cas, guide_design, protospacer, pam_site, cloning_oligos, target_verification, top_oligo, bottom_oligo, and construction_file_inputs."
+    }
+  ],
+  "examples": [
+    {
+      "input": {
+        "seq": "ecoli_rpsl",
+        "organism": "e_coli",
+        "target_reference": "ecoli_rpsl"
+      },
+      "output": {
+        "result": {
+          "selected_cas": "Cas9",
+          "target_verification": {
+            "verified": true,
+            "reference": "ecoli_rpsl"
+          }
+        }
+      }
+    }
+  ],
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/design_crispr_cloning_workflow.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "crispr_design_cloning_workflow",
+    "seq_params": ["seq"]
+  }
+}

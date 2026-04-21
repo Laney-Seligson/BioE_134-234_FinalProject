@@ -1,3 +1,5 @@
+# 
+
 class CreateConstructionFile:
     """
     Description:
@@ -72,7 +74,7 @@ class CreateConstructionFile:
 
         assembly_strategy = self._normalize_assembly_strategy(assembly_strategy)
 
-# Fail early if seq_params did not resolve properly
+        # Fail early if seq_params did not resolve properly
         for field_name, seq_value in (
             ("backbone_sequence", backbone_sequence),
             ("insert_sequence", insert_sequence),
@@ -156,7 +158,6 @@ class CreateConstructionFile:
             "construction_file_txt": construction_file_txt,
             "text": construction_file_txt,
         }
-    
 
     def _require_nonempty_string(self, value: str, field_name: str) -> None:
         if not isinstance(value, str) or not value.strip():
@@ -322,7 +323,8 @@ class CreateConstructionFile:
                         "step_type": "Gibson",
                         "inputs": [vector_pcr_product, insert_pcr_product],
                         "parameters": {
-                            "overlap_notes": "Primer-designed Gibson overlaps"
+                            "reagent": "GibsonMix",
+                            "overlap_bp": 20
                         },
                         "output": construct_name
                     }
@@ -578,14 +580,12 @@ class CreateConstructionFile:
                 )
 
             elif step_type == "Gibson":
-                overlap_value = str(
-                    parameters.get("overlap_bp", parameters.get("overlap_notes", ""))
-                )
+                reagent = parameters.get("reagent", "GibsonMix")
                 lines.append(
                     f"{'Gibson':<14}"
                     f"{inputs[0] if len(inputs) > 0 else '':<14}"
                     f"{inputs[1] if len(inputs) > 1 else '':<14}"
-                    f"{overlap_value:<18}"
+                    f"{reagent:<18}"
                     f"{output}"
                 )
 
@@ -621,8 +621,7 @@ class CreateConstructionFile:
             )
 
         return "\n".join(lines)
-    
-    
+
     def _normalize_assembly_strategy(self, strategy: str) -> str:
         if not isinstance(strategy, str) or not strategy.strip():
             raise ValueError("assembly_strategy must be a non-empty string.")
@@ -641,6 +640,7 @@ class CreateConstructionFile:
 _instance = CreateConstructionFile()
 _instance.initiate()
 create_construction_file = _instance.run
+
 
 def prompt_optional(prompt_text: str) -> str:
     value = input(prompt_text).strip()
@@ -691,7 +691,9 @@ def main() -> None:
     vector_reverse_primer_sequence = ""
     enzyme = ""
 
-    if assembly_strategy in {"GoldenGate", "Gibson"}:
+    normalized_strategy = assembly_strategy.strip().lower().replace("_", "").replace(" ", "")
+
+    if normalized_strategy in {"goldengate", "gibson"}:
         print("\n--- Primer information required for this strategy ---")
         insert_forward_primer_name = prompt_required("Insert forward primer name: ")
         insert_forward_primer_sequence = prompt_required("Insert forward primer sequence: ")
@@ -703,7 +705,7 @@ def main() -> None:
         vector_reverse_primer_name = prompt_required("Vector reverse primer name: ")
         vector_reverse_primer_sequence = prompt_required("Vector reverse primer sequence: ")
 
-    if assembly_strategy == "GoldenGate":
+    if normalized_strategy == "goldengate":
         enzyme = prompt_required("Assembly enzyme: ")
 
     print("\n--- Optional transformation information ---")

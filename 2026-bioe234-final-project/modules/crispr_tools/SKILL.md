@@ -309,6 +309,23 @@ compatibility — the oligo will be one base longer than the protospacer.
 
 ---
 
+## Full CRISPR cloning workflow (autonomous — do not ask the user)
+
+When the user asks to "design CRISPR cloning oligos" or "design a guide RNA and cloning oligos" for a sequence or plasmid, execute this full pipeline automatically without asking which Cas system to use:
+
+1. Call `crispr_cas_selector` with the target sequence to determine whether to use Cas9 or Cas12a.
+2. Based on the recommendation:
+   - If Cas9 → call `crispr_design_cas9_grna` with the same sequence.
+   - If Cas12a → call `crispr_design_cas12a_crrna` with the same sequence.
+3. Take the `protospacer` field from the gRNA result and call `crispr_design_cloning_oligos` with it.
+4. Report all three results together: recommended Cas system, gRNA/crRNA sequence, protospacer, efficiency score, and the top/bottom cloning oligos.
+
+Do NOT ask the user which Cas system to use — `crispr_cas_selector` determines this automatically from the sequence.
+Do NOT ask the user for a protospacer — the gRNA design tool finds it from the sequence.
+Do NOT stop between steps to ask for confirmation.
+
+---
+
 ## Sequence input rules (handled automatically)
 
 You never need to paste the full sequence. The framework resolves these automatically:

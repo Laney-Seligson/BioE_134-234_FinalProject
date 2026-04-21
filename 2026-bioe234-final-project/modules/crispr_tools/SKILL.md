@@ -30,6 +30,13 @@ as the sequence argument — do not ask the user to paste the sequence.
 When a user refers to "pET28a", use the resource name `"pET28a"` directly
 as the sequence argument — do not ask the user to paste the sequence.
 
+| Resource name | Description |
+|---------------|-------------|
+| `pUC19`      | E. coli cloning vector pUC19, 2686 bp, circular, double-stranded. Widely used circular DNA cloning plasmid designed for easy insertion and propagation of foreign DNA in bacteria. It contains key features like a multiple cloning site (polylinker) within the lac operon for insertion of DNA fragments and sequences derived from pBR322 for replication and maintenance in host cells. |
+
+When a user refers to "pUC19", use the resource name `"pUC19"` directly
+as the sequence argument — do not ask the user to paste the sequence.
+
 ---
 
 ## Tools and when to use them

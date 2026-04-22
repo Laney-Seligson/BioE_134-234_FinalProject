@@ -23,6 +23,7 @@ from modules.crispr_tools.tools.construction_file_validation import (
 )
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.verify_edit import verify_edit
+from modules.crispr_tools.tools.lab_sheet import lab_sheet
 
 
 def test_reverse_complement_basic():
@@ -286,3 +287,185 @@ def test_predict_offtargets_circular_wraps_origin():
     )
     # circular scan should find the wrapped site; linear scan should miss it
     assert len(result_circular["offtarget_sites"]) > len(result_linear["offtarget_sites"])
+
+
+# ---------------------------------------------------------------------------
+# lab_sheet tests
+# ---------------------------------------------------------------------------
+
+def _make_record(strategy="GoldenGate", selection="Kan"):
+    ops = [
+        {
+            "step_number": 1,
+            "step_type": "PCR",
+            "inputs": ["ins_fwd", "ins_rev", "insert"],
+            "parameters": {"forward_primer": "ins_fwd", "reverse_primer": "ins_rev", "template": "insert"},
+            "output": "ins_pcr",
+            "description": "",
+        },
+        {
+            "step_number": 2,
+            "step_type": "PCR",
+            "inputs": ["vec_fwd", "vec_rev", "backbone"],
+            "parameters": {"forward_primer": "vec_fwd", "reverse_primer": "vec_rev", "template": "backbone"},
+            "output": "vec_pcr",
+            "description": "",
+        },
+    ]
+    if strategy == "GoldenGate":
+        ops.append({
+            "step_number": 3,
+            "step_type": "GoldenGate",
+            "inputs": ["vec_pcr", "ins_pcr"],
+            "parameters": {"enzyme": "BsaI"},
+            "output": "my_construct",
+            "description": "",
+        })
+    else:
+        ops.append({
+            "step_number": 3,
+            "step_type": "Gibson",
+            "inputs": ["vec_pcr", "ins_pcr"],
+            "parameters": {"reagent": "GibsonMix", "overlap_bp": 20},
+            "output": "my_construct",
+            "description": "",
+        })
+    ops.append({
+        "step_number": 4,
+        "step_type": "Transform",
+        "inputs": ["my_construct"],
+        "parameters": {"cells": "Mach1", "selection": selection, "temperature_c": 37},
+        "output": "my_construct_e",
+        "description": "",
+    })
+    return {
+        "construct_name": "my_construct",
+        "assembly_strategy": strategy,
+        "parts": [],
+        "operations": ops,
+        "notes": "",
+    }
+
+
+def test_lab_sheet_empty_record_raises():
+    with pytest.raises(ValueError):
+        lab_sheet({})
+
+
+def test_lab_sheet_returns_required_keys():
+    result = lab_sheet(_make_record())
+    assert "construct_name" in result
+    assert "assembly_strategy" in result
+    assert "lab_sheet_text" in result
+    assert "step_count" in result
+
+
+def test_lab_sheet_pcr_section_format():
+    result = lab_sheet(_make_record())
+    text = result["lab_sheet_text"]
+    assert "A: PCR" in text
+    assert "samples:" in text
+    assert "source:" in text
+    assert "primer1" in text
+    assert "destination: thermocycler1A" in text
+    assert "program: Q5/Q5-4K" in text
+
+
+def test_lab_sheet_gel_dpni_section():
+    result = lab_sheet(_make_record())
+    text = result["lab_sheet_text"]
+    assert "A: Gel and DpnI" in text
+    assert "DpnI" in text
+    assert "BstEII ladder" in text
+
+
+def test_lab_sheet_zymo_section():
+    result = lab_sheet(_make_record())
+    text = result["lab_sheet_text"]
+    assert "A: Zymo" in text
+    assert "elution_volume" in text
+    assert "50 uL" in text
+
+
+def test_lab_sheet_goldengate_assemble_section():
+    result = lab_sheet(_make_record(strategy="GoldenGate"))
+    text = result["lab_sheet_text"]
+    assert "A: Assemble" in text
+    assert "DNA Mix:" in text
+    assert "BsaI" in text
+    assert "T4 DNA ligase" in text
+    assert "program: main/GG1" in text
+
+
+def test_lab_sheet_gibson_assemble_section():
+    result = lab_sheet(_make_record(strategy="Gibson"))
+    text = result["lab_sheet_text"]
+    assert "A: Assemble" in text
+    assert "2X Gibson Mix" in text
+    assert "program: main/GIB2" in text
+
+
+def test_lab_sheet_transform_no_rescue_for_amp():
+    result = lab_sheet(_make_record(selection="Amp"))
+    text = result["lab_sheet_text"]
+    assert "rescue_required: no" in text
+    assert "rescue step" not in text
+
+
+def test_lab_sheet_transform_rescue_for_spec():
+    result = lab_sheet(_make_record(selection="Spec"))
+    text = result["lab_sheet_text"]
+    assert "rescue_required: yes" in text
+    assert "rescue step" in text
+
+
+def test_lab_sheet_thread_prefix():
+    result = lab_sheet(_make_record(), thread="K")
+    text = result["lab_sheet_text"]
+    assert "K: PCR" in text
+    assert "K: Assemble" in text
+    assert "K: Transform" in text
+    assert "K1" in text
+
+
+def test_lab_sheet_step_count_includes_gel_and_zymo():
+    result = lab_sheet(_make_record())
+    # PCR + Gel+DpnI + Zymo + Assemble + Transform = 5
+    assert result["step_count"] == 5
+
+
+def test_lab_sheet_direct_synthesis():
+    record = {
+        "construct_name": "synth_insert",
+        "assembly_strategy": "DirectSynthesis",
+        "parts": [],
+        "operations": [
+            {
+                "step_number": 1,
+                "step_type": "DirectSynthesis",
+                "inputs": ["synth_insert"],
+                "parameters": {},
+                "output": "synth_insert",
+                "description": "",
+            }
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    text = result["lab_sheet_text"]
+    assert "DirectSynthesis" in text
+    assert "vendor" in text
+
+
+def test_lab_sheet_notes_appended_when_present():
+    record = _make_record()
+    record["notes"] = "Handle with care."
+    result = lab_sheet(record, include_notes=True)
+    assert "Handle with care." in result["lab_sheet_text"]
+
+
+def test_lab_sheet_notes_suppressed_when_flag_false():
+    record = _make_record()
+    record["notes"] = "Handle with care."
+    result = lab_sheet(record, include_notes=False)
+    assert "Handle with care." not in result["lab_sheet_text"]

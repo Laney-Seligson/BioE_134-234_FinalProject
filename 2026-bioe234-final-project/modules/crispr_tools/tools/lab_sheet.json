@@ -1,7 +1,7 @@
 {
   "id": "org.bioe134-234.function.cloning.lab_sheet.v1",
   "name": "Lab Sheet Generator",
-  "description": "Renders a bench-ready markdown protocol from a structured construction file. Outputs a printable lab sheet with reagent tables, volumes, and thermocycler programs for each cloning step (PCR, GoldenGate, Gibson, Transform).",
+  "description": "Renders a bench-ready plain-text lab sheet from a structured construction file, matching the LabPlanner format. Output is organized into lettered sections (A: PCR, A: Assemble, A: Transform) with samples tables, source locations, reaction volumes, and notes.",
   "type": "function",
   "seq_params": [],
   "keywords": [
@@ -24,6 +24,11 @@
       "description": "The structured construction file dict from create_construction_file (the 'structured_construction_file' key). Must contain construct_name, assembly_strategy, and operations."
     },
     {
+      "name": "thread",
+      "type": "string",
+      "description": "Single-letter thread identifier used as section prefix (e.g. 'A' produces 'A: PCR', 'A1', 'A2'). Default 'A'."
+    },
+    {
       "name": "include_notes",
       "type": "boolean",
       "description": "If true, appends notes from the construction file at the bottom of the lab sheet. Default true."
@@ -32,11 +37,11 @@
   "outputs": [
     {
       "type": "object",
-      "description": "Bench-ready lab sheet as markdown text.",
+      "description": "Bench-ready lab sheet as plain text in LabPlanner format.",
       "properties": {
         "construct_name": { "type": "string" },
         "assembly_strategy": { "type": "string" },
-        "lab_sheet_md": { "type": "string", "description": "Full markdown text of the bench protocol." },
+        "lab_sheet_text": { "type": "string", "description": "Full plain-text bench protocol in LabPlanner format." },
         "step_count": { "type": "integer" }
       }
     }
@@ -45,19 +50,43 @@
     {
       "input": {
         "construction_record": {
-          "construct_name": "pET28a_REP24",
+          "construct_name": "pTarget-cscB1",
           "assembly_strategy": "GoldenGate",
+          "parts": [],
           "operations": [
-            { "type": "PCR", "template": "REP24", "primers": ["my_insert_fwd", "my_insert_rev"], "output": "ins_pcr" },
-            { "type": "GoldenGate", "enzyme": "BsaI", "inputs": ["ins_pcr", "vec_pcr"], "output": "pET28a_REP24" },
-            { "type": "Transform", "strain": "Mach1", "selection": "Kan", "temperature_c": 37 }
-          ]
-        }
+            {
+              "step_number": 1,
+              "step_type": "PCR",
+              "inputs": ["cscB1", "pTargRev", "pTargetF"],
+              "parameters": { "forward_primer": "cscB1", "reverse_primer": "pTargRev", "template": "pTargetF" },
+              "output": "ipcr1",
+              "description": ""
+            },
+            {
+              "step_number": 2,
+              "step_type": "GoldenGate",
+              "inputs": ["vec_pcr", "ipcr1"],
+              "parameters": { "enzyme": "BsaI" },
+              "output": "pTarget-cscB1",
+              "description": ""
+            },
+            {
+              "step_number": 3,
+              "step_type": "Transform",
+              "inputs": ["pTarget-cscB1"],
+              "parameters": { "cells": "Mach1", "selection": "Spec", "temperature_c": 37 },
+              "output": "pTarget-cscB1_e",
+              "description": ""
+            }
+          ],
+          "notes": ""
+        },
+        "thread": "A"
       },
       "output": {
-        "construct_name": "pET28a_REP24",
+        "construct_name": "pTarget-cscB1",
         "assembly_strategy": "GoldenGate",
-        "step_count": 3
+        "step_count": 5
       }
     }
   ],

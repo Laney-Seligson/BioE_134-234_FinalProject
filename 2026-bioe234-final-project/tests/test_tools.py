@@ -469,3 +469,4 @@ def test_lab_sheet_notes_suppressed_when_flag_false():
     record["notes"] = "Handle with care."
     result = lab_sheet(record, include_notes=False)
     assert "Handle with care." not in result["lab_sheet_text"]
+

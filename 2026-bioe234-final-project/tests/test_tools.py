@@ -431,10 +431,36 @@ def test_lab_sheet_thread_prefix():
     assert "K1" in text
 
 
-def test_lab_sheet_step_count_includes_gel_and_zymo():
+def test_lab_sheet_step_count_includes_all_sections():
     result = lab_sheet(_make_record())
-    # PCR + Gel+DpnI + Zymo + Assemble + Transform = 5
-    assert result["step_count"] == 5
+    # PCR + Gel+DpnI + Zymo + Assemble + Transform + Pick + Miniprep + Sequencing = 8
+    assert result["step_count"] == 8
+
+
+def test_lab_sheet_pick_section():
+    result = lab_sheet(_make_record())
+    text = result["lab_sheet_text"]
+    assert "A: Pick" in text
+    assert "number" in text
+    assert "labels" in text
+    assert "A1A" in text
+
+
+def test_lab_sheet_miniprep_section():
+    result = lab_sheet(_make_record())
+    text = result["lab_sheet_text"]
+    assert "A: Miniprep" in text
+    assert "culture" in text
+    assert "location" in text
+
+
+def test_lab_sheet_sequencing_section():
+    result = lab_sheet(_make_record())
+    text = result["lab_sheet_text"]
+    assert "A: Sequencing" in text
+    assert "L4440" in text
+    assert "2.66 uM" in text
+    assert "Stanley Hall" in text
 
 
 def test_lab_sheet_direct_synthesis():
@@ -472,3 +498,4 @@ def test_lab_sheet_notes_suppressed_when_flag_false():
     record["notes"] = "Handle with care."
     result = lab_sheet(record, include_notes=False)
     assert "Handle with care." not in result["lab_sheet_text"]
+

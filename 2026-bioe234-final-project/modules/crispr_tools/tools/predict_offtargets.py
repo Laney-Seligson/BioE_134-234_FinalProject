@@ -2,112 +2,151 @@ from __future__ import annotations
 
 from typing import Optional
 
+_SUPPORTED_NUCLEASES = {"cas9", "cas12a"}
+
+# Seed region lengths by nuclease (positions from the PAM-proximal end).
+# SpCas9: positions 1-12 are the seed (Hsu et al. 2013, Nat Biotechnol).
+# LbCas12a: positions 1-10 are most sensitive; the entire guide is more
+# stringent than Cas9 (Zetsche et al. 2015, Cell; Kim et al. 2016, Nat Biotechnol).
+_SEED_LENGTHS = {"cas9": 12, "cas12a": 10}
+
+# Protospacer lengths by nuclease.
+_GUIDE_LENGTHS = {"cas9": 20, "cas12a": 23}
+
 
 def _reverse_complement(seq: str) -> str:
     complement = {"A": "T", "T": "A", "C": "G", "G": "C"}
     return "".join(complement[b] for b in reversed(seq))
 
 
+def _check_pam(seq: str, window_start: int, guide_len: int, nuclease: str) -> bool:
+    """Return True if a valid PAM is present adjacent to the window."""
+    if nuclease == "cas9":
+        # NGG immediately after the window (Jinek et al. 2012)
+        pam_start = window_start + guide_len
+        if pam_start + 2 >= len(seq):
+            return False
+        return seq[pam_start + 1] == "G" and seq[pam_start + 2] == "G"
+    else:  # cas12a
+        # TTTV (V = A/C/G) immediately before the window (Zetsche et al. 2015)
+        if window_start < 4:
+            return False
+        pam = seq[window_start - 4 : window_start]
+        return len(pam) == 4 and pam[:3] == "TTT" and pam[3] in "ACG"
+
+
 class PredictOfftargets:
     """
     Description:
         Scans a reference DNA sequence for potential CRISPR off-target sites.
-        Takes the 20bp protospacer from the gRNA design step and slides it
-        across every position of the reference on both strands counting
-        how many bases don't match at each position.
+        Supports both SpCas9 (NGG PAM, 20bp guide) and LbCas12a (TTTV PAM, 23bp guide).
 
-        Any site with mismatches at or below the threshold (default <= 3) gets
-        flagged. Logic: if guide is similar enough to another region of the genome,
-        it can cut there too, which we do not want.
+        Takes the protospacer from the gRNA design step and slides it across
+        every position of the reference on both strands, counting mismatches
+        at each position. Any site within max_mismatches is flagged.
 
-        The scoring uses seed-region logic — the "seed region" is positions 1-12
-        counting from the PAM end of the guide (Hsu et al. 2013). Mismatches
-        there are much more dangerous than mismatches at the far end, because
-        that's where Cas9 first contacts the DNA.
+        PAM check:
+          - Cas9:   NGG immediately 3' of the protospacer (Jinek et al. 2012).
+          - Cas12a: TTTV (V = A/C/G) immediately 5' of the protospacer
+                    (Zetsche et al. 2015, Cell 163(3):759-771).
+          Without a valid PAM the nuclease cannot cut, so PAM-less sites are
+          reported but scored LOW risk regardless of mismatch count.
 
-        Also checks for an NGG PAM after each candidate site, since without a
-        PAM Cas9 basically can't cut.
+        Risk scoring uses seed-region logic:
+          - Cas9   seed = positions 1-12 from PAM-proximal end (Hsu et al. 2013).
+          - Cas12a seed = positions 1-10 from PAM-proximal end; Cas12a is more
+            mismatch-intolerant throughout the guide (Kim et al. 2016, Nat Biotechnol).
+          HIGH: 0 mismatches, OR (0 seed mismatches + valid PAM).
+          MEDIUM: ≤1 seed mismatch + PAM, OR ≤2 total mismatches + PAM.
+          LOW: everything else.
 
-        The reference can be passed as a resource name like "pBR322", a raw
-        sequence, FASTA, or GenBank — the framework handles the conversion.
-
-        Supports circular references (e.g. plasmids) via is_circular=True,
-        which wraps the sequence before scanning so sites spanning the origin
-        are not missed.
+        Supports circular references via is_circular=True so sites spanning
+        the origin of a plasmid are not missed.
 
     Input:
-        protospacer (str): the 20bp DNA protospacer sequence WITHOUT the PAM.
-                           e.g. "TCAGAAACCTGCCAGTTTGC"
-                           only A, T, G, C — no ambiguous bases here.
-        reference (str):   the DNA sequence to scan for off-target sites.
-                           can be a resource name, raw string, FASTA, or GenBank.
-        max_mismatches (int): how many mismatches to still flag as a potential
-                              off-target. default is 3.
-        is_circular (bool): if True, wraps the reference before scanning so
-                            sites spanning the origin are captured. default False.
+        protospacer (str): the DNA protospacer WITHOUT the PAM.
+                           20bp for Cas9, 23bp for Cas12a.
+                           Only A, T, G, C — no ambiguous bases.
+        reference (str):   the DNA sequence to scan. can be a resource name,
+                           raw string, FASTA, or GenBank.
+        nuclease (str):    "cas9" (default) or "cas12a".
+        max_mismatches (int): flag sites with ≤N mismatches. default 3.
+        is_circular (bool): wrap the reference before scanning. default False.
 
     Output:
         dict with keys:
-            - protospacer: the input protospacer (echoed back for reference)
-            - reference_length: how long the reference was
-            - strands_scanned: always 2 (forward + reverse complement)
+            - protospacer: the input protospacer (echoed back)
+            - nuclease: which nuclease was used
+            - reference_length: length of the reference
+            - strands_scanned: always 2
             - sites_evaluated: total windows checked across both strands
             - offtarget_sites: list of dicts, one per flagged site, each with:
-                - position: where in the reference (0-indexed, forward strand)
-                - strand: "+" forward or "-" reverse
-                - sequence: the 20bp window at that position
+                - position: where in the reference (0-indexed, forward strand coords)
+                - strand: "+" or "-"
+                - sequence: the window at that position
                 - mismatches: how many bases differ from the protospacer
                 - mismatch_positions: which positions (1 = PAM-proximal end)
-                - seed_mismatches: mismatches in the dangerous positions 1-12
-                - has_pam: True if NGG follows this site
+                - seed_mismatches: mismatches in the seed region
+                - has_pam: True if a valid PAM flanks this site
                 - risk: "HIGH", "MEDIUM", or "LOW"
-            - high_risk_count: how many HIGH risk sites were found
-            - specificity_summary: one sentence summary of the result
+            - high_risk_count: number of HIGH risk sites
+            - specificity_summary: one-sentence summary
 
     Tests:
         - Case:
-            Input: protospacer="ATGATGATGATGATGATGAT", reference="ATGATGATGATGATGATGATAGG"
-            Expected Output: offtarget_sites has at least one entry with mismatches=0, has_pam=True
-            Description: exact match + NGG PAM on forward strand should be flagged HIGH risk.
+            Input: protospacer="ATGATGATGATGATGATGAT", reference="ATGATGATGATGATGATGATAGG", nuclease="cas9"
+            Expected Output: offtarget_sites has at least one entry with mismatches=0, has_pam=True, risk="HIGH"
+            Description: exact Cas9 match + NGG PAM on forward strand → HIGH risk.
         - Case:
-            Input: protospacer="ATGATGATGATGATGATGAT", reference="CCCCCCCCCCCCCCCCCCCCAGG"
+            Input: protospacer="ATGATGATGATGATGATGAT", reference="CCCCCCCCCCCCCCCCCCCCAGG", nuclease="cas9"
             Expected Output: offtarget_sites is empty or all entries have mismatches > 0
             Description: no match → empty list or only high-mismatch sites.
         - Case:
             Input: protospacer="", reference="ATGATGATG"
             Expected Exception: ValueError
-            Description: empty protospacer should raise an error.
+            Description: empty protospacer raises ValueError.
         - Case:
             Input: protospacer="ATGATGATGATGATGATGAT", reference=""
             Expected Exception: ValueError
-            Description: empty reference should raise an error.
+            Description: empty reference raises ValueError.
         - Case:
-            Input: protospacer="ATGATGATGATGATGATGAT", reference="ATGATGATGATGATGATGATAGG", max_mismatches=0
+            Input: protospacer="ATGATGATGATGATGATGAT", reference="ATGATGATGATGATGATGATAGG", max_mismatches=0, nuclease="cas9"
             Expected Output: only the exact-match site is returned
             Description: max_mismatches=0 means only perfect matches come through.
         - Case:
-            Input: protospacer="ATGATGATGATGATGATGAT", reference="CCCCCCCCCCCCCCCCATGA", max_mismatches=3
+            Input: protospacer="ATGATGATGATGATGATGAT", reference="CCCCCCCCCCCCCCCCATGA", max_mismatches=3, nuclease="cas9"
             Expected Output: site at position 19 has has_pam=False
             Description: protospacer at last valid window with no room for PAM.
+        - Case:
+            Input: protospacer="ATGATGATGATGATGATGATGAT", reference="TTTAATGATGATGATGATGATGATGATAAAAAAAAAA", nuclease="cas12a"
+            Expected Output: offtarget_sites has at least one entry with mismatches=0, has_pam=True, risk="HIGH"
+            Description: exact Cas12a match + TTTV PAM before 23bp window → HIGH risk.
+        - Case:
+            Input: protospacer="ATGATGATGATGATGATGATGAT", reference="ATGATGATGATGATGATGATGATAAAAAAAAAA", nuclease="cas12a"
+            Expected Output: all sites have has_pam=False
+            Description: Cas12a protospacer present but no TTTV PAM before it → no valid cut site.
     """
 
-    _seed_region_length: int
-
     def initiate(self) -> None:
-        # positions 1-12 from the PAM end are the seed region per Hsu et al. 2013
-        self._seed_region_length = 12
+        pass
 
     def run(
         self,
         protospacer: str,
         reference: str,
+        nuclease: str = "cas9",
         max_mismatches: int = 3,
         is_circular: bool = False,
     ) -> dict:
 
         protospacer = protospacer.upper().strip()
         reference = reference.upper().strip()
+        nuclease = nuclease.lower().strip()
 
+        if nuclease not in _SUPPORTED_NUCLEASES:
+            raise ValueError(
+                f"Unsupported nuclease '{nuclease}'. Choose 'cas9' or 'cas12a'."
+            )
         if not protospacer:
             raise ValueError("Protospacer must not be empty.")
         if not reference:
@@ -127,11 +166,13 @@ class PredictOfftargets:
                 "Only standard bases A, T, G, C (and N) are accepted."
             )
 
-        guide_len = len(protospacer)
+        guide_len = _GUIDE_LENGTHS[nuclease]
+        seed_len = _SEED_LENGTHS[nuclease]
         ref_len = len(reference)
 
-        # for circular references, append enough bases to catch sites spanning the origin
-        wrap_len = guide_len + 3  # protospacer + PAM
+        # wrap enough bases to catch sites spanning the circular origin
+        pam_len = 3 if nuclease == "cas9" else 4
+        wrap_len = guide_len + pam_len
         scan_ref = reference + reference[:wrap_len] if is_circular else reference
 
         offtarget_sites = []
@@ -151,37 +192,33 @@ class PredictOfftargets:
                 if mismatches > max_mismatches:
                     continue
 
-                # position numbering: 1 = PAM-proximal end (most dangerous)
+                # positions numbered 1 = PAM-proximal end (most dangerous)
                 mismatch_positions = []
                 for j in range(guide_len):
                     pam_proximal_idx = guide_len - 1 - j
                     if protospacer[pam_proximal_idx] != window[pam_proximal_idx]:
                         mismatch_positions.append(j + 1)
 
-                seed_mismatches = sum(
-                    1 for p in mismatch_positions if p <= self._seed_region_length
-                )
+                seed_mismatches = sum(1 for p in mismatch_positions if p <= seed_len)
 
-                pam_start = i + guide_len
-                has_pam = False
-                if pam_start + 2 < len(seq):
-                    pam_candidate = seq[pam_start : pam_start + 3]
-                    if len(pam_candidate) == 3 and pam_candidate[1] == "G" and pam_candidate[2] == "G":
-                        has_pam = True
+                has_pam = _check_pam(seq, i, guide_len, nuclease)
 
-                if mismatches == 0:
+                # Without a valid PAM the nuclease cannot bind and cut,
+                # so PAM-less sites are always LOW risk regardless of mismatch count.
+                if not has_pam:
+                    risk = "LOW"
+                elif mismatches == 0:
                     risk = "HIGH"
-                elif seed_mismatches == 0 and has_pam:
+                elif seed_mismatches == 0:
                     risk = "HIGH"
-                elif seed_mismatches <= 1 and has_pam:
+                elif seed_mismatches <= 1:
                     risk = "MEDIUM"
-                elif mismatches <= 2 and has_pam:
+                elif mismatches <= 2:
                     risk = "MEDIUM"
                 else:
                     risk = "LOW"
 
-                # convert back to forward-strand coordinates in the original reference;
-                # for circular sequences, positions >= ref_len wrap back to 0-based origin
+                # convert back to forward-strand coordinates in the original reference
                 if strand == "+":
                     reported_position = i % ref_len
                 else:
@@ -204,8 +241,8 @@ class PredictOfftargets:
 
         if not offtarget_sites:
             specificity_summary = (
-                f"No off-target sites found within {max_mismatches} mismatches, "
-                "the guide appears highly specific for this reference."
+                f"No off-target sites found within {max_mismatches} mismatches "
+                f"({nuclease.upper()}), the guide appears highly specific for this reference."
             )
         elif high_risk_count == 1 and offtarget_sites[0]["mismatches"] == 0:
             specificity_summary = (
@@ -222,6 +259,7 @@ class PredictOfftargets:
 
         return {
             "protospacer": protospacer,
+            "nuclease": nuclease,
             "reference_length": ref_len,
             "strands_scanned": 2,
             "sites_evaluated": sites_evaluated,

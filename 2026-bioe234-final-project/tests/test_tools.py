@@ -24,6 +24,7 @@ from modules.crispr_tools.tools.construction_file_validation import (
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.lab_sheet import lab_sheet
+from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
 
 
 def test_reverse_complement_basic():
@@ -265,6 +266,95 @@ def test_verify_edit_reverse_strand():
 # Additional edge case tests
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Cas12a tests for predict_offtargets
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_cas12a_exact_match_high_risk():
+    # TTTA PAM (TTTV where V=A) before 23bp protospacer → HIGH risk
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "TTTA" + protospacer + "AAAAAAAAAA"
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert len(result["offtarget_sites"]) >= 1
+    top = result["offtarget_sites"][0]
+    assert top["mismatches"] == 0
+    assert top["has_pam"] is True
+    assert top["risk"] == "HIGH"
+
+
+def test_predict_offtargets_cas12a_no_pam_returns_low_risk():
+    # 23bp protospacer present but no TTTV before it
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "AAAA" + protospacer + "AAAAAAAAAA"
+    result = predict_offtargets(
+        protospacer=protospacer, reference=reference, nuclease="cas12a", max_mismatches=0
+    )
+    for site in result["offtarget_sites"]:
+        assert site["has_pam"] is False
+        assert site["risk"] == "LOW"
+
+
+def test_predict_offtargets_cas12a_invalid_nuclease_raises():
+    with pytest.raises(ValueError):
+        predict_offtargets(
+            protospacer="ATGATGATGATGATGATGAT",
+            reference="ATGATGATG",
+            nuclease="talenuclease",
+        )
+
+
+def test_predict_offtargets_cas12a_result_includes_nuclease_key():
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "TTTA" + protospacer + "AAAAAAAAAA"
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert result["nuclease"] == "cas12a"
+
+
+# ---------------------------------------------------------------------------
+# Cas12a tests for verify_edit
+# ---------------------------------------------------------------------------
+
+def test_verify_edit_cas12a_forward_strand():
+    # TTTA (TTTV) PAM before 23bp protospacer; cut at ps_position + 18
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    # ps_position = 4, expected cut = 4 + 18 = 22
+    reference = "TTTA" + protospacer + "A" * 200
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert result["strand"] == "+"
+    assert result["pam_sequence"] == "TTTA"
+    assert result["cut_position"] == 22
+    assert result["nuclease"] == "cas12a"
+
+
+def test_verify_edit_cas12a_reverse_strand():
+    # RC protospacer on + strand, TAAA after it (= RC of TTTA = TTTV PAM on minus strand)
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    from modules.crispr_tools.tools.verify_edit import _reverse_complement
+    rc = _reverse_complement(protospacer)
+    # forward strand: [padding][RC protospacer][TAAA][padding]
+    reference = "A" * 20 + rc + "TAAA" + "A" * 200
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert result["strand"] == "-"
+    assert result["pam_sequence"] == "TTTA"
+
+
+def test_verify_edit_cas12a_wrong_pam_raises():
+    # AAAA before protospacer — not a valid TTTV PAM
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "AAAA" + protospacer + "A" * 200
+    with pytest.raises(ValueError, match="TTTV"):
+        verify_edit(protospacer=protospacer, reference=reference, nuclease="cas12a")
+
+
+def test_verify_edit_invalid_nuclease_raises():
+    with pytest.raises(ValueError):
+        verify_edit(
+            protospacer="TCAGAAACCTGCCAGTTTGC",
+            reference=_VERIFY_REFERENCE,
+            nuclease="talenuclease",
+        )
+
+
 def test_predict_offtargets_no_pam_at_end_of_reference():
     # protospacer fits at position 0 but there is no room for a PAM after it
     protospacer = "ATGATGATGATGATGATGAT"
@@ -498,4 +588,112 @@ def test_lab_sheet_notes_suppressed_when_flag_false():
     record["notes"] = "Handle with care."
     result = lab_sheet(record, include_notes=False)
     assert "Handle with care." not in result["lab_sheet_text"]
+
+
+# ---------------------------------------------------------------------------
+# lookup_gene_sequence tests (NCBI calls are mocked)
+# ---------------------------------------------------------------------------
+
+def _make_lookup_instance():
+    inst = LookupGeneSequence()
+    inst.initiate(email="test@example.com")
+    return inst
+
+
+def test_lookup_gene_sequence_empty_gene_name_raises():
+    inst = _make_lookup_instance()
+    with pytest.raises(ValueError, match="gene_name"):
+        inst.run(gene_name="", organism="E. coli")
+
+
+def test_lookup_gene_sequence_empty_organism_raises():
+    inst = _make_lookup_instance()
+    with pytest.raises(ValueError, match="organism"):
+        inst.run(gene_name="lacZ", organism="")
+
+
+def test_lookup_gene_sequence_alias_resolved(monkeypatch):
+    """Common alias 'E. coli' maps to 'Escherichia coli' before hitting NCBI."""
+    captured = {}
+
+    def fake_esearch(db, term, retmax):
+        captured["term"] = term
+        # simulate NCBI returning one hit
+        class FakeHandle:
+            def close(self): pass
+        return FakeHandle()
+
+    def fake_read(handle):
+        if "IdList" not in captured:
+            return {"IdList": ["945006"]}
+        return {"IdList": []}
+
+    monkeypatch.setattr("Bio.Entrez.esearch", fake_esearch)
+    monkeypatch.setattr("Bio.Entrez.read", fake_read)
+
+    inst = _make_lookup_instance()
+    # will fail at _fetch_cds_for_gene since we only mocked esearch, but
+    # we can check the query term was resolved correctly before the error
+    try:
+        inst.run(gene_name="lacZ", organism="E. coli")
+    except (ValueError, Exception):
+        pass
+
+    assert "Escherichia coli" in captured.get("term", "")
+
+
+def test_lookup_gene_sequence_no_results_raises(monkeypatch):
+    """When NCBI returns no gene IDs, ValueError is raised."""
+    class FakeHandle:
+        def close(self): pass
+
+    monkeypatch.setattr("Bio.Entrez.esearch", lambda **kw: FakeHandle())
+    monkeypatch.setattr("Bio.Entrez.read", lambda h: {"IdList": []})
+
+    inst = _make_lookup_instance()
+    with pytest.raises(ValueError, match="No gene found"):
+        inst.run(gene_name="xyzzy_fake_9999", organism="E. coli")
+
+
+def test_lookup_gene_sequence_cds_extraction(monkeypatch):
+    """Full happy-path mock: returns a CDS sequence from a GenBank record."""
+    import io
+
+    fake_gb = (
+        "LOCUS       NM_000001               10 bp    mRNA    linear   BCT 01-JAN-2020\n"
+        "DEFINITION  Escherichia coli lacZ mRNA.\n"
+        "ACCESSION   NM_000001\n"
+        "VERSION     NM_000001.1\n"
+        "FEATURES             Location/Qualifiers\n"
+        "     CDS             1..10\n"
+        '                     /product="beta-galactosidase"\n'
+        "ORIGIN\n"
+        "        1 atgaaatttg\n"
+        "//\n"
+    )
+
+    class FakeHandle:
+        def close(self): pass
+
+    read_responses = iter([
+        {"IdList": ["945006"]},
+        [{"LinkSetDb": [{"Link": [{"Id": "12345"}]}]}],
+    ])
+
+    monkeypatch.setattr("Bio.Entrez.esearch", lambda **kw: FakeHandle())
+    monkeypatch.setattr("Bio.Entrez.read", lambda h: next(read_responses))
+    monkeypatch.setattr("Bio.Entrez.elink", lambda **kw: FakeHandle())
+    monkeypatch.setattr(
+        "Bio.Entrez.efetch",
+        lambda **kw: io.StringIO(fake_gb) if kw.get("db") == "nucleotide" else FakeHandle(),
+    )
+
+    inst = _make_lookup_instance()
+    result = inst.run(gene_name="lacZ", organism="E. coli")
+
+    assert result["gene_name"] == "lacZ"
+    assert result["organism"] == "Escherichia coli"
+    assert result["product"] == "beta-galactosidase"
+    assert result["source"] == "CDS annotation"
+    assert len(result["sequence"]) > 0
 

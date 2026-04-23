@@ -90,7 +90,7 @@ def register_resources(mcp, data_dir: Path, module_name: str) -> None:
 
     sequence_extensions = {".gb", ".gbk", ".genbank", ".fa", ".fasta", ".fna"}
 
-    for data_file in sorted(data_dir.iterdir()):
+    for data_file in sorted(data_dir.rglob("*")):
         if data_file.is_dir():
             continue
         if data_file.suffix.lower() not in sequence_extensions:
@@ -98,7 +98,7 @@ def register_resources(mcp, data_dir: Path, module_name: str) -> None:
         if data_file.name.startswith("_"):
             continue
 
-        resource_name = data_file.stem
+        resource_name = _resource_name_for_data_file(data_dir, data_file)
         register_resource(resource_name, data_file)
 
         resource_meta = _load_resource_metadata(data_file)
@@ -109,6 +109,19 @@ def register_resources(mcp, data_dir: Path, module_name: str) -> None:
             f"  ({resource_meta.get('description', data_file.name)})",
             file=sys.stderr,
         )
+
+
+def _resource_name_for_data_file(data_dir: Path, data_file: Path) -> str:
+    """Create stable resource names for top-level and nested sequence files."""
+    relative = data_file.relative_to(data_dir)
+
+    if len(relative.parts) >= 3 and relative.parts[0] == "references":
+        reference_name = relative.parts[1]
+        if data_file.stem == "gene":
+            return reference_name
+        return f"{reference_name}_{data_file.stem}"
+
+    return data_file.stem
 
 
 # ---------------------------------------------------------------------------

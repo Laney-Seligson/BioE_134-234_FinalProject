@@ -266,6 +266,95 @@ def test_verify_edit_reverse_strand():
 # Additional edge case tests
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Cas12a tests for predict_offtargets
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_cas12a_exact_match_high_risk():
+    # TTTA PAM (TTTV where V=A) before 23bp protospacer → HIGH risk
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "TTTA" + protospacer + "AAAAAAAAAA"
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert len(result["offtarget_sites"]) >= 1
+    top = result["offtarget_sites"][0]
+    assert top["mismatches"] == 0
+    assert top["has_pam"] is True
+    assert top["risk"] == "HIGH"
+
+
+def test_predict_offtargets_cas12a_no_pam_returns_low_risk():
+    # 23bp protospacer present but no TTTV before it
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "AAAA" + protospacer + "AAAAAAAAAA"
+    result = predict_offtargets(
+        protospacer=protospacer, reference=reference, nuclease="cas12a", max_mismatches=0
+    )
+    for site in result["offtarget_sites"]:
+        assert site["has_pam"] is False
+        assert site["risk"] == "LOW"
+
+
+def test_predict_offtargets_cas12a_invalid_nuclease_raises():
+    with pytest.raises(ValueError):
+        predict_offtargets(
+            protospacer="ATGATGATGATGATGATGAT",
+            reference="ATGATGATG",
+            nuclease="talenuclease",
+        )
+
+
+def test_predict_offtargets_cas12a_result_includes_nuclease_key():
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "TTTA" + protospacer + "AAAAAAAAAA"
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert result["nuclease"] == "cas12a"
+
+
+# ---------------------------------------------------------------------------
+# Cas12a tests for verify_edit
+# ---------------------------------------------------------------------------
+
+def test_verify_edit_cas12a_forward_strand():
+    # TTTA (TTTV) PAM before 23bp protospacer; cut at ps_position + 18
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    # ps_position = 4, expected cut = 4 + 18 = 22
+    reference = "TTTA" + protospacer + "A" * 200
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert result["strand"] == "+"
+    assert result["pam_sequence"] == "TTTA"
+    assert result["cut_position"] == 22
+    assert result["nuclease"] == "cas12a"
+
+
+def test_verify_edit_cas12a_reverse_strand():
+    # RC protospacer on + strand, TAAA after it (= RC of TTTA = TTTV PAM on minus strand)
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    from modules.crispr_tools.tools.verify_edit import _reverse_complement
+    rc = _reverse_complement(protospacer)
+    # forward strand: [padding][RC protospacer][TAAA][padding]
+    reference = "A" * 20 + rc + "TAAA" + "A" * 200
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas12a")
+    assert result["strand"] == "-"
+    assert result["pam_sequence"] == "TTTA"
+
+
+def test_verify_edit_cas12a_wrong_pam_raises():
+    # AAAA before protospacer — not a valid TTTV PAM
+    protospacer = "ATGATGATGATGATGATGATGAT"
+    reference = "AAAA" + protospacer + "A" * 200
+    with pytest.raises(ValueError, match="TTTV"):
+        verify_edit(protospacer=protospacer, reference=reference, nuclease="cas12a")
+
+
+def test_verify_edit_invalid_nuclease_raises():
+    with pytest.raises(ValueError):
+        verify_edit(
+            protospacer="TCAGAAACCTGCCAGTTTGC",
+            reference=_VERIFY_REFERENCE,
+            nuclease="talenuclease",
+        )
+
+
 def test_predict_offtargets_no_pam_at_end_of_reference():
     # protospacer fits at position 0 but there is no room for a PAM after it
     protospacer = "ATGATGATGATGATGATGAT"

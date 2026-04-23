@@ -14,7 +14,7 @@ The `crispr_tools` module provides fundamental tools to go through the crispr pi
 
 ## Available resources
 
-Here are the descriptions of the available resources. When a user inquires for a plasmid or a backbone sequence, provide the names of the plasmid and a short description of the plasmid to help the user choose which one to use.
+Here are the descriptions of the available resources. When a user inquires for a plasmid or a backbone sequence, provide the names of the plasmid and a short description of the plasmid to help the user choose which one to use. When a user inquires for a paper, provide the names of the papers and short description.
 
 | Resource name | Description |
 |---------------|-------------|
@@ -36,6 +36,12 @@ as the sequence argument — do not ask the user to paste the sequence.
 
 When a user refers to "pUC19", use the resource name `"pUC19"` directly
 as the sequence argument — do not ask the user to paste the sequence.
+
+| Resource name | Description |
+|---------------|-------------|
+| `miao_2013_targeted_mutagenesis_rice`      | This paper demonstrates one of the earliest successful applications of CRISPR-Cas9 genome editing in plants, specifically in Oryza sativa (rice). The authors developed a system to introduce targeted mutations in endogenous genes by expressing Cas9 and guide RNAs within plant cells. |
+
+When a user refers to "miao 2013 targeted mutagensis rice" or "miao_2013_targeted_mutagenesis_rice", or "miao paper", or "rice paper", use the resource name `"miao_2013_targeted_mutagenesis_rice"` directly to fill the shorthand construction file — do not ask the user to paste the info.
 
 ---
 
@@ -70,7 +76,7 @@ Use when the user asks to:
 **Coordinate example:** "translate bases 100 to 200" → `start=100, end=200`
 "translate the first 60bp" → `start=0, end=60` (or omit start, set `end=60`)
 
-## Tool: create_construction_file
+<!-- ## Tool: create_construction_file
 
 Before calling this tool, gather all required fields for the selected assembly strategy.
 
@@ -227,7 +233,203 @@ Important behavior:
 - Always follow the references defined in each step (`forward_primer`, `reverse_primer`, `template`, `output`)
 - Always validate a construction file before presenting it as final if the workflow includes PCR steps
 
+--- -->
+## Tool: create_construction_file
+
+This tool supports **three distinct modes**. You MUST choose the correct mode before calling.
+
 ---
+
+### 🔹 Mode 1: `sequence_build` (default cloning workflows)
+
+Use this when:
+- The user provides DNA sequences
+- The user wants a full construction file
+- The workflow is standard cloning (GoldenGate, Gibson, DirectSynthesis)
+
+#### Required fields:
+
+For all workflows:
+- construct_name
+- backbone_name
+- backbone_sequence
+- insert_name
+- insert_sequence
+
+For GoldenGate:
+- insert_forward_primer_name
+- insert_forward_primer_sequence
+- insert_reverse_primer_name
+- insert_reverse_primer_sequence
+- vector_forward_primer_name
+- vector_forward_primer_sequence
+- vector_reverse_primer_name
+- vector_reverse_primer_sequence
+- enzyme
+
+For Gibson:
+- insert_forward_primer_name
+- insert_forward_primer_sequence
+- insert_reverse_primer_name
+- insert_reverse_primer_sequence
+- vector_forward_primer_name
+- vector_forward_primer_sequence
+- vector_reverse_primer_name
+- vector_reverse_primer_sequence
+
+Optional:
+- cell_strain
+- selection
+- temperature_c
+
+---
+
+### 🔹 Mode 2: `paper_info` (extract structured info from a paper)
+
+Use this when:
+- The user provides or references a paper
+- The user wants to store important information from a paper
+- No sequences are required
+
+#### Required fields:
+- paper_id
+- title
+- source_pdf
+- organism
+- system
+
+Optional:
+- targets
+- vectors
+- enzymes
+- assembly_method
+- delivery_method
+- validation_methods
+- key_constraints
+- paper_notes
+
+⚠️ IMPORTANT:
+- DO NOT include sequences
+- DO NOT include backbone_sequence or insert_sequence
+- DO NOT infer missing details
+
+---
+
+### 🔹 Mode 3: `paper_shorthand` (generate shorthand workflow from paper info)
+
+Use this when:
+- The user asks to generate a construction workflow from a paper
+- The input is a paper or paper_info resource
+- Sequences are NOT available
+
+#### Required fields:
+- paper_id
+- organism
+- system
+
+Optional (strongly recommended):
+- targets
+- vectors
+- enzymes
+- assembly_method
+- delivery_method
+- validation_methods
+
+⚠️ CRITICAL RULES:
+- DO NOT provide backbone_sequence
+- DO NOT provide insert_sequence
+- DO NOT invent sequences
+- ONLY use the provided structured paper information
+- Output should be a shorthand workflow, NOT a full construction file
+
+---
+
+## Mode selection rules
+
+You MUST select the correct mode:
+
+- If the user provides DNA sequences → use `sequence_build`
+- If the user is summarizing a paper → use `paper_info`
+- If the user wants a workflow from a paper → use `paper_shorthand`
+
+If uncertain:
+- Prefer `paper_shorthand` over `sequence_build` when sequences are missing
+
+---
+
+## Required interaction rules
+
+Never return an empty response.
+
+If required fields for the chosen mode are missing:
+- Ask for ALL missing fields in one message
+- Do NOT partially call the tool
+
+If all required fields are present:
+- Call the tool immediately
+- Do NOT ask for confirmation
+- Do NOT wait for "proceed"
+
+---
+
+## Presenting results
+
+### sequence_build:
+Display `construction_file_txt` in a code block
+
+### paper_info:
+Display structured JSON
+
+### paper_shorthand:
+Display shorthand workflow in a code block
+
+---
+
+## 🚨 Anti-hallucination rule (VERY IMPORTANT)
+
+If the user is working from a paper:
+- DO NOT invent DNA sequences
+- DO NOT create placeholder sequences like "Miao2013_sequence"
+- DO NOT force the request into sequence_build mode
+
+Instead:
+- Use `paper_shorthand`
+
+## Paper resources
+
+Paper workflow resources are available under:
+
+resource://paper_info/<paper_id>
+
+When a user refers to a paper:
+- retrieve the paper_info resource
+- use its fields directly
+- do NOT invent missing values
+
+### `get_paper_info`
+Loads a curated paper information JSON record from `modules/crispr_tools/data/paper_info/`.
+
+Use when the user asks:
+- "what is the miao paper"
+- "load the paper info for ..."
+- "use the paper information to generate shorthand"
+- "read the curated paper workflow record"
+
+Input:
+- `paper_id`: stable paper identifier such as `miao_2013_targeted_mutagenesis_rice`
+
+What it returns:
+- a structured `paper_important_info_v1` object
+
+How to use with `create_construction_file`:
+1. Call `get_paper_info` first.
+2. Read the returned fields.
+3. Then call `create_construction_file` with `input_mode="paper_shorthand"` and pass the returned paper fields into the tool.
+
+Important:
+- Do NOT assume paper JSON files in `data/` are auto-registered as MCP resources.
+- Use `get_paper_info` to load them.
+- Do NOT invent missing sequences or paper metadata.
 
 ## Interpreting results
 

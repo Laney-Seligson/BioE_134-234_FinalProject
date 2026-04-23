@@ -1,0 +1,41 @@
+{
+  "resource_type": "paper_important_info_v1",
+  "paper_id": "miao_2013_targeted_mutagenesis_rice",
+  "title": "Targeted mutagenesis in rice using CRISPR-Cas system",
+  "source_pdf": "cr2013123.pdf",
+  "organism": "Oryza sativa",
+  "system": "CRISPR-Cas9",
+  "targets": [
+    "CAO1",
+    "LAZY1"
+  ],
+  "vectors": [
+    "pH-Ubi-cas9-7",
+    "pOs-sgRNA",
+    "pOs-cr-tracr"
+  ],
+  "enzymes": [
+    "BsaI",
+    "BsmBI"
+  ],
+  "assembly_method": "Gateway",
+  "delivery_method": [
+    "Agrobacterium-mediated transformation",
+    "particle bombardment"
+  ],
+  "validation_methods": [
+    "PCR",
+    "sequencing",
+    "phenotype",
+    "GUS reporter assay"
+  ],
+  "key_constraints": [
+    "Full plasmid sequences not provided in main text",
+    "Exact cloning oligo sequences not provided",
+    "Best suited for shorthand workflow extraction rather than sequence-level reconstruction"
+  ],
+  "notes": [
+    "Cas9 destination vector and guide RNA entry vectors are shown in Figure 1A",
+    "Both sgRNA and dual crRNA:tracrRNA formats were tested"
+  ]
+}

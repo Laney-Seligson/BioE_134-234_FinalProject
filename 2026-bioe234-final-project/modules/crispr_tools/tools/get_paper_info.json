@@ -1,0 +1,50 @@
+{
+    "id": "org.bioe234.function.crispr.get_paper_info.v1",
+    "name": "Get Paper Info",
+    "description": "Load a curated paper information JSON record from the crispr_tools data directory so downstream tools can use structured paper metadata instead of guessing from the paper name.",
+    "type": "function",
+    "keywords": [
+      "paper",
+      "literature",
+      "metadata",
+      "CRISPR",
+      "workflow",
+      "resource loader"
+    ],
+    "date_created": null,
+    "date_last_modified": null,
+    "inputs": [
+      {
+        "name": "paper_id",
+        "type": "string",
+        "description": "Stable paper identifier or resource-like name, for example 'miao_2013_targeted_mutagenesis_rice' or 'resource://paper_info/miao_2013_targeted_mutagenesis_rice'."
+      }
+    ],
+    "outputs": [
+      {
+        "type": "object",
+        "description": "Curated paper information object with resource_type 'paper_important_info_v1'."
+      }
+    ],
+    "examples": [
+      {
+        "input": {
+          "paper_id": "miao_2013_targeted_mutagenesis_rice"
+        },
+        "output": {
+          "result": {
+            "resource_type": "paper_important_info_v1",
+            "paper_id": "miao_2013_targeted_mutagenesis_rice"
+          }
+        }
+      }
+    ],
+    "execution_details": {
+      "language": "Python",
+      "source": "modules/crispr_tools/tools/get_paper_info.py",
+      "initialization": "initiate",
+      "execution": "run",
+      "disposal": null,
+      "mcp_name": "get_paper_info"
+    }
+  }

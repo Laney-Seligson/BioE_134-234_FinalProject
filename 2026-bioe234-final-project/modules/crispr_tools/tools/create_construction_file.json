@@ -1,175 +1,198 @@
 {
-  "id": "org.bioe134-234.function.crispr.create_construction_file.v1",
-  "name": "Create Construction File",
-  "description": "Generate a construction file for an E_coli cloning workflow. Before calling, gather all required fields for the selected assembly strategy. If any required field is missing, ask for all missing required fields in one message. If all required fields are present, call the tool immediately. Always treat the returned text field as the main human-readable output. construction_file_txt contains the same rendered construction file text for downstream use.",
+  "id": "org.bioe234.function.create_construction_file.v2",
+  "name": "Create_Construction_File",
+  "description": "Generate either (1) a full DNA cloning construction file from sequences, (2) a structured paper information resource, or (3) a shorthand construction workflow derived from a paper. Always choose the correct input_mode before calling this tool.",
   "type": "function",
-  "seq_params": [
-    "backbone_sequence",
-    "insert_sequence"
-  ],
   "keywords": [
-    "CRISPR",
-    "construction file",
-    "E_coli",
+    "cloning",
+    "DNA assembly",
     "GoldenGate",
     "Gibson",
-    "DirectSynthesis",
-    "cloning",
-    "plasmid assembly",
-    "lab workflow"
+    "CRISPR",
+    "construction file",
+    "paper extraction",
+    "workflow abstraction",
+    "synthetic biology"
   ],
-  "date_created": null,
-  "date_last_modified": null,
+
   "inputs": [
+    {
+      "name": "input_mode",
+      "type": "string",
+      "description": "Select mode: 'sequence_build', 'paper_info', or 'paper_shorthand'. This determines required fields and behavior.",
+      "enum": ["sequence_build", "paper_info", "paper_shorthand"]
+    },
+
     {
       "name": "construct_name",
       "type": "string",
-      "description": "Name of the final construct."
+      "description": "Name of final construct (required for sequence_build)."
     },
     {
       "name": "assembly_strategy",
       "type": "string",
-      "description": "Main assembly strategy. Supported values are GoldenGate, Gibson, and DirectSynthesis."
+      "description": "Assembly strategy for sequence_build. Options: GoldenGate, Gibson, DirectSynthesis."
     },
     {
       "name": "backbone_name",
       "type": "string",
-      "description": "Name of the backbone plasmid."
+      "description": "Backbone plasmid name (sequence_build only)."
     },
     {
       "name": "backbone_sequence",
       "type": "string",
-      "description": "DNA sequence of the backbone plasmid."
+      "description": "Backbone DNA sequence (sequence_build only). Must be valid DNA."
     },
     {
       "name": "insert_name",
       "type": "string",
-      "description": "Name of the insert or donor sequence."
+      "description": "Insert name (sequence_build only)."
     },
     {
       "name": "insert_sequence",
       "type": "string",
-      "description": "DNA sequence of the insert or donor."
+      "description": "Insert DNA sequence (sequence_build only). Must be valid DNA."
     },
     {
       "name": "insert_forward_primer_name",
       "type": "string",
-      "description": "Name of the forward primer used to amplify the insert. Required for GoldenGate and Gibson."
+      "description": "Forward primer name for insert (GoldenGate/Gibson only)."
     },
     {
       "name": "insert_forward_primer_sequence",
       "type": "string",
-      "description": "DNA sequence of the forward primer used to amplify the insert. Required for GoldenGate and Gibson."
+      "description": "Forward primer sequence (GoldenGate/Gibson only)."
     },
     {
       "name": "insert_reverse_primer_name",
       "type": "string",
-      "description": "Name of the reverse primer used to amplify the insert. Required for GoldenGate and Gibson."
+      "description": "Reverse primer name for insert."
     },
     {
       "name": "insert_reverse_primer_sequence",
       "type": "string",
-      "description": "DNA sequence of the reverse primer used to amplify the insert. Required for GoldenGate and Gibson."
+      "description": "Reverse primer sequence."
     },
     {
       "name": "vector_forward_primer_name",
       "type": "string",
-      "description": "Name of the forward primer used to amplify the vector backbone. Required for GoldenGate and Gibson."
+      "description": "Vector forward primer name."
     },
     {
       "name": "vector_forward_primer_sequence",
       "type": "string",
-      "description": "DNA sequence of the forward primer used to amplify the vector backbone. Required for GoldenGate and Gibson."
+      "description": "Vector forward primer sequence."
     },
     {
       "name": "vector_reverse_primer_name",
       "type": "string",
-      "description": "Name of the reverse primer used to amplify the vector backbone. Required for GoldenGate and Gibson."
+      "description": "Vector reverse primer name."
     },
     {
       "name": "vector_reverse_primer_sequence",
       "type": "string",
-      "description": "DNA sequence of the reverse primer used to amplify the vector backbone. Required for GoldenGate and Gibson."
+      "description": "Vector reverse primer sequence."
     },
     {
       "name": "enzyme",
       "type": "string",
-      "description": "Assembly enzyme used for GoldenGate workflows, such as BsaI or BbsI."
+      "description": "Assembly enzyme (required for GoldenGate)."
     },
     {
       "name": "cell_strain",
       "type": "string",
-      "description": "Transformation strain, such as Mach1 or DH5alpha. Optional."
+      "description": "Transformation host strain."
     },
     {
       "name": "selection",
       "type": "string",
-      "description": "Selection marker or antibiotic, such as Kan or Amp. Optional."
+      "description": "Selection marker (e.g. Kan, Amp)."
     },
     {
       "name": "temperature_c",
       "type": "integer",
-      "description": "Transformation temperature in degrees Celsius. Defaults to 37."
+      "description": "Transformation temperature."
+    },
+
+
+    {
+      "name": "paper_id",
+      "type": "string",
+      "description": "Unique identifier for the paper (required for paper modes)."
     },
     {
-      "name": "notes",
+      "name": "title",
       "type": "string",
-      "description": "Optional notes about the construction workflow."
+      "description": "Paper title."
+    },
+    {
+      "name": "source_pdf",
+      "type": "string",
+      "description": "Source PDF filename or resource."
+    },
+    {
+      "name": "organism",
+      "type": "string",
+      "description": "Organism used in the paper."
+    },
+    {
+      "name": "system",
+      "type": "string",
+      "description": "Editing or cloning system (e.g. CRISPR-Cas9)."
+    },
+    {
+      "name": "targets",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Target genes or loci."
+    },
+    {
+      "name": "vectors",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Plasmids or constructs used."
+    },
+    {
+      "name": "enzymes",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Relevant enzymes."
+    },
+    {
+      "name": "assembly_method",
+      "type": "string",
+      "description": "Assembly method (Gateway, GoldenGate, Gibson, DirectSynthesis)."
+    },
+    {
+      "name": "delivery_method",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Transformation or delivery methods."
+    },
+    {
+      "name": "validation_methods",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Validation techniques used."
+    },
+    {
+      "name": "key_constraints",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Important limitations (e.g. missing sequences)."
+    },
+    {
+      "name": "paper_notes",
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional notes about the paper."
     }
   ],
+
   "outputs": [
     {
       "type": "object",
-      "description": "A validated construction result containing text, construction_file_txt, construct_name, assembly_strategy, file_name, and structured_construction_file."
+      "description": "Output depends on input_mode: sequence_build returns a construction file, paper_info returns structured metadata, paper_shorthand returns shorthand workflow."
     }
-  ],
-  "examples": [
-    {
-      "input": {
-        "construct_name": "pET28a_REP24",
-        "assembly_strategy": "GoldenGate",
-        "backbone_name": "pET28a",
-        "backbone_sequence": "AGATCT",
-        "insert_name": "REP24",
-        "insert_sequence": "ATGAAA",
-        "insert_forward_primer_name": "repF",
-        "insert_forward_primer_sequence": "CCATAGGTCTCAATGAAAAATGTTTTAATGGTTACTA",
-        "insert_reverse_primer_name": "repR",
-        "insert_reverse_primer_sequence": "CAGATGGTCTCACGAGATTAAATAAAGATTGTTTAAT",
-        "vector_forward_primer_name": "vecF",
-        "vector_forward_primer_sequence": "CCATAGGTCTCACTCGAGCACCACCACCACCACCACT",
-        "vector_reverse_primer_name": "vecR",
-        "vector_reverse_primer_sequence": "CAGATGGTCTCATCATGGTATATCTCCTTCTTAAAGT",
-        "enzyme": "BsaI",
-        "cell_strain": "Mach1",
-        "selection": "Kan",
-        "temperature_c": 37,
-        "notes": "Example E_coli Golden Gate construction workflow."
-      },
-      "output": {
-        "result": {
-          "construct_name": "pET28a_REP24",
-          "assembly_strategy": "GoldenGate",
-          "file_name": "pET28a_REP24_construction.txt",
-          "text": "PCR           repF          repR          REP24             REP24_pcr\nPCR           vecF          vecR          pET28a            pET28a_pcr\nGoldenGate    pET28a_pcr    REP24_pcr     BsaI              pET28a_REP24\nTransform     pET28a_REP24  Mach1         Kan       37      pET28a_REP24_e",
-          "construction_file_txt": "PCR           repF          repR          REP24             REP24_pcr\nPCR           vecF          vecR          pET28a            pET28a_pcr\nGoldenGate    pET28a_pcr    REP24_pcr     BsaI              pET28a_REP24\nTransform     pET28a_REP24  Mach1         Kan       37      pET28a_REP24_e",
-          "structured_construction_file": {
-            "construct_name": "pET28a_REP24",
-            "assembly_strategy": "GoldenGate",
-            "parts": [],
-            "operations": [],
-            "notes": "Example E_coli Golden Gate construction workflow."
-          }
-        }
-      }
-    }
-  ],
-  "execution_details": {
-    "language": "Python",
-    "source": "2026-bioe234-final-project/modules/crispr_tools/tools/create_construction_file.py",
-    "initialization": "initiate",
-    "execution": "run",
-    "disposal": null,
-    "mcp_name": "create_construction_file"
-  }
+  ]
 }

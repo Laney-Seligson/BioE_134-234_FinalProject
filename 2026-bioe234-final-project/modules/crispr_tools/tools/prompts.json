@@ -58,5 +58,5 @@
     "expected_tool": "crispr_verify_edit",
     "expected_args": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "reference": "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" },
     "notes": "Raw sequence input — should find protospacer at position 15, PAM TGG, cut at 32."
-  },
+  }
 ]

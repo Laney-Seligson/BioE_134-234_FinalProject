@@ -24,6 +24,7 @@ from modules.crispr_tools.tools.construction_file_validation import (
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.lab_sheet import lab_sheet
+from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
 
 
 def test_reverse_complement_basic():
@@ -495,4 +496,112 @@ def test_lab_sheet_notes_suppressed_when_flag_false():
     record["notes"] = "Handle with care."
     result = lab_sheet(record, include_notes=False)
     assert "Handle with care." not in result["lab_sheet_text"]
+
+
+# ---------------------------------------------------------------------------
+# lookup_gene_sequence tests (NCBI calls are mocked)
+# ---------------------------------------------------------------------------
+
+def _make_lookup_instance():
+    inst = LookupGeneSequence()
+    inst.initiate(email="test@example.com")
+    return inst
+
+
+def test_lookup_gene_sequence_empty_gene_name_raises():
+    inst = _make_lookup_instance()
+    with pytest.raises(ValueError, match="gene_name"):
+        inst.run(gene_name="", organism="E. coli")
+
+
+def test_lookup_gene_sequence_empty_organism_raises():
+    inst = _make_lookup_instance()
+    with pytest.raises(ValueError, match="organism"):
+        inst.run(gene_name="lacZ", organism="")
+
+
+def test_lookup_gene_sequence_alias_resolved(monkeypatch):
+    """Common alias 'E. coli' maps to 'Escherichia coli' before hitting NCBI."""
+    captured = {}
+
+    def fake_esearch(db, term, retmax):
+        captured["term"] = term
+        # simulate NCBI returning one hit
+        class FakeHandle:
+            def close(self): pass
+        return FakeHandle()
+
+    def fake_read(handle):
+        if "IdList" not in captured:
+            return {"IdList": ["945006"]}
+        return {"IdList": []}
+
+    monkeypatch.setattr("Bio.Entrez.esearch", fake_esearch)
+    monkeypatch.setattr("Bio.Entrez.read", fake_read)
+
+    inst = _make_lookup_instance()
+    # will fail at _fetch_cds_for_gene since we only mocked esearch, but
+    # we can check the query term was resolved correctly before the error
+    try:
+        inst.run(gene_name="lacZ", organism="E. coli")
+    except (ValueError, Exception):
+        pass
+
+    assert "Escherichia coli" in captured.get("term", "")
+
+
+def test_lookup_gene_sequence_no_results_raises(monkeypatch):
+    """When NCBI returns no gene IDs, ValueError is raised."""
+    class FakeHandle:
+        def close(self): pass
+
+    monkeypatch.setattr("Bio.Entrez.esearch", lambda **kw: FakeHandle())
+    monkeypatch.setattr("Bio.Entrez.read", lambda h: {"IdList": []})
+
+    inst = _make_lookup_instance()
+    with pytest.raises(ValueError, match="No gene found"):
+        inst.run(gene_name="xyzzy_fake_9999", organism="E. coli")
+
+
+def test_lookup_gene_sequence_cds_extraction(monkeypatch):
+    """Full happy-path mock: returns a CDS sequence from a GenBank record."""
+    import io
+
+    fake_gb = (
+        "LOCUS       NM_000001               10 bp    mRNA    linear   BCT 01-JAN-2020\n"
+        "DEFINITION  Escherichia coli lacZ mRNA.\n"
+        "ACCESSION   NM_000001\n"
+        "VERSION     NM_000001.1\n"
+        "FEATURES             Location/Qualifiers\n"
+        "     CDS             1..10\n"
+        '                     /product="beta-galactosidase"\n'
+        "ORIGIN\n"
+        "        1 atgaaatttg\n"
+        "//\n"
+    )
+
+    class FakeHandle:
+        def close(self): pass
+
+    read_responses = iter([
+        {"IdList": ["945006"]},
+        [{"LinkSetDb": [{"Link": [{"Id": "12345"}]}]}],
+    ])
+
+    monkeypatch.setattr("Bio.Entrez.esearch", lambda **kw: FakeHandle())
+    monkeypatch.setattr("Bio.Entrez.read", lambda h: next(read_responses))
+    monkeypatch.setattr("Bio.Entrez.elink", lambda **kw: FakeHandle())
+    monkeypatch.setattr(
+        "Bio.Entrez.efetch",
+        lambda **kw: io.StringIO(fake_gb) if kw.get("db") == "nucleotide" else FakeHandle(),
+    )
+
+    inst = _make_lookup_instance()
+    result = inst.run(gene_name="lacZ", organism="E. coli")
+
+    assert result["gene_name"] == "lacZ"
+    assert result["organism"] == "Escherichia coli"
+    assert result["product"] == "beta-galactosidase"
+    assert result["source"] == "CDS annotation"
+    assert len(result["sequence"]) > 0
 

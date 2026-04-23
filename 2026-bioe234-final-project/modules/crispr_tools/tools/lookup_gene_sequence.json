@@ -1,0 +1,95 @@
+{
+  "id": "org.bioe134-234.function.crispr.lookup_gene_sequence.v1",
+  "name": "Gene Sequence Lookup",
+  "description": "Fetches the coding DNA sequence (CDS) for a gene from NCBI Entrez given a gene name and organism. Queries the NCBI Gene database, retrieves the linked mRNA/RefSeq record, and extracts the annotated CDS. Common organism aliases (e.g. 'E. coli', 'mouse', 'Arabidopsis') are resolved automatically.",
+  "type": "function",
+  "keywords": [
+    "NCBI",
+    "Entrez",
+    "gene sequence",
+    "CDS",
+    "DNA sequence",
+    "gene lookup",
+    "RefSeq",
+    "mRNA",
+    "gene ontology",
+    "organism"
+  ],
+  "date_created": null,
+  "date_last_modified": null,
+  "inputs": [
+    {
+      "name": "gene_name",
+      "type": "string",
+      "description": "Gene symbol or name to search for, e.g. 'cscB', 'lacZ', 'GAPDH', 'cas9'."
+    },
+    {
+      "name": "organism",
+      "type": "string",
+      "description": "Organism name or common alias. Accepts scientific names ('Escherichia coli') or common aliases ('E. coli', 'mouse', 'human', 'yeast', 'Arabidopsis', 'zebrafish', 'rice', 'corn', etc.)."
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "description": "Email address for NCBI Entrez (required by NCBI usage policy). Overrides the default set at initiation.",
+      "optional": true
+    },
+    {
+      "name": "api_key",
+      "type": "string",
+      "description": "Optional NCBI API key. Increases rate limit from 3 to 10 requests/second.",
+      "optional": true
+    },
+    {
+      "name": "max_results",
+      "type": "integer",
+      "description": "How many Gene DB hits to try before giving up. Default 5.",
+      "optional": true
+    }
+  ],
+  "outputs": [
+    {
+      "type": "object",
+      "description": "Gene metadata and CDS nucleotide sequence from NCBI.",
+      "properties": {
+        "gene_name": { "type": "string" },
+        "organism": { "type": "string", "description": "Resolved scientific name." },
+        "gene_id": { "type": "string", "description": "NCBI Gene ID." },
+        "accession": { "type": "string", "description": "mRNA/nucleotide accession used." },
+        "sequence": { "type": "string", "description": "CDS nucleotide sequence (5' to 3')." },
+        "sequence_length": { "type": "integer" },
+        "product": { "type": "string", "description": "Protein product name from CDS annotation." },
+        "source": { "type": "string", "description": "'CDS annotation' or 'full record'." },
+        "summary": { "type": "string" }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "input": {
+        "gene_name": "lacZ",
+        "organism": "E. coli",
+        "email": "user@example.com"
+      },
+      "output": {
+        "gene_name": "lacZ",
+        "organism": "Escherichia coli",
+        "gene_id": "945006",
+        "accession": "NM_001234.1",
+        "sequence": "ATGACCATG...",
+        "sequence_length": 3075,
+        "product": "beta-galactosidase",
+        "source": "CDS annotation",
+        "summary": "Retrieved 3075 bp CDS for lacZ (beta-galactosidase) from Escherichia coli via accession NM_001234.1."
+      }
+    }
+  ],
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/lookup_gene_sequence.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "lookup_gene_sequence"
+  }
+}

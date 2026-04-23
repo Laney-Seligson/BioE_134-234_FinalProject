@@ -43,6 +43,13 @@ as the sequence argument — do not ask the user to paste the sequence.
 
 When a user refers to "miao 2013 targeted mutagensis rice" or "miao_2013_targeted_mutagenesis_rice", or "miao paper", or "rice paper", use the resource name `"miao_2013_targeted_mutagenesis_rice"` directly to fill the shorthand construction file — do not ask the user to paste the info.
 
+| Resource name | Description |
+|---------------|-------------|
+| `hall_2018_genome_editing_mice_crispr_cas9`      | This paper outlines a general protocol for genome editing in mice using CRISPR-Cas9, including sgRNA design, cloning, and in vitro transcription methods. It describes delivery of Cas9 and sgRNAs into mouse embryos via microinjection or electroporation to generate knockouts (NHEJ) or knockins (HDR). The paper also provides oligo templates and design rules for guide construction, along with validation methods such as PCR and sequencing. As a protocol-focused study, it is best used for workflow abstraction and design guidance rather than full sequence-level construction files. |
+
+When a user refers to "hall 2018 genome editing mice crispr cas9 paper" or "hall_2018_genome_editing_mice_crispr_cas9", or "hall paper", or "mouse paper", use the resource name `"hall_2018_genome_editing_mice_crispr_cas9"` directly to fill the shorthand construction file — do not ask the user to paste the info.
+
+
 ---
 
 ## Tools and when to use them

@@ -1,0 +1,156 @@
+{
+    "resource_type": "paper_important_info_v2",
+    "paper_id": "hall_2018_genome_editing_mice_crispr_cas9",
+    "title": "Genome Editing in Mice Using CRISPR/Cas9 Technology",
+    "source_pdf": "nihms-1865250.pdf",
+    "citation": {
+      "authors": [
+        "Bradford Hall",
+        "Andrew Cho",
+        "Advait Limaye",
+        "Kyoungin Cho",
+        "Jaspal Khillan",
+        "Ashok B. Kulkarni"
+      ],
+      "journal": "Current Protocols in Cell Biology",
+      "year": 2018
+    },
+    "organism": "Mus musculus",
+    "system": "CRISPR-Cas9",
+    "application": [
+      "knockout mouse generation via NHEJ",
+      "knockin mouse generation via HDR"
+    ],
+    "targets": [],
+    "vectors": [
+      "pX330-U6 Chimeric_BB-CBh-hSpCas9",
+      "pCAG-T3-hCAS-pA",
+      "pCAG-EGXXFP"
+    ],
+    "enzymes": [
+      "Cas9",
+      "BbsI",
+      "T7 Endonuclease I",
+      "Surveyor nuclease"
+    ],
+    "assembly_method": "Protocol-dependent; includes PCR-template sgRNA synthesis for IVT and optional BbsI cloning into pX330",
+    "delivery_method": [
+      "pronuclear microinjection",
+      "cytoplasmic injection",
+      "electroporation"
+    ],
+    "validation_methods": [
+      "blastocyst test",
+      "PCR",
+      "T7E1 mismatch assay",
+      "Surveyor mismatch assay",
+      "RFLP analysis",
+      "DNA sequencing"
+    ],
+    "oligo_information": {
+      "explicit_sequences": [
+        {
+          "name": "sgRNA_oligo_1_template",
+          "category": "sgRNA_template_oligo",
+          "sequence": "5'-gaaattaatacgactcactataggNNNNNNNNNNNNNNNNNNNNgttttagagctagaaatagc-3'",
+          "role": "Gene-specific oligo for PCR-based generation of an sgRNA template for IVT",
+          "source_context": "Basic Protocol 1, Method 1"
+        },
+        {
+          "name": "sgRNA_oligo_2_common",
+          "category": "sgRNA_template_oligo",
+          "sequence": "5'-aaaagcaccgactcggtgccactttttcaagttgataacggactagccttattttaacttgctatttctagctctaaaac-3'",
+          "role": "Common oligo encoding sgRNA backbone elements",
+          "source_context": "Basic Protocol 1, Method 1"
+        },
+        {
+          "name": "pX330_top_oligo_template",
+          "category": "cloning_oligo",
+          "sequence": "5'-CACCGNNNNNNNNNNNNNNNNNNN-3'",
+          "role": "Top oligo for guide cloning into BbsI-digested pX330",
+          "source_context": "Basic Protocol 1, Method 2"
+        },
+        {
+          "name": "pX330_bottom_oligo_template",
+          "category": "cloning_oligo",
+          "sequence": "5'-AAACNNNNNNNNNNNNNNNNNNNC-3'",
+          "role": "Bottom oligo for guide cloning into BbsI-digested pX330",
+          "source_context": "Basic Protocol 1, Method 2"
+        },
+        {
+          "name": "T7_sgRNA_F",
+          "category": "PCR_primer",
+          "sequence": "5'-ttaatacgactcactataggNNNNNNNNNNNNNNNNNNN-3'",
+          "role": "Forward primer used to add a T7 promoter for IVT after pX330 cloning",
+          "source_context": "Basic Protocol 1, Method 2"
+        },
+        {
+          "name": "T7_sgRNA_R",
+          "category": "PCR_primer",
+          "sequence": "5'-AAAAGCACCGACTCGGTGCC-3'",
+          "role": "Reverse primer for T7-based sgRNA template amplification",
+          "source_context": "Basic Protocol 1, Method 2"
+        },
+        {
+          "name": "Cas9_f",
+          "category": "PCR_primer",
+          "sequence": "TAATACGACTCACTATAGGGAGAATGGACTATAAGGACCACGAC",
+          "role": "Forward primer to make a PCR template for Cas9 IVT from pX330",
+          "source_context": "Basic Protocol 3, Forms of Cas9"
+        },
+        {
+          "name": "Cas9_r",
+          "category": "PCR_primer",
+          "sequence": "GCGAGCTCTAGGAATTCTTAC",
+          "role": "Reverse primer to make a PCR template for Cas9 IVT from pX330",
+          "source_context": "Basic Protocol 3, Forms of Cas9"
+        }
+      ],
+      "design_rules": [
+        {
+          "name": "Cas9_target_rule",
+          "rule_type": "target_selection",
+          "description": "Select a unique genomic target of about 20 bp immediately followed by an NGG PAM for SpCas9.",
+          "example_format": "5'-N20NGG-3'"
+        },
+        {
+          "name": "Guide_excludes_PAM",
+          "rule_type": "guide_design",
+          "description": "Do not include the NGG PAM in the sgRNA guide sequence itself."
+        },
+        {
+          "name": "Guide_count_rule",
+          "rule_type": "guide_selection",
+          "description": "Choose about 3 best sgRNAs with strong on-target scores and minimal off-target probability for further analysis."
+        },
+        {
+          "name": "GC_content_rule",
+          "rule_type": "guide_filtering",
+          "description": "Prefer overall GC content of roughly 40\u201360%, ideally with stronger GC content near the PAM-proximal seed region."
+        },
+        {
+          "name": "T7_G_rule",
+          "rule_type": "transcription_constraint",
+          "description": "T7 transcription prefers one or two leading guanines at initiation; if the selected guide already starts with one or two G bases, the extra added Gs can be reduced."
+        },
+        {
+          "name": "Knockin_distance_rule",
+          "rule_type": "HDR_design",
+          "description": "For knockin design, place the DSB as close as possible, ideally within about 10\u201320 bp, to the intended insertion site."
+        }
+      ],
+      "interpretation_notes": [
+        "This paper provides protocol-level oligo templates and design patterns rather than one fully specified experiment-specific oligo set for a single locus.",
+        "Sequences containing N placeholders are templates to be instantiated with a user-selected protospacer."
+      ]
+    },
+    "key_constraints": [
+      "This is a general mouse CRISPR protocol paper, not a single fixed construct paper.",
+      "The paper does not provide one complete construction-ready oligo set for a single experimental target.",
+      "The paper is best suited for protocol-style shorthand generation or rule-based oligo generation, not direct sequence-level reconstruction of one canonical build."
+    ],
+    "notes": [
+      "The paper describes sgRNA synthesis by PCR-template IVT, optional cloning into pX330 via BbsI, and direct use of synthetic crRNA/tracrRNA in Easi-CRISPR workflows.",
+      "Pronuclear microinjection is presented as the main delivery workflow, with electroporation discussed as an alternative."
+    ]
+  }

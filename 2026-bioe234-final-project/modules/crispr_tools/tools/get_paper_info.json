@@ -1,50 +1,34 @@
 {
-    "id": "org.bioe234.function.crispr.get_paper_info.v1",
-    "name": "Get Paper Info",
-    "description": "Load a curated paper information JSON record from the crispr_tools data directory so downstream tools can use structured paper metadata instead of guessing from the paper name.",
-    "type": "function",
-    "keywords": [
-      "paper",
-      "literature",
-      "metadata",
-      "CRISPR",
-      "workflow",
-      "resource loader"
-    ],
-    "date_created": null,
-    "date_last_modified": null,
-    "inputs": [
-      {
-        "name": "paper_id",
-        "type": "string",
-        "description": "Stable paper identifier or resource-like name, for example 'miao_2013_targeted_mutagenesis_rice' or 'resource://paper_info/miao_2013_targeted_mutagenesis_rice'."
-      }
-    ],
-    "outputs": [
-      {
-        "type": "object",
-        "description": "Curated paper information object with resource_type 'paper_important_info_v1'."
-      }
-    ],
-    "examples": [
-      {
-        "input": {
-          "paper_id": "miao_2013_targeted_mutagenesis_rice"
-        },
-        "output": {
-          "result": {
-            "resource_type": "paper_important_info_v1",
-            "paper_id": "miao_2013_targeted_mutagenesis_rice"
-          }
-        }
-      }
-    ],
-    "execution_details": {
-      "language": "Python",
-      "source": "modules/crispr_tools/tools/get_paper_info.py",
-      "initialization": "initiate",
-      "execution": "run",
-      "disposal": null,
-      "mcp_name": "get_paper_info"
+  "id": "org.bioe234.function.get_paper_info.v2",
+  "name": "get_paper_info",
+  "description": "Load a curated paper information JSON record from the crispr_tools data directory. Supports both v1 and v2 schemas. Returns normalized fields (targets, vectors, enzymes, assembly_method, delivery_method, validation_methods, key_constraints, notes) so downstream tools can operate consistently. v2 records may additionally include structured oligo_information (explicit_sequences and design_rules).",
+  "type": "function",
+  "keywords": [
+    "paper",
+    "literature",
+    "crispr",
+    "workflow",
+    "protocol",
+    "metadata",
+    "resource",
+    "oligos",
+    "design rules"
+  ],
+  "date_created": null,
+  "date_last_modified": null,
+
+  "inputs": [
+    {
+      "name": "paper_id",
+      "type": "string",
+      "description": "Unique identifier for the paper. The tool will search for files named <paper_id>.json or <paper_id>_v2.json in modules/crispr_tools/data/paper_info/."
     }
-  }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "Structured paper information with normalized fields. Always includes core fields (paper_id, title, organism, system, targets, vectors, enzymes, assembly_method, delivery_method, validation_methods, key_constraints, notes). May additionally include oligo_information if available."
+    }
+  ]
+}

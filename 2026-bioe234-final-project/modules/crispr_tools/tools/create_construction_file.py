@@ -344,37 +344,87 @@ class CreateConstructionFile:
     def _resolve_paper_info(
         self,
         paper_id: str,
-        paper_info_json: Any,
+        paper_info_json: Any = None,
     ) -> dict:
-        if isinstance(paper_info_json, dict) and paper_info_json:
-            data = dict(paper_info_json)
-            if data.get("resource_type") == "paper_important_info_v1":
-                return data
+        """
+        Resolve curated paper information from either:
+        - a dict passed directly as paper_info_json,
+        - a JSON string passed as paper_info_json,
+        - a file in modules/crispr_tools/data/paper_info/ named <paper_id>.json,
+        - or a v2 file named <paper_id>_v2.json.
 
+        Supports both paper_important_info_v1 and paper_important_info_v2.
+        This is intentionally done inside Create_Construction_File so Gemini does
+        not need to pass nested fields like oligo_information between tool calls.
+        """
+        allowed_types = {"paper_important_info_v1", "paper_important_info_v2"}
+
+        def _valid(data: Any) -> dict:
+            if not isinstance(data, dict):
+                return {}
+            if data.get("resource_type") not in allowed_types:
+                return {}
+            data = dict(data)
+            data.setdefault("paper_id", paper_id or data.get("paper_id", ""))
+            data.setdefault("title", data.get("paper_id", ""))
+            data.setdefault("source_pdf", "")
+            data.setdefault("organism", "")
+            data.setdefault("system", "")
+            data.setdefault("targets", [])
+            data.setdefault("vectors", [])
+            data.setdefault("enzymes", [])
+            data.setdefault("assembly_method", "")
+            data.setdefault("delivery_method", [])
+            data.setdefault("validation_methods", [])
+            data.setdefault("key_constraints", [])
+            data.setdefault("notes", [])
+            data.setdefault("oligo_information", None)
+            return data
+
+        # 1. Direct dict input.
+        direct = _valid(paper_info_json)
+        if direct:
+            return direct
+
+        # 2. JSON string input.
         if isinstance(paper_info_json, str) and paper_info_json.strip():
             try:
-                data = json.loads(paper_info_json)
+                direct = _valid(json.loads(paper_info_json))
+                if direct:
+                    return direct
             except Exception:
-                data = None
-            if isinstance(data, dict) and data.get("resource_type") == "paper_important_info_v1":
-                return data
+                pass
 
+        # 3. Local curated paper-info file lookup.
         normalized_id = self._normalize_paper_id(paper_id) if isinstance(paper_id, str) and paper_id.strip() else ""
         if not normalized_id:
             return {}
 
-        path = self._paper_info_dir() / f"{normalized_id}.json"
-        if not path.exists():
-            return {}
+        paper_dir = self._paper_info_dir()
+        candidate_paths = [
+            paper_dir / f"{normalized_id}.json",
+            paper_dir / f"{normalized_id}_v2.json",
+        ]
 
-        try:
-            import json
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
+        # If the user passed an id ending in _v2, also try the base name.
+        if normalized_id.endswith("_v2"):
+            base_id = normalized_id[:-3]
+            candidate_paths.extend([
+                paper_dir / f"{base_id}.json",
+                paper_dir / f"{base_id}_v2.json",
+            ])
 
-        if isinstance(data, dict) and data.get("resource_type") == "paper_important_info_v1":
-            return data
+        for path in candidate_paths:
+            if not path.exists():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            resolved = _valid(data)
+            if resolved:
+                return resolved
+
         return {}
 
 
@@ -655,41 +705,6 @@ class CreateConstructionFile:
 
         return operations
 
-    def _normalize_sequence(self, sequence: str) -> str:
-        if not isinstance(sequence, str) or not sequence.strip():
-            raise ValueError("sequence must be a non-empty string.")
-
-        raw = sequence.strip()
-
-        # Reject obvious unresolved placeholders / resource names
-        # instead of silently converting them into fake DNA.
-        if raw.startswith("resource://"):
-            raise ValueError(
-                f"sequence '{raw}' was not resolved before normalization."
-            )
-
-        cleaned = []
-        for char in raw.upper():
-            if char.isalpha():
-                cleaned.append(char)
-
-        cleaned = "".join(cleaned)
-
-        if not cleaned:
-            raise ValueError("sequence became empty after normalization.")
-
-        # Auto-convert RNA to DNA (U → T) — construction files are always DNA
-        cleaned = cleaned.replace("U", "T")
-
-        invalid = set(cleaned) - set("ACGTN")
-        if invalid:
-            raise ValueError(
-                "sequence contains invalid DNA characters or appears to be an unresolved "
-                f"resource/placeholder: {sorted(invalid)}"
-            )
-
-        return cleaned
-
     def _validate_parts(self, parts: list) -> list:
         validated = []
         seen_names = set()
@@ -923,6 +938,36 @@ class CreateConstructionFile:
             key_constraints = key_constraints if self._coerce_list(key_constraints) else resolved_info.get("key_constraints", [])
             paper_notes = paper_notes if self._coerce_list(paper_notes) else resolved_info.get("notes", [])
 
+            # v2/protocol-style paper records include oligo_information. These are
+            # reusable protocol/template papers rather than single construct papers,
+            # so they need protocol shorthand instead of normal plasmid assembly shorthand.
+            if resolved_info.get("oligo_information"):
+                if title:
+                    resolved_info["title"] = title
+                if source_pdf:
+                    resolved_info["source_pdf"] = source_pdf
+                if organism:
+                    resolved_info["organism"] = organism
+                if system:
+                    resolved_info["system"] = system
+                if self._coerce_list(targets):
+                    resolved_info["targets"] = self._coerce_list(targets)
+                if self._coerce_list(vectors):
+                    resolved_info["vectors"] = self._coerce_list(vectors)
+                if self._coerce_list(enzymes):
+                    resolved_info["enzymes"] = self._coerce_list(enzymes)
+                if assembly_method:
+                    resolved_info["assembly_method"] = assembly_method
+                if self._coerce_list(delivery_method):
+                    resolved_info["delivery_method"] = self._coerce_list(delivery_method)
+                if self._coerce_list(validation_methods):
+                    resolved_info["validation_methods"] = self._coerce_list(validation_methods)
+                if self._coerce_list(key_constraints):
+                    resolved_info["key_constraints"] = self._coerce_list(key_constraints)
+                if self._coerce_list(paper_notes):
+                    resolved_info["notes"] = self._coerce_list(paper_notes)
+                return self._build_protocol_template_shorthand(resolved_info)
+
         title = title.strip() if isinstance(title, str) else ""
         if not title:
             title = self._normalize_paper_id(paper_id)
@@ -986,6 +1031,36 @@ class CreateConstructionFile:
             key_constraints = key_constraints if self._coerce_list(key_constraints) else resolved_info.get("key_constraints", [])
             paper_notes = paper_notes if self._coerce_list(paper_notes) else resolved_info.get("notes", [])
 
+            # v2/protocol-style paper records include oligo_information. These are
+            # reusable protocol/template papers rather than single construct papers,
+            # so they need protocol shorthand instead of normal plasmid assembly shorthand.
+            if resolved_info.get("oligo_information"):
+                if title:
+                    resolved_info["title"] = title
+                if source_pdf:
+                    resolved_info["source_pdf"] = source_pdf
+                if organism:
+                    resolved_info["organism"] = organism
+                if system:
+                    resolved_info["system"] = system
+                if self._coerce_list(targets):
+                    resolved_info["targets"] = self._coerce_list(targets)
+                if self._coerce_list(vectors):
+                    resolved_info["vectors"] = self._coerce_list(vectors)
+                if self._coerce_list(enzymes):
+                    resolved_info["enzymes"] = self._coerce_list(enzymes)
+                if assembly_method:
+                    resolved_info["assembly_method"] = assembly_method
+                if self._coerce_list(delivery_method):
+                    resolved_info["delivery_method"] = self._coerce_list(delivery_method)
+                if self._coerce_list(validation_methods):
+                    resolved_info["validation_methods"] = self._coerce_list(validation_methods)
+                if self._coerce_list(key_constraints):
+                    resolved_info["key_constraints"] = self._coerce_list(key_constraints)
+                if self._coerce_list(paper_notes):
+                    resolved_info["notes"] = self._coerce_list(paper_notes)
+                return self._build_protocol_template_shorthand(resolved_info)
+
         title = title.strip() if isinstance(title, str) else ""
         if not title:
             title = self._normalize_paper_id(paper_id)
@@ -1039,6 +1114,141 @@ class CreateConstructionFile:
             "steps": steps,
             "key_constraints": constraints_list,
             "notes": notes_list,
+            "file_name": f"{self._sanitize_name(paper_id, 'paper')}_shorthand.txt",
+            "paper_shorthand_txt": shorthand_txt,
+            "text": shorthand_txt,
+        }
+
+    def _build_protocol_template_shorthand(self, paper_info: dict) -> dict:
+        """Build shorthand for protocol-style v2 paper records with oligo_information."""
+        if not isinstance(paper_info, dict):
+            raise ValueError("paper_info must be a dictionary for protocol shorthand generation.")
+
+        paper_id = str(paper_info.get("paper_id", "paper")).strip() or "paper"
+        title = str(paper_info.get("title", paper_id)).strip() or paper_id
+        source_pdf = str(paper_info.get("source_pdf", "")).strip()
+        organism = str(paper_info.get("organism", "organism")).strip() or "organism"
+        system = str(paper_info.get("system", "system")).strip() or "system"
+
+        vectors = self._coerce_list(paper_info.get("vectors", []))
+        enzymes = self._coerce_list(paper_info.get("enzymes", []))
+        delivery_methods = self._coerce_list(paper_info.get("delivery_method", []))
+        validation_methods = self._coerce_list(paper_info.get("validation_methods", []))
+        constraints = self._coerce_list(paper_info.get("key_constraints", []))
+        notes = self._coerce_list(paper_info.get("notes", []))
+
+        oligo_info = paper_info.get("oligo_information", {}) or {}
+        if not isinstance(oligo_info, dict):
+            oligo_info = {}
+        explicit_sequences = oligo_info.get("explicit_sequences", []) or []
+        design_rules = oligo_info.get("design_rules", []) or []
+        interpretation_notes = self._coerce_list(oligo_info.get("interpretation_notes", []))
+
+        declarations = []
+        seen = set()
+
+        def add_declaration(line: str) -> None:
+            if line not in seen:
+                declarations.append(line)
+                seen.add(line)
+
+        for vector in vectors:
+            add_declaration(f"plasmid {self._sanitize_name(vector, 'vector')}")
+        for enzyme in enzymes:
+            add_declaration(f"enzyme {self._sanitize_name(enzyme, 'enzyme')}")
+        add_declaration(f"cell {self._sanitize_name(organism, 'target_cells')}")
+
+        steps = []
+        for item in explicit_sequences:
+            if not isinstance(item, dict):
+                continue
+            name = self._sanitize_name(str(item.get("name", "oligo_template")), "oligo_template")
+            category = self._sanitize_name(str(item.get("category", "template")), "template")
+            steps.append(f"oligo_template {name} {category}")
+
+        enzyme_tokens = [self._sanitize_name(e, "enzyme") for e in enzymes]
+        vector_tokens = [self._sanitize_name(v, "vector") for v in vectors]
+        bbsI_present = any(e.lower() == "bbsi" for e in enzyme_tokens)
+        if bbsI_present and vector_tokens:
+            guide_vector = None
+            for vector in vector_tokens:
+                lower = vector.lower()
+                if "px330" in lower or "sgrna" in lower or "grna" in lower:
+                    guide_vector = vector
+                    break
+            guide_vector = guide_vector or vector_tokens[0]
+            steps.append(f"digest {guide_vector} BbsI guide_vector_digest")
+            steps.append("ligate guide_oligo_pair guide_vector_digest sgRNA_construct")
+
+        explicit_text = json.dumps(explicit_sequences).lower()
+        has_t7 = "t7" in explicit_text or any("t7" in e.lower() for e in enzymes)
+        if has_t7:
+            steps.append("ivt sgRNA_template T7 sgRNA")
+
+        delivery = self._sanitize_name(delivery_methods[0], "delivery") if delivery_methods else "delivery"
+        target_cell = self._sanitize_name(organism, "target_cells")
+        if "microinjection" in delivery.lower() or "injection" in delivery.lower():
+            steps.append(f"deliver Cas9 sgRNA {target_cell}_zygote {delivery} edited_zygote")
+        elif "electroporation" in delivery.lower():
+            steps.append(f"deliver Cas9 sgRNA {target_cell}_zygote electroporation edited_zygote")
+        else:
+            steps.append(f"deliver Cas9 sgRNA {target_cell} {delivery} edited_cells")
+
+        validation_lower = " ".join(validation_methods).lower()
+        if "pcr" in validation_lower:
+            steps.append("pcr genotype_F genotype_R edited_sample genotype_amplicon")
+        if "t7e1" in validation_lower or "survey" in validation_lower or "mismatch" in validation_lower:
+            steps.append("screen genotype_amplicon mismatch_assay indel_screen")
+        if "rflp" in validation_lower:
+            steps.append("screen genotype_amplicon RFLP knockin_screen")
+        if "sequence" in validation_lower or "sequencing" in validation_lower:
+            steps.append("sequence genotype_amplicon Sanger confirmed_edit")
+
+        design_rule_comments = []
+        for rule in design_rules:
+            if not isinstance(rule, dict):
+                continue
+            rule_name = rule.get("name", "design_rule")
+            description = rule.get("description", "")
+            if description:
+                design_rule_comments.append(f"# design_rule {rule_name}: {description}")
+
+        lines = [f"# Paper shorthand for: {title}", f"# paper_id: {paper_id}"]
+        if source_pdf:
+            lines.append(f"# source_pdf: {source_pdf}")
+        lines.extend([f"# organism: {organism}", f"# system: {system}", "# protocol_style: true"])
+        for constraint in constraints:
+            lines.append(f"# constraint: {constraint}")
+        for note in notes:
+            lines.append(f"# note: {note}")
+        for note in interpretation_notes:
+            lines.append(f"# note: {note}")
+
+        if design_rule_comments:
+            lines.append("")
+            lines.extend(design_rule_comments)
+        if declarations:
+            lines.append("")
+            lines.extend(declarations)
+        if steps:
+            lines.append("")
+            lines.extend(steps)
+        shorthand_txt = "\n".join(lines)
+
+        return {
+            "mode": "paper_shorthand",
+            "resource_type": "paper_shorthand_v1",
+            "paper_id": paper_id,
+            "title": title,
+            "source_pdf": source_pdf,
+            "organism": organism,
+            "system": system,
+            "protocol_style": True,
+            "declarations": declarations,
+            "steps": steps,
+            "key_constraints": constraints,
+            "notes": notes + interpretation_notes,
+            "oligo_information": oligo_info,
             "file_name": f"{self._sanitize_name(paper_id, 'paper')}_shorthand.txt",
             "paper_shorthand_txt": shorthand_txt,
             "text": shorthand_txt,

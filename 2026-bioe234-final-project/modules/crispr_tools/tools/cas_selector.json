@@ -1,7 +1,7 @@
 {
   "id": "org.bioe234.function.crispr.cas_selector.v1",
   "name": "CRISPR Nuclease Selector",
-  "description": "Analyzes the GC and AT content of a DNA sequence and recommends Cas9 (for GC-rich genomes, NGG PAM) or Cas12a (for AT-rich genomes, TTTV PAM).",
+  "description": "Recommends Cas9 or Cas12a for a CRISPR experiment. First compares valid guide counts (NGG for Cas9, TTTV for Cas12a); the nuclease with clearly more guides wins if the ratio meets margin_threshold (default 1.5x). When counts are within the margin, secondary criteria apply: multiplexing favors Cas12a, high specificity favors Cas12a, otherwise Cas9 is the default. AT-richness is reported as supporting context but does not override the primary signals.",
   "type": "function",
   "keywords": ["CRISPR", "Cas9", "Cas12a", "GC content", "AT content", "PAM", "nuclease", "genome editing"],
   "date_created": null,
@@ -12,28 +12,49 @@
       "name": "seq",
       "type": "string",
       "description": "DNA sequence to analyze. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves the format automatically before passing a clean sequence to the function."
+    },
+    {
+      "name": "repair_template",
+      "type": "boolean",
+      "description": "True if a homology-directed repair (HDR) donor template will be provided; False for NHEJ-based knockout or indel. Noted in the rationale but does not change the nuclease recommendation -- both Cas9 and Cas12a support HDR and NHEJ."
+    },
+    {
+      "name": "num_targets",
+      "type": "integer",
+      "description": "Number of distinct genomic loci to edit in one experiment. Values >= 2 indicate multiplexing. Defaults to 1. Multiplexing biases toward Cas12a because it processes crRNA arrays from a single transcript, simplifying multi-locus editing.",
+      "default": 1
+    },
+    {
+      "name": "margin_threshold",
+      "type": "number",
+      "description": "Minimum ratio by which one nuclease must exceed the other's valid guide count for the count difference to drive the recommendation. Must be >= 1.0. Default 1.5 means one nuclease needs at least 50% more valid guides (e.g. 40 vs 36 is a tie; 40 vs 20 is a clear win). When counts fall within this margin, secondary criteria (multiplexing, specificity, default Cas9) decide.",
+      "default": 1.5
     }
   ],
 
   "outputs": [
     {
       "type": "object",
-      "description": "A dictionary with gc_fraction (float), at_fraction (float), recommendation ('Cas9' or 'Cas12a'), and rationale (str explaining the choice)."
+      "description": "A dictionary with ngg_count, tttv_count, recommendation ('Cas9' or 'Cas12a'), and rationale explaining the recommendation based on PAM density, repair strategy, and multiplexing needs."
     }
   ],
 
   "examples": [
     {
-      "input":  { "seq": "GCGCGCGCGC" },
-      "output": { "result": {"gc_fraction": 1.0, "at_fraction": 0.0, "recommendation": "Cas9", "rationale": "GC content is 100.0%, so NGG PAM sites (used by Cas9) are relatively abundant — Cas9 is the preferred CRISPR nuclease."} }
+      "input":  { "seq": "GCGCGCGCGC", "repair_template": false, "num_targets": 1 },
+      "output": { "result": {"ngg_count": 2, "tttv_count": 0, "recommendation": "Cas9"} }
     },
     {
-      "input":  { "seq": "ATATATATAT" },
-      "output": { "result": {"gc_fraction": 0.0, "at_fraction": 1.0, "recommendation": "Cas12a", "rationale": "AT content is 100.0%, so TTTV PAM sites (used by Cas12a) are relatively abundant — Cas12a is the preferred CRISPR nuclease."} }
+      "input":  { "seq": "ATATATATAT", "repair_template": false, "num_targets": 1 },
+      "output": { "result": {"ngg_count": 0, "tttv_count": 3, "recommendation": "Cas12a"} }
     },
     {
-      "input":  { "seq": "ATGCATGC" },
-      "output": { "result": {"gc_fraction": 0.5, "at_fraction": 0.5, "recommendation": "Cas9", "rationale": "GC content is 50.0%, so NGG PAM sites (used by Cas9) are relatively abundant — Cas9 is the preferred CRISPR nuclease."} }
+      "input":  { "seq": "GCGCGCGCGC", "repair_template": true, "num_targets": 1 },
+      "output": { "result": {"recommendation": "Cas9"} }
+    },
+    {
+      "input":  { "seq": "GCGCGCGCGC", "repair_template": false, "num_targets": 3 },
+      "output": { "result": {"recommendation": "Cas12a"} }
     }
   ],
 

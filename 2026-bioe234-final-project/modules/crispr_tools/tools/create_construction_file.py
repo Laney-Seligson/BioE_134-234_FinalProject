@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any
 
 
@@ -151,12 +152,8 @@ class CreateConstructionFile:
         if assembly_strategy not in self.allowed_strategies:
             raise ValueError(f"assembly_strategy must be one of {sorted(self.allowed_strategies)}.")
 
-        for field_name, seq_value in (
-            ("backbone_sequence", backbone_sequence),
-            ("insert_sequence", insert_sequence),
-        ):
-            if isinstance(seq_value, str) and seq_value.strip().startswith("resource://"):
-                raise ValueError(f"{field_name} was not resolved from the resource before validation.")
+        backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
+        insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
 
         self._validate_user_inputs(
             assembly_strategy=assembly_strategy,
@@ -284,8 +281,6 @@ class CreateConstructionFile:
             raise ValueError("sequence must be a non-empty string.")
 
         raw = sequence.strip()
-        if raw.startswith("resource://"):
-            raise ValueError(f"sequence '{raw}' was not resolved before normalization.")
 
         cleaned = []
         for char in raw.upper():
@@ -299,8 +294,8 @@ class CreateConstructionFile:
         invalid = set(cleaned) - set("ACGTN")
         if invalid:
             raise ValueError(
-                "sequence contains invalid DNA characters or appears to be an unresolved "
-                f"resource/placeholder: {sorted(invalid)}"
+                "Sequence contains invalid DNA characters after resolution. "
+                f"Invalid characters: {sorted(invalid)}"
             )
         return cleaned
 
@@ -475,6 +470,92 @@ class CreateConstructionFile:
                 )
 
         return parts
+
+    def _resolve_sequence_input(self, value: str, field_name: str) -> str:
+        """
+        Resolve a sequence input that may be a raw DNA string, a known resource
+        name like 'pET28a', an MCP-style resource URI, or a local FASTA/GenBank file.
+        Returns a raw DNA sequence string.
+        """
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{field_name} must be a non-empty string.")
+
+        raw = value.strip()
+
+        # Already looks like DNA; let _normalize_sequence clean it later.
+        dna_chars = set("ACGTNacgtn")
+        compact = "".join(ch for ch in raw if ch.isalpha())
+        if compact and set(compact) <= dna_chars:
+            return raw
+
+        # MCP-style resource URI.
+        if raw.startswith("resource://"):
+            resource_name = raw.split("/")[-1]
+            resolved = self._load_sequence_resource_by_name(resource_name)
+            if resolved:
+                return resolved
+            raise ValueError(
+                f"{field_name} resource '{raw}' could not be resolved to a sequence."
+            )
+
+        # Plain resource names like pET28a, pBR322, pUC19.
+        resolved = self._load_sequence_resource_by_name(raw)
+        if resolved:
+            return resolved
+
+        # Local file path.
+        maybe_path = Path(raw)
+        if maybe_path.exists() and maybe_path.is_file():
+            suffix = maybe_path.suffix.lower()
+            if suffix in {".fa", ".fasta", ".fna"}:
+                return self._read_fasta_file(maybe_path)
+            if suffix in {".gb", ".gbk", ".genbank"}:
+                return self._read_genbank_file(maybe_path)
+
+        raise ValueError(
+            f"{field_name} does not look like a valid DNA sequence and could not be "
+            f"resolved as a known resource or file: '{raw}'"
+        )
+
+    def _load_sequence_resource_by_name(self, name: str) -> str | None:
+        """Resolve known sequence resources from module data directories."""
+        normalized = name.strip()
+
+        candidate_paths = [
+            Path("modules/crispr_tools/data") / f"{normalized}.gb",
+            Path("modules/crispr_tools/data") / f"{normalized}.gbk",
+            Path("modules/crispr_tools/data") / f"{normalized}.fasta",
+            Path("modules/crispr_tools/data") / f"{normalized}.fa",
+            Path("modules/seq_basics/data") / f"{normalized}.gb",
+            Path("modules/seq_basics/data") / f"{normalized}.gbk",
+            Path("modules/seq_basics/data") / f"{normalized}.fasta",
+            Path("modules/seq_basics/data") / f"{normalized}.fa",
+        ]
+
+        for path in candidate_paths:
+            if path.exists():
+                suffix = path.suffix.lower()
+                if suffix in {".fa", ".fasta", ".fna"}:
+                    return self._read_fasta_file(path)
+                if suffix in {".gb", ".gbk", ".genbank"}:
+                    return self._read_genbank_file(path)
+        return None
+
+    def _read_fasta_file(self, path: Path) -> str:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        seq_lines = [line.strip() for line in lines if line.strip() and not line.startswith(">")]
+        seq = "".join(seq_lines)
+        return self._normalize_sequence(seq)
+
+    def _read_genbank_file(self, path: Path) -> str:
+        text = path.read_text(encoding="utf-8")
+        if "ORIGIN" not in text:
+            raise ValueError(f"GenBank file '{path}' is missing ORIGIN section.")
+
+        origin = text.split("ORIGIN", 1)[1]
+        origin = origin.split("//", 1)[0]
+        letters_only = "".join(ch for ch in origin if ch.isalpha())
+        return self._normalize_sequence(letters_only)
 
     def _build_operations(
         self,

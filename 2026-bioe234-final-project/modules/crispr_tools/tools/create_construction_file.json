@@ -1,7 +1,7 @@
 {
   "id": "org.bioe234.function.create_construction_file.v2",
   "name": "Create_Construction_File",
-  "description": "Generate either (1) a full DNA cloning construction file from sequences, (2) a structured paper information resource, or (3) a shorthand construction workflow derived from a paper. Always choose the correct input_mode before calling this tool.",
+  "description": "Generate either (1) a full DNA cloning construction file from sequences, (2) a structured paper information resource, or (3) a shorthand construction workflow derived from a paper. Always choose the correct input_mode before calling this tool. Before calling, you MUST gather ALL required fields. If ANY required field is missing or unclear, DO NOT call the tool. Instead, ask for ALL missing fields in ONE message. NEVER pass placeholder text (e.g. 'Please provide...') into any sequence field.",
   "type": "function",
   "keywords": [
     "cloning",

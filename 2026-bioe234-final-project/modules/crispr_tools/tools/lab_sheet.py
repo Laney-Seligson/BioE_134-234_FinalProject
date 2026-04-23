@@ -209,6 +209,84 @@ def _format_transform_section(op: dict, thread: str) -> str:
     return "\n".join(lines)
 
 
+def _format_pick_section(op: dict, thread: str) -> str:
+    params = op.get("parameters", {})
+    inputs = op.get("inputs", [])
+    strain = params.get("cells", "Mach1")
+    antibiotic = params.get("selection", "Amp")
+    product = inputs[0] if inputs else op.get("output", "")
+
+    rows = [
+        [f"{thread}1", product, strain, antibiotic, "37°C", "2", f"{thread}1A, {thread}1B"]
+    ]
+    samples_table = _col_table(
+        ["source", "product", "strain", "antibiotic", "incubate", "number", "labels"], rows
+    )
+
+    return "\n".join([
+        f"{thread}: Pick",
+        "",
+        "samples:",
+        samples_table,
+    ])
+
+
+def _format_miniprep_section(op: dict, thread: str) -> str:
+    params = op.get("parameters", {})
+    inputs = op.get("inputs", [])
+    product = inputs[0] if inputs else op.get("output", "")
+
+    rows = [
+        [f"{thread}1A", f"{product}-A", f"box{thread}/C1"],
+        [f"{thread}1B", f"{product}-B", f"box{thread}/D1"],
+    ]
+    samples_table = _col_table(["culture", "label", "location"], rows)
+
+    return "\n".join([
+        f"{thread}: Miniprep",
+        "",
+        "samples:",
+        samples_table,
+        "",
+        "note:",
+        f"Write the short label (e.g. {thread}1A) on the top of the eppendorf,",
+        "put the full name (the label column) on the side of the tube.",
+    ])
+
+
+def _format_sequencing_section(op: dict, thread: str) -> str:
+    params = op.get("parameters", {})
+    inputs = op.get("inputs", [])
+    product = inputs[0] if inputs else op.get("output", "")
+
+    src_rows = [
+        [f"{thread}1A", f"box{thread}/C1", f"{product}-A"],
+        [f"{thread}1B", f"box{thread}/D1", f"{product}-B"],
+        ["L4440", "oligos1/J1", "sequencing primer"],
+    ]
+    source_table = _col_table(["label", "location", "product"], src_rows)
+
+    return "\n".join([
+        f"{thread}: Sequencing",
+        "",
+        "sources:",
+        source_table,
+        "",
+        "Instructions:",
+        "Resuspend the oligo L4440 to the appropriate volume for a 100 uM stock.",
+        "In an eppendorf, prepare a 2.66 uM dilute stock of L4440 as:",
+        "  487 uL ddH2O",
+        "  13.3 uL of 100 uM oligo",
+        "For each plasmid listed, mix the following sequencing reactions in an eppendorf tube:",
+        "  6 uL ddH2O",
+        "  4 uL miniprep DNA (undiluted)",
+        "  3 uL oligo (2.66 uM)",
+        f'Label the tops of the tubes with the label (e.g. "{thread}1A").',
+        "When done, save the L4440 stock at: oligos1/A5",
+        "Take the sequencing reactions and order form to: 237 Stanley Hall (second floor cold room)",
+    ])
+
+
 def _format_direct_synthesis_section(op: dict, thread: str) -> str:
     inputs = op.get("inputs", [])
     output = op.get("output", "")
@@ -299,6 +377,9 @@ class LabSheet:
 
         for op in transform_ops:
             sections.append(_format_transform_section(op, thread))
+            sections.append(_format_pick_section(op, thread))
+            sections.append(_format_miniprep_section(op, thread))
+            sections.append(_format_sequencing_section(op, thread))
 
         for op in direct_ops:
             sections.append(_format_direct_synthesis_section(op, thread))

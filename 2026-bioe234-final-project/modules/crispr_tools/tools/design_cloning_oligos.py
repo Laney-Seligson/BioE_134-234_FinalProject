@@ -2,11 +2,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from modules.crispr_tools.tools.crispr_defaults import (
-    DEFAULT_VECTOR_BY_REFERENCE,
-    E_COLI_PCRISPR_DEFAULTS,
-)
-
 
 @dataclass(frozen=True)
 class VectorConfig:
@@ -31,9 +26,8 @@ class LocalReference:
 
 
 TOOL_DIR = Path(__file__).resolve().parent
-MODULE_DIR = TOOL_DIR.parent
-PROJECT_ROOT = MODULE_DIR.parent.parent
-WORKSPACE_ROOT = PROJECT_ROOT.parent
+CRISPR_TOOLS_DIR = TOOL_DIR.parent
+BUNDLED_DATA_DIR = CRISPR_TOOLS_DIR / "data"
 
 
 VECTOR_CONFIG = {
@@ -77,15 +71,28 @@ VECTOR_CONFIG = {
         ),
     ),
     "pcrispr": VectorConfig(
-        assembly_method=E_COLI_PCRISPR_DEFAULTS["assembly_method"],
-        enzyme=E_COLI_PCRISPR_DEFAULTS["enzyme"],
-        top_overhang=E_COLI_PCRISPR_DEFAULTS["top_overhang"],
-        bottom_overhang=E_COLI_PCRISPR_DEFAULTS["bottom_overhang"],
-        u6_requires_5prime_g=E_COLI_PCRISPR_DEFAULTS["u6_requires_5prime_g"],
-        cell_strain=E_COLI_PCRISPR_DEFAULTS["cell_strain"],
-        selection=E_COLI_PCRISPR_DEFAULTS["selection"],
-        notes=E_COLI_PCRISPR_DEFAULTS["notes"],
-        source=E_COLI_PCRISPR_DEFAULTS["source"],
+        assembly_method="golden_gate",
+        enzyme="BsaI",
+        top_overhang="AAAC",
+        bottom_overhang="AAAAC",
+        u6_requires_5prime_g=False,
+        backbone_resource="pCRISPR_rpsL",
+        cell_strain="HME63 or MG1655 carrying pCas9",
+        selection="Kan",
+        notes=(
+            "E. coli pCRISPR::rpsL guide-array plasmid used with a separate "
+            "pCas9 plasmid carrying tracrRNA and Cas9. The local backbone "
+            "sequence is Addgene plasmid #44505, pCRISPR::rpsL. Jiang et al. "
+            "used this two-plasmid system with Lambda Red recombineering for "
+            "efficient genome editing."
+        ),
+        source=(
+            "Jiang et al. Nat Biotechnol 2013, doi:10.1038/nbt.2508; "
+            "Addgene plasmid #44505 pCRISPR::rpsL; pCas9 carries tracrRNA/Cas9 "
+            "and pCRISPR carries the spacer array. Supplementary Fig. 9 and "
+            "Supplementary Table 2 describe BsaI insertion of spacers into "
+            "pCRISPR using AAAC/AAAAC-style oligos."
+        ),
     ),
     "pet28a": VectorConfig(
         assembly_method="golden_gate",
@@ -123,8 +130,9 @@ VECTOR_CONFIG = {
 
 
 BACKBONE_RESOURCES = {
-    "pET28a": MODULE_DIR / "data" / "pET28a.gb",
-    "pBR322": MODULE_DIR / "data" / "pBR322.gb",
+    "pET28a": BUNDLED_DATA_DIR / "pET28a.gb",
+    "pBR322": BUNDLED_DATA_DIR / "pBR322.gb",
+    "pCRISPR_rpsL": BUNDLED_DATA_DIR / "pCRISPR_rpsL.gbk",
 }
 
 
@@ -133,8 +141,7 @@ LOCAL_REFERENCES = {
         organism="Escherichia coli str. K-12 substr. MG1655",
         resource_name="ecoli_rpsl",
         path=(
-            MODULE_DIR
-            / "data"
+            BUNDLED_DATA_DIR
             / "references"
             / "ecoli_rpsl"
             / "ncbi_dataset"
@@ -147,10 +154,18 @@ LOCAL_REFERENCES = {
 
 
 ORGANISM_ALIASES = {
+    "e coli": "ecoli_rpsl",
+    "e. coli": "ecoli_rpsl",
     "e_coli": "ecoli_rpsl",
     "ecoli": "ecoli_rpsl",
     "escherichia coli": "ecoli_rpsl",
     "rpsl": "ecoli_rpsl",
+    "stra": "ecoli_rpsl",
+}
+
+
+DEFAULT_VECTOR_BY_REFERENCE = {
+    "ecoli_rpsl": "pcrispr",
 }
 
 
@@ -217,6 +232,7 @@ class DesignCloningOligos:
     ) -> Optional[LocalReference]:
         if target_reference:
             key = target_reference.strip().lower().replace(" ", "_")
+            key = ORGANISM_ALIASES.get(key, key)
         elif organism:
             organism_key = organism.strip().lower().replace("-", " ")
             key = ORGANISM_ALIASES.get(organism_key)

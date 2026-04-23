@@ -104,6 +104,9 @@ def test_design_cloning_oligos_defaults_to_ecoli_pcrispr_reference():
     assert result["target_verification"]["reference"] == "ecoli_rpsl"
     assert result["top_oligo"] == "AAACTACTTTACGCAGCGCGGAGT"
     assert result["bottom_oligo"] == "AAAACACTCCGCGCTGCGTAAAGTA"
+    assert result["construction_file_inputs"]["backbone_name"] == "pCRISPR_rpsL"
+    assert result["construction_file_inputs"]["backbone_sequence"] != "N"
+    assert len(result["construction_file_inputs"]["backbone_sequence"]) == 2433
     assert result["construction_file_inputs"]["cell_strain"] == "HME63 or MG1655 carrying pCas9"
     assert result["construction_file_inputs"]["selection"] == "Kan"
 

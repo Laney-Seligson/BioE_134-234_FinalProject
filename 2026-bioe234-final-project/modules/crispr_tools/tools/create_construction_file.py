@@ -574,6 +574,41 @@ class CreateConstructionFile:
 
         return operations
 
+    def _normalize_sequence(self, sequence: str) -> str:
+        if not isinstance(sequence, str) or not sequence.strip():
+            raise ValueError("sequence must be a non-empty string.")
+
+        raw = sequence.strip()
+
+        # Reject obvious unresolved placeholders / resource names
+        # instead of silently converting them into fake DNA.
+        if raw.startswith("resource://"):
+            raise ValueError(
+                f"sequence '{raw}' was not resolved before normalization."
+            )
+
+        cleaned = []
+        for char in raw.upper():
+            if char.isalpha():
+                cleaned.append(char)
+
+        cleaned = "".join(cleaned)
+
+        if not cleaned:
+            raise ValueError("sequence became empty after normalization.")
+
+        # Auto-convert RNA to DNA (U → T) — construction files are always DNA
+        cleaned = cleaned.replace("U", "T")
+
+        invalid = set(cleaned) - set("ACGTN")
+        if invalid:
+            raise ValueError(
+                "sequence contains invalid DNA characters or appears to be an unresolved "
+                f"resource/placeholder: {sorted(invalid)}"
+            )
+
+        return cleaned
+
     def _validate_parts(self, parts: list) -> list:
         validated = []
         seen_names = set()

@@ -58,5 +58,147 @@
     "expected_tool": "crispr_verify_edit",
     "expected_args": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "reference": "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" },
     "notes": "Raw sequence input — should find protospacer at position 15, PAM TGG, cut at 32."
-  }
+  },
+  {
+    "prompt": "Make a Golden Gate construction file using pET28a and a simple insert sequence.",
+    "expected_tool": "create_construction_file",
+    "expected_args": {
+      "assembly_strategy": "GoldenGate",
+      "backbone_sequence": "pET28a"
+    },
+    "notes": "Tests minimal user input. Model should ask for missing primers before calling tool."
+  },
+  {
+    "prompt": "Create a cloning plan for inserting a gene into pET28a using Golden Gate.",
+    "expected_tool": "create_construction_file",
+    "expected_args": {
+      "assembly_strategy": "GoldenGate",
+      "backbone_sequence": "pET28a"
+    },
+    "notes": "High-level request — model should gather required primer and sequence info."
+  },
+  {
+    "prompt": "Generate a construction file for Gibson assembly with pET28a.",
+    "expected_tool": "create_construction_file",
+    "expected_args": {
+      "assembly_strategy": "Gibson",
+      "backbone_sequence": "pET28a"
+    },
+    "notes": "Tests Gibson pathway and missing overlap primer handling."
+  },
+  {
+    "prompt": "Make a construction file using this insert ATGAAATTTGGGCCC and pET28a.",
+    "expected_tool": "create_construction_file",
+    "expected_args": {
+      "insert_sequence": "ATGAAATTTGGGCCC",
+      "backbone_sequence": "pET28a"
+    },
+    "notes": "Tests raw insert input with resource backbone."
+  },
+  {
+    "prompt": "Create a Golden Gate cloning file with enzyme BsaI and pET28a backbone.",
+    "expected_tool": "create_construction_file",
+    "expected_args": {
+      "assembly_strategy": "GoldenGate",
+      "enzyme": "BsaI",
+      "backbone_sequence": "pET28a"
+    },
+    "notes": "Tests enzyme handling and missing primer fields."
+  },
+  {
+    "prompt": "Check if my Golden Gate cloning plan works with pET28a and a small insert.",
+    "expected_tool": "validate_construction_file",
+    "expected_args": {
+      "backbone_sequence": "pET28a"
+    },
+    "notes": "Model should ask for primers and insert before validation."
+  },
+  {
+    "prompt": "Validate a cloning workflow using pET28a and an insert ATGAAATTTGGGCCC.",
+    "expected_tool": "validate_construction_file",
+    "expected_args": {
+      "backbone_sequence": "pET28a",
+      "insert_sequence": "ATGAAATTTGGGCCC"
+    },
+    "notes": "Tests validation with minimal valid inputs."
+  },
+  {
+    "prompt": "Does this Golden Gate design look correct?",
+    "expected_tool": "validate_construction_file",
+    "expected_args": {},
+    "notes": "Should trigger clarification — no inputs provided."
+  },
+  {
+    "prompt": "Check if my primers will amplify the insert correctly.",
+    "expected_tool": "validate_construction_file",
+    "expected_args": {},
+    "notes": "Model should request insert + primer sequences before calling tool."
+  },
+  {
+    "prompt": "Verify that this cloning experiment will produce the correct plasmid.",
+    "expected_tool": "validate_construction_file",
+    "expected_args": {},
+    "notes": "High-level intent — tests whether model gathers all required fields first."
+  },
+  [
+    {
+      "prompt": "Make a shorthand construction file from the Miao 2013 paper.",
+      "expected_tool": "create_construction_file",
+      "expected_args": {
+        "input_mode": "paper_shorthand",
+        "paper_id": "miao_2013_targeted_mutagenesis_rice"
+      },
+      "notes": "Basic shorthand request using known paper ID."
+    },
+    {
+      "prompt": "Generate a workflow from the rice CRISPR paper by Miao.",
+      "expected_tool": "create_construction_file",
+      "expected_args": {
+        "input_mode": "paper_shorthand"
+      },
+      "notes": "Tests whether model maps natural language → correct paper_id."
+    },
+    {
+      "prompt": "Create a shorthand cloning workflow for a CRISPR experiment in rice.",
+      "expected_tool": "create_construction_file",
+      "expected_args": {
+        "input_mode": "paper_shorthand"
+      },
+      "notes": "More ambiguous — tests if model asks for which paper or infers Miao 2013."
+    },
+    {
+      "prompt": "Turn this paper into a shorthand construction file.",
+      "expected_tool": "create_construction_file",
+      "expected_args": {
+        "input_mode": "paper_shorthand"
+      },
+      "notes": "Should trigger clarification if no paper is specified."
+    },
+    {
+      "prompt": "Give me a cloning workflow from miao_2013_targeted_mutagenesis_rice.",
+      "expected_tool": "create_construction_file",
+      "expected_args": {
+        "input_mode": "paper_shorthand",
+        "paper_id": "miao_2013_targeted_mutagenesis_rice"
+      },
+      "notes": "Direct resource-style reference."
+    },
+    {
+      "prompt": "Summarize the experimental workflow from the Miao CRISPR rice study.",
+      "expected_tool": "create_construction_file",
+      "expected_args": {
+        "input_mode": "paper_shorthand"
+      },
+      "notes": "Tests mapping of 'workflow summary' → shorthand mode."
+    },
+    {
+      "prompt": "Make a shorthand construction file using paper info for miao_2013_targeted_mutagenesis_rice.",
+      "expected_tool": "create_construction_file",
+      "expected_args": {
+        "input_mode": "paper_shorthand",
+        "paper_id": "miao_2013_targeted_mutagenesis_rice"
+      },
+      "notes": "Explicit test of paper_info → shorthand pipeline."
+    }
+  ]
 ]

@@ -726,30 +726,42 @@ class CRISPRCloningDesigner:
                 "Type IIS cloning overhangs are vector-specific and are not determined by the guide sequence. "
                 "Please provide the bottom-strand 5′ overhang from the plasmid map or protocol."
                 )
-        if not enzyme:
+        resolved_enzyme = enzyme or (spec.enzyme if spec else None)
+        if not resolved_enzyme:
             missing.append("enzyme")
             questions.append(
                 "Which Type IIS restriction enzyme does your vector use? "
                 "(e.g. BbsI, BsmBI, BsaI)"
             )
-        if scaffold_in_vector is None:
+
+        resolved_scaffold = scaffold_in_vector if scaffold_in_vector is not None else (
+            spec.scaffold_in_vector if spec else None
+        )
+        if resolved_scaffold is None:
             missing.append("scaffold_in_vector")
             questions.append(
                 "Is the sgRNA scaffold already encoded in the vector? "
                 "(True for most guide-cloning vectors; False if you are cloning "
                 "the entire guide + scaffold as the insert)"
             )
-        if promoter is None:
+
+        resolved_promoter = promoter or (spec.promoter if spec else None)
+        if resolved_promoter is None:
             missing.append("promoter")
             questions.append(
                 "What promoter does your vector use to drive the guide RNA? "
                 "(e.g. U6, H1, T7 — affects whether a 5′G is needed)"
             )
-        if u6_prefers_5prime_g is None:
+
+        resolved_prepend_g = u6_prefers_5prime_g if u6_prefers_5prime_g is not None else (
+            spec.u6_prefers_5prime_g if spec else None
+        )
+        if resolved_prepend_g is None:
             missing.append("u6_prefers_5prime_g")
             questions.append(
                 "Should a 5′G be prepended when the protospacer does not already "
-                "start with G? (recommended for U6-driven guides; not needed for T7)")
+                "start with G? (recommended for U6-driven guides; not needed for T7)"
+            )
         if missing: 
             return _needs_user_input(
                 cloning_method="TypeIISOligoCloning",

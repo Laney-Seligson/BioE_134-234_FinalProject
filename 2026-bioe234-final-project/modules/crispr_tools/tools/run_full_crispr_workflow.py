@@ -56,6 +56,29 @@ _VECTOR_RECOMMENDATIONS: dict[str, list[dict]] = {
             "citation": "Jiang et al. Nat Biotechnol 2015. doi:10.1038/nbt.3234",
         },
     ],
+    "plant": [
+        {
+            "vector_key": "pkse401",
+            "vector_name": "pKSE401",
+            "use_case": "Binary vector for Agrobacterium-mediated CRISPR in Arabidopsis and other dicots. Expresses SpCas9 under 35S and sgRNA under AtU6 promoter.",
+            "delivery": "Agrobacterium tumefaciens (floral dip or tissue culture)",
+            "citation": "Xing et al. BMC Plant Biol 2014. doi:10.1186/s12870-014-0327-y",
+        },
+        {
+            "vector_key": "phee401e",
+            "vector_name": "pHEE401E",
+            "use_case": "High-efficiency Arabidopsis CRISPR using egg cell-specific promoter for Cas9; improves heritable editing rates in T1 plants.",
+            "delivery": "Agrobacterium tumefaciens (floral dip)",
+            "citation": "Wang et al. Plant Cell 2015. doi:10.1105/tpc.15.00454",
+        },
+        {
+            "vector_key": "pcbc_dt1t2",
+            "vector_name": "pCBC-DT1T2",
+            "use_case": "Dual-sgRNA binary vector for multiplex editing in Arabidopsis; Golden Gate assembly of two sgRNAs into a single T-DNA.",
+            "delivery": "Agrobacterium tumefaciens (floral dip)",
+            "citation": "Xing et al. BMC Plant Biol 2014. doi:10.1186/s12870-014-0327-y",
+        },
+    ],
 }
 
 _MAMMALIAN_KEYWORDS = {
@@ -65,6 +88,11 @@ _MAMMALIAN_KEYWORDS = {
 }
 _ZEBRAFISH_KEYWORDS = {"zebrafish", "danio rerio", "danio"}
 _ECOLI_KEYWORDS = {"escherichia", "e. coli", "ecoli", "e.coli"}
+_PLANT_KEYWORDS = {
+    "arabidopsis", "arabidopsis thaliana", "plant", "tobacco", "nicotiana",
+    "maize", "zea mays", "rice", "oryza sativa", "tomato", "solanum lycopersicum",
+    "wheat", "triticum", "soybean", "glycine max", "poplar", "populus",
+}
 
 
 def _classify_organism(organism: str) -> str:
@@ -73,9 +101,11 @@ def _classify_organism(organism: str) -> str:
         return "ecoli"
     if any(kw in o for kw in _ZEBRAFISH_KEYWORDS):
         return "zebrafish"
+    if any(kw in o for kw in _PLANT_KEYWORDS):
+        return "plant"
     if any(kw in o for kw in _MAMMALIAN_KEYWORDS):
         return "mammalian"
-    return "mammalian"  # sensible default for unlisted organisms
+    return "mammalian"  # default fallback for unlisted organisms
 
 from modules.crispr_tools.tools.create_construction_file import CreateConstructionFile
 from modules.crispr_tools.tools.construction_file_validation import ValidateConstructionFile

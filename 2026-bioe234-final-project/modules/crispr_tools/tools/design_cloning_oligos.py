@@ -390,6 +390,71 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         ),
     ),
 
+    # ── Plant binary vectors (Agrobacterium T-DNA delivery) ─────────────────
+    # AtU6-26 driven sgRNA cloned via BsaI TypeIIS sites into a binary vector
+    # backbone.  BsaI leaves ACCG (top) and AAAC (bottom) 4-nt overhangs.
+    # Verify overhangs against the plasmid map before ordering oligos.
+
+    "pkse401": VectorSpec(
+        name="pKSE401",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
+        enzyme="BsaI",
+        promoter="AtU6-26",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="GGTCTC",
+        top_overhang="ACCG",
+        bottom_overhang="AAAC",
+        u6_prefers_5prime_g=True,
+        cell_strain="Arabidopsis thaliana (Agrobacterium floral dip)",
+        selection="Spec",
+        notes=(
+            "Binary vector for Arabidopsis CRISPR. SpCas9 under 35S; sgRNA under "
+            "AtU6-26. BsaI digest yields ACCG/AAAC overhangs. Verified against "
+            "Addgene #62203 map before ordering oligos."
+        ),
+        citations=(
+            Citation("Xing et al. BMC Plant Biol 2014",
+                     "https://doi.org/10.1186/s12870-014-0327-y",
+                     "pKSE401 BsaI ACCG/AAAC Arabidopsis sgRNA cloning protocol"),
+            Citation("Addgene #62203",
+                     "https://www.addgene.org/62203/",
+                     "pKSE401 plasmid repository record"),
+        ),
+    ),
+
+    "phee401e": VectorSpec(
+        name="pHEE401E",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
+        enzyme="BsaI",
+        promoter="AtU6-26",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="GGTCTC",
+        top_overhang="ACCG",
+        bottom_overhang="AAAC",
+        u6_prefers_5prime_g=True,
+        cell_strain="Arabidopsis thaliana (Agrobacterium floral dip)",
+        selection="Hyg",
+        notes=(
+            "High-efficiency Arabidopsis CRISPR via egg cell-specific EC1.2en-EC1.1p "
+            "promoter driving Cas9; improves heritable T1 editing rates over 35S-Cas9. "
+            "sgRNA cloning (BsaI ACCG/AAAC) is identical to pKSE401."
+        ),
+        citations=(
+            Citation("Wang et al. Plant Cell 2015",
+                     "https://doi.org/10.1105/tpc.15.00454",
+                     "pHEE401E egg cell-specific Cas9 for heritable Arabidopsis editing"),
+            Citation("Addgene #71288",
+                     "https://www.addgene.org/71288/",
+                     "pHEE401E plasmid repository record"),
+        ),
+    ),
+
     # ── Educational / backbone-only presets ─────────────────────────────────
     "pet28a": VectorSpec(
         name="pET28a",

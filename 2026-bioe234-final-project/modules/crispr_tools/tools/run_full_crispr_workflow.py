@@ -1,7 +1,81 @@
 from __future__ import annotations
 
-from platform import system
 from typing import Optional
+
+
+# ---------------------------------------------------------------------------
+# Organism → vector recommendations (with citations)
+# ---------------------------------------------------------------------------
+
+_VECTOR_RECOMMENDATIONS: dict[str, list[dict]] = {
+    "mammalian": [
+        {
+            "vector_key": "px330",
+            "vector_name": "pX330",
+            "use_case": "Transient transfection of mammalian cells (MEFs, HEK293, primary cells). All-in-one SpCas9 + sgRNA; fastest path from spacer to edit.",
+            "delivery": "Lipofection or electroporation",
+            "citation": "Cong et al. Science 2013. doi:10.1126/science.1231143",
+        },
+        {
+            "vector_key": "lenticrispr_v2",
+            "vector_name": "lentiCRISPR v2",
+            "use_case": "Stable Cas9 + sgRNA integration in mammalian cell lines via lentiviral transduction; puromycin selection.",
+            "delivery": "Lentiviral transduction",
+            "citation": "Sanjana et al. Nat Methods 2014. doi:10.1038/nmeth.3047",
+        },
+        {
+            "vector_key": "px458_gibson",
+            "vector_name": "pX458",
+            "use_case": "SpCas9 + GFP reporter; FACS-based enrichment of transfected cells improves editing efficiency.",
+            "delivery": "Lipofection or electroporation",
+            "citation": "Ran et al. Nat Protoc 2013. doi:10.1038/nprot.2013.143",
+        },
+    ],
+    "zebrafish": [
+        {
+            "vector_key": "pdr274",
+            "vector_name": "pDR274",
+            "use_case": "T7-driven sgRNA for zebrafish embryo microinjection. Co-inject with Cas9 mRNA or protein into 1-cell embryos.",
+            "delivery": "Microinjection into 1-cell embryo",
+            "citation": "Hwang et al. PLoS One 2013. doi:10.1371/journal.pone.0068708; Varshney et al. Nat Protoc 2016. doi:10.1038/nprot.2016.099",
+        },
+    ],
+    "ecoli": [
+        {
+            "vector_key": "pcrispr",
+            "vector_name": "pCRISPR::rpsL",
+            "use_case": "E. coli genome editing via two-plasmid system (pCas9 + pCRISPR). rpsL counter-selection improves recombinant recovery.",
+            "delivery": "Electroporation",
+            "citation": "Jiang et al. Nat Biotechnol 2013. doi:10.1038/nbt.2508",
+        },
+        {
+            "vector_key": "ptargetf",
+            "vector_name": "pTargetF",
+            "use_case": "E. coli sgRNA delivery; pairs with pCas9-CR4 for chromosomal editing.",
+            "delivery": "Electroporation",
+            "citation": "Jiang et al. Nat Biotechnol 2015. doi:10.1038/nbt.3234",
+        },
+    ],
+}
+
+_MAMMALIAN_KEYWORDS = {
+    "human", "homo sapiens", "mouse", "mus musculus", "rat", "rattus",
+    "hamster", "monkey", "primate", "mammal", "hela", "hek", "cho",
+    "293", "jurkat", "macaque",
+}
+_ZEBRAFISH_KEYWORDS = {"zebrafish", "danio rerio", "danio"}
+_ECOLI_KEYWORDS = {"escherichia", "e. coli", "ecoli", "e.coli"}
+
+
+def _classify_organism(organism: str) -> str:
+    o = organism.lower()
+    if any(kw in o for kw in _ECOLI_KEYWORDS):
+        return "ecoli"
+    if any(kw in o for kw in _ZEBRAFISH_KEYWORDS):
+        return "zebrafish"
+    if any(kw in o for kw in _MAMMALIAN_KEYWORDS):
+        return "mammalian"
+    return "mammalian"  # sensible default for unlisted organisms
 
 from modules.crispr_tools.tools.create_construction_file import CreateConstructionFile
 from modules.crispr_tools.tools.construction_file_validation import ValidateConstructionFile
@@ -77,7 +151,19 @@ class RunFullCrisprWorkflow:
         if not query or not query.strip():
             raise ValueError("query must not be empty.")
         if not vector or not vector.strip():
-            raise ValueError("vector must not be empty.")
+            category = _classify_organism(organism)
+            recs = _VECTOR_RECOMMENDATIONS.get(category, _VECTOR_RECOMMENDATIONS["mammalian"])
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["vector"],
+                "organism": organism,
+                "organism_category": category,
+                "questions": [
+                    f"Which vector would you like to use for {organism}? "
+                    f"See vector_recommendations for literature-backed options."
+                ],
+                "vector_recommendations": recs,
+            }
         if not isinstance(guide_index, int) or guide_index < 0:
             raise ValueError("guide_index must be a non-negative integer.")
 

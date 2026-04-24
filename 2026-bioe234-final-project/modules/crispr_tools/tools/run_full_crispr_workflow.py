@@ -6,10 +6,11 @@ from typing import Optional
 from modules.crispr_tools.tools.create_construction_file import CreateConstructionFile
 from modules.crispr_tools.tools.construction_file_validation import ValidateConstructionFile
 from modules.crispr_tools.tools.design_cas9_grna import DesignCas9Grna
-from modules.crispr_tools.tools.crispr_cas_selector import CasSelector
-from modules.crispr_tools.tools.design_cas12a_grna import DesignCas12aGrna
+from modules.crispr_tools.tools.cas_selector import CasSelector
+from modules.crispr_tools.tools.design_cas12a_crrna import DesignCas12aCrrna
 from modules.crispr_tools.tools.design_cloning_oligos import CRISPRCloningDesigner
 from modules.crispr_tools.tools.fetch_target_sequence import FetchTargetSequence
+from modules.crispr_tools.tools._utils import rank_guides
 
 
 _CONSTRUCTION_INPUT_FIELDS = {
@@ -48,7 +49,7 @@ class RunFullCrisprWorkflow:
         self.cas9_designer = DesignCas9Grna()
         self.cas9_designer.initiate()
 
-        self.cas12a_designer = DesignCas12aGrna()
+        self.cas12a_designer = DesignCas12aCrrna()
         self.cas12a_designer.initiate()
 
         self.oligo_designer = CRISPRCloningDesigner()
@@ -126,12 +127,14 @@ class RunFullCrisprWorkflow:
             guides = self.cas12a_designer.run(seq)
         else:
             raise ValueError(f"Unsupported nuclease system: {spec.nuclease_system}")
-        if guide_index >= len(guides):
+        ranked = rank_guides(guides)
+
+        if guide_index >= len(ranked):
             raise ValueError(
-                f"guide_index {guide_index} is out of range for {len(guides)} designed guides."
+                f"guide_index {guide_index} is out of range for {len(ranked)} designed guides."
             )
 
-        selected_guide = guides[guide_index]
+        selected_guide = ranked[guide_index]
         protospacer = selected_guide["protospacer"]
 
         cloning = self.oligo_designer.run(

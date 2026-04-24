@@ -37,3 +37,23 @@ CODON_TABLE = {
 # M = A or C (amino)
 # N = any base
 VALID_SEQUENCE_CHARS = set("ATUCGRSYKWMN")
+
+
+def _score_guide(protospacer: str) -> float:
+    gc = (protospacer.count("G") + protospacer.count("C")) / len(protospacer)
+    score = 100 - abs(gc - 0.5) * 200   # 100 at 50% GC, 0 at 0% or 100%
+    if "TTTT" in protospacer:            score -= 30   # Pol III termination risk
+    if any(b * 5 in protospacer for b in "ACGT"): score -= 20   # homopolymer
+    return round(score, 1)
+
+
+def rank_guides(guides: list) -> list:
+    """Score, print, and return guides sorted best-first."""
+    scored = sorted(((g, _score_guide(g["protospacer"])) for g in guides),
+                    key=lambda x: x[1], reverse=True)
+    print(f"\n{'Rank':<5} {'Score':<7} {'GC%':<6} {'PAM':<6} Protospacer")
+    for rank, (g, score) in enumerate(scored, 1):
+        p = g["protospacer"]
+        gc_pct = f"{(p.count('G')+p.count('C'))/len(p)*100:.0f}%"
+        print(f"  #{rank:<3} {score:<7} {gc_pct:<6} {g.get('pam_site',''):<6} {p}")
+    return [g | {"score": s} for g, s in scored]

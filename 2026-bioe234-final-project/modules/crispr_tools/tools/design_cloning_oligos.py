@@ -1,11 +1,15 @@
 """
 CRISPR Cloning Workflow Designer
 =================================
-A guided wet-lab simulation tool for three CRISPR guide-cloning workflows:
+A guided wet-lab simulation tool for four CRISPR guide-cloning workflows:
 
   1. TypeIISOligoCloning  — BbsI/BsmBI/BsaI annealed-oligo sticky-end ligation
   2. RestrictionLigation  — conventional RE cloning (e.g. SpeI for pTargetF)
   3. GibsonAssembly       — overlap-based seamless assembly
+  4. GoldenGateAssembly   — Type IIS PCR-based multi-fragment assembly with
+                            user-designed 4-nt overhangs; emits all four primer
+                            fields required by create_construction_file's
+                            assembly_strategy="GoldenGate" mode.
 
 Behavior
 --------
@@ -16,13 +20,15 @@ Behavior
 
 construction_file_inputs compatibility
 ---------------------------------------
-All three branches return construction_file_inputs compatible with
-create_construction_file(input_mode="sequence_build"). Because that tool's
-assembly_strategy is limited to {"GoldenGate", "Gibson", "DirectSynthesis"},
-and Gibson/GoldenGate require all four PCR-primer fields (including vector
-linearisation primers this tool does not design), all branches emit
-assembly_strategy="DirectSynthesis". The biologically honest cloning_method
-is carried as a separate field in both the result and construction_file_inputs.
+TypeIISOligoCloning, RestrictionLigation, and GibsonAssembly emit
+assembly_strategy="DirectSynthesis" because create_construction_file's Gibson
+and GoldenGate strategies require all four PCR-primer fields including vector
+linearisation primers those branches do not design.
+
+GoldenGateAssembly is the exception: it designs all four primers (insert
+forward/reverse + vector forward/reverse) and therefore emits
+assembly_strategy="GoldenGate", which is fully compatible with
+create_construction_file's GoldenGate step.
 
 DISCLAIMER: For educational planning only. Validate designs against the actual
 plasmid map before ordering reagents.
@@ -450,6 +456,28 @@ WORKFLOW_CITATIONS: dict[str, tuple[Citation, ...]] = {
                  "https://www.neb.com/en-us/tools-and-resources/usage-guidelines/nebuilder-hifi-dna-assembly",
                  "Practical overlap design guidelines: 15–30 bp, Tm ≥ 55 °C"),
     ),
+    "GoldenGateAssembly": (
+        Citation("Engler et al. PLoS One 2008",
+                 "https://doi.org/10.1371/journal.pone.0003647",
+                 "Original Golden Gate assembly using Type IIS enzymes with user-designed overhangs"),
+        Citation("NEB Golden Gate Assembly",
+                 "https://www.neb.com/applications/cloning/golden-gate-assembly",
+                 "NEB Golden Gate reagents and overhang uniqueness design guidelines"),
+    ),
+}
+
+# ---------------------------------------------------------------------------
+# Golden Gate enzyme specifications
+# recognition: Type IIS recognition sequence (written 5'→3')
+# spacer_len:  number of bases between recognition site and the cut point
+#              (= number of N's in the primer tail between site and overhang)
+# ---------------------------------------------------------------------------
+
+GOLDEN_GATE_ENZYME_SPECS: dict[str, dict] = {
+    "BsaI":  {"recognition": "GGTCTC", "spacer_len": 1},
+    "BsmBI": {"recognition": "CGTCTC", "spacer_len": 1},
+    "Esp3I": {"recognition": "CGTCTC", "spacer_len": 1},  # BsmBI isoschizomer
+    "BbsI":  {"recognition": "GAAGAC", "spacer_len": 2},
 }
 
 
@@ -588,10 +616,13 @@ class CRISPRCloningDesigner:
         # RE ligation inputs
         guide_cassette_sequence: Optional[str],
         restriction_site_sequence: Optional[str],
-        # Gibson inputs
+        # Gibson / Golden Gate inputs
         insert_sequence: Optional[str],
         left_overlap_context: Optional[str],
         right_overlap_context: Optional[str],
+        # Golden Gate-specific inputs
+        left_overhang: Optional[str],
+        right_overhang: Optional[str],
     ) -> dict:
         """
         Inspect available inputs and decide whether we can proceed.
@@ -640,7 +671,14 @@ class CRISPRCloningDesigner:
             return self._assess_gibson(
                 vector_name, insert_sequence,
                 left_overlap_context, right_overlap_context,
-            ) 
+            )
+
+        if method == "GoldenGateAssembly":
+            return self._assess_golden_gate(
+                vector_name, insert_sequence,
+                left_overlap_context, right_overlap_context,
+                left_overhang, right_overhang, enzyme,
+            )
 
         return _needs_user_input(
             cloning_method=method,
@@ -807,6 +845,71 @@ class CRISPRCloningDesigner:
                     "Gibson assembly joins fragments by designed sequence overlaps. "
                     "The left and right overlap contexts come from your plasmid map, "
                     "not from the guide sequence itself."
+                ),
+            )
+        return {"status": "ready"}
+
+    def _assess_golden_gate(
+        self,
+        vector_name: str,
+        insert_sequence: Optional[str],
+        left_vector_context: Optional[str],
+        right_vector_context: Optional[str],
+        left_overhang: Optional[str],
+        right_overhang: Optional[str],
+        enzyme: Optional[str],
+    ) -> dict:
+        missing, questions = [], []
+
+        if not insert_sequence:
+            missing.append("insert_sequence")
+            questions.append(
+                "What is the insert sequence to clone in? "
+                "(A/T/G/C only; do not include the overhang bases — those are added by the primers.)"
+            )
+        if not left_vector_context:
+            missing.append("left_vector_context")
+            questions.append(
+                "What is the vector sequence immediately 5′ of the insertion site? "
+                "Provide at least 20 bp so a vector reverse primer can be designed."
+            )
+        if not right_vector_context:
+            missing.append("right_vector_context")
+            questions.append(
+                "What is the vector sequence immediately 3′ of the insertion site? "
+                "Provide at least 20 bp so a vector forward primer can be designed."
+            )
+        if not left_overhang:
+            missing.append("left_overhang")
+            questions.append(
+                "What 4-nt sequence should be used for the left junction overhang? "
+                "(e.g. ATCG — this is the sequence in the assembled product reading 5′→3′ "
+                "on the top strand at the left boundary of the insert.)"
+            )
+        if not right_overhang:
+            missing.append("right_overhang")
+            questions.append(
+                "What 4-nt sequence should be used for the right junction overhang? "
+                "(e.g. GCTA — must be different from the left overhang and, ideally, "
+                "not the reverse complement of any other overhang in the assembly.)"
+            )
+        if not enzyme:
+            missing.append("enzyme")
+            questions.append(
+                "Which Type IIS enzyme will you use? "
+                f"Supported: {', '.join(sorted(GOLDEN_GATE_ENZYME_SPECS))}."
+            )
+
+        if missing:
+            return _needs_user_input(
+                cloning_method="GoldenGateAssembly",
+                vector=vector_name,
+                missing_fields=missing,
+                questions=questions,
+                note=(
+                    "Golden Gate assembly uses a Type IIS enzyme to expose freely designable "
+                    "4-nt overhangs. All four primers (insert fwd/rev + vector fwd/rev) are "
+                    "designed so create_construction_file can use assembly_strategy='GoldenGate'."
                 ),
             )
         return {"status": "ready"}
@@ -1146,6 +1249,162 @@ class CRISPRCloningDesigner:
             "construction_file_inputs": construction_file_inputs,
         }
 
+    # ── Workflow branch D: Golden Gate Assembly ───────────────────────────────
+
+    def design_golden_gate_fragment(
+        self,
+        insert_sequence: str,
+        left_vector_context: str,
+        right_vector_context: str,
+        left_overhang: str,
+        right_overhang: str,
+        enzyme: str,
+        spec: Optional[VectorSpec],
+        construct_name: Optional[str] = None,
+    ) -> dict:
+        """
+        Design all four primers for Golden Gate assembly of an insert into a vector.
+
+        Primer design
+        -------------
+        For a Type IIS enzyme (e.g. BsaI: GGTCTCN↓) the recognition site is placed
+        in each primer's 5′ tail, oriented so the enzyme cuts toward the junction and
+        exposes the user-defined 4-nt overhang.  Primer structures:
+
+          insert_fwd : 5'-[clamp][recognition][spacer][left_overhang][insert_first_20nt]-3'
+                       → exposes 5′-left_overhang on insert top strand
+
+          insert_rev : 5'-[clamp][recognition][spacer][RC(right_overhang)][RC(insert_last_20nt)]-3'
+                       → exposes 5′-RC(right_overhang) on insert bottom strand
+
+          vector_fwd : 5'-[clamp][recognition][spacer][right_overhang][right_context_first_20nt]-3'
+                       → exposes 5′-right_overhang on vector top strand (right side)
+
+          vector_rev : 5'-[clamp][recognition][spacer][RC(left_overhang)][RC(left_context_last_20nt)]-3'
+                       → exposes 5′-RC(left_overhang) on vector bottom strand (left side)
+
+        After digest, insert and vector PCR products have complementary 5′ overhangs at
+        both junctions and ligate directionally in a single T4-ligase or GG-mix reaction.
+
+        construction_file_inputs uses assembly_strategy="GoldenGate" because all four
+        primer fields are provided — unlike the other branches that use DirectSynthesis.
+
+        Wet-lab steps
+        -------------
+        1. PCR insert with insert_fwd / insert_rev.
+        2. PCR vector backbone with vector_fwd / vector_rev (amplifies entire backbone).
+        3. Digest both PCR products with the Type IIS enzyme.
+        4. Ligate (T4 ligase 16 °C overnight, or single-tube NEB Golden Gate mix).
+        5. Transform; select; confirm by sequencing across both junctions.
+
+        Overhang uniqueness: in a two-fragment assembly (insert + linearised vector)
+        only two overhangs are required.  For multi-fragment assemblies, ALL overhangs
+        (and their reverse complements) must be unique — verify with the NEB Ligation
+        Fidelity Viewer or a similar tool before ordering primers.
+        """
+        enz_spec = GOLDEN_GATE_ENZYME_SPECS.get(enzyme)
+        if enz_spec is None:
+            known = ", ".join(sorted(GOLDEN_GATE_ENZYME_SPECS))
+            raise ValueError(
+                f"Unknown Golden Gate enzyme '{enzyme}'. "
+                f"Supported enzymes: {known}."
+            )
+
+        recognition = enz_spec["recognition"]
+        spacer      = "A" * enz_spec["spacer_len"]
+        clamp       = "AAAA"
+
+        left_oh  = _validate_dna(left_overhang,  "left_overhang")
+        right_oh = _validate_dna(right_overhang, "right_overhang")
+
+        if len(left_oh) != 4:
+            raise ValueError(f"left_overhang must be exactly 4 nt, got {len(left_oh)}.")
+        if len(right_oh) != 4:
+            raise ValueError(f"right_overhang must be exactly 4 nt, got {len(right_oh)}.")
+        if left_oh == right_oh:
+            raise ValueError("left_overhang and right_overhang must be different.")
+        if len(left_vector_context) < 20:
+            raise ValueError(
+                f"left_vector_context must be at least 20 bp, got {len(left_vector_context)}."
+            )
+        if len(right_vector_context) < 20:
+            raise ValueError(
+                f"right_vector_context must be at least 20 bp, got {len(right_vector_context)}."
+            )
+        if len(insert_sequence) < 20:
+            raise ValueError(
+                f"insert_sequence must be at least 20 bp, got {len(insert_sequence)}."
+            )
+
+        tail        = clamp + recognition + spacer
+        insert_fwd  = tail + left_oh  + insert_sequence[:20]
+        insert_rev  = tail + _reverse_complement(right_oh) + _reverse_complement(insert_sequence[-20:])
+        vector_fwd  = tail + right_oh + right_vector_context[:20]
+        vector_rev  = tail + _reverse_complement(left_oh)  + _reverse_complement(left_vector_context[-20:])
+
+        slug         = (spec.name if spec else "custom").lower().replace(" ", "_")
+        ins_fwd_name = f"{slug}_gg_insert_fwd"
+        ins_rev_name = f"{slug}_gg_insert_rev"
+        vec_fwd_name = f"{slug}_gg_vector_fwd"
+        vec_rev_name = f"{slug}_gg_vector_rev"
+        final_name   = construct_name or f"{slug}_gg_construct"
+
+        backbone_name, backbone_seq = self._resolve_backbone(spec)
+
+        note_lines = [
+            f"Golden Gate assembly using {enzyme} (recognition site: {recognition}; spacer: {len(spacer)} nt).",
+            f"Left junction overhang: {left_oh}.  Right junction overhang: {right_oh}.",
+            "PCR insert with insert_fwd/rev; PCR vector backbone with vector_fwd/rev.",
+            f"Digest both PCR products with {enzyme}, then ligate (T4 or NEB Golden Gate Mix).",
+            "For multi-fragment assemblies verify all overhang sequences are unique "
+            "(use NEB Ligation Fidelity Viewer).",
+        ]
+
+        construction_file_inputs = {
+            "construct_name":                 final_name,
+            "cloning_method":                 "GoldenGateAssembly",
+            "assembly_strategy":              "GoldenGate",
+            "backbone_name":                  backbone_name,
+            "backbone_sequence":              backbone_seq,
+            "insert_name":                    f"{slug}_insert",
+            "insert_sequence":                insert_sequence,
+            "insert_forward_primer_name":     ins_fwd_name,
+            "insert_forward_primer_sequence": insert_fwd,
+            "insert_reverse_primer_name":     ins_rev_name,
+            "insert_reverse_primer_sequence": insert_rev,
+            "vector_forward_primer_name":     vec_fwd_name,
+            "vector_forward_primer_sequence": vector_fwd,
+            "vector_reverse_primer_name":     vec_rev_name,
+            "vector_reverse_primer_sequence": vector_rev,
+            "enzyme":                         enzyme,
+            "cell_strain":                    spec.cell_strain if spec else "",
+            "selection":                      spec.selection   if spec else "",
+            "temperature_c":                  37,
+            "notes":                          " ".join(note_lines),
+        }
+
+        all_citations = (spec.citations if spec else ()) + WORKFLOW_CITATIONS["GoldenGateAssembly"]
+
+        return {
+            "status":                      "ready",
+            "cloning_method":              "GoldenGateAssembly",
+            "vector":                      spec.name if spec else "custom",
+            "enzyme":                      enzyme,
+            "recognition_site":            recognition,
+            "left_overhang":               left_oh,
+            "right_overhang":              right_oh,
+            "citations":                   _format_citations(all_citations),
+            "insert_forward_primer_name":  ins_fwd_name,
+            "insert_reverse_primer_name":  ins_rev_name,
+            "vector_forward_primer_name":  vec_fwd_name,
+            "vector_reverse_primer_name":  vec_rev_name,
+            "insert_forward_primer":       insert_fwd,
+            "insert_reverse_primer":       insert_rev,
+            "vector_forward_primer":       vector_fwd,
+            "vector_reverse_primer":       vector_rev,
+            "construction_file_inputs":    construction_file_inputs,
+        }
+
     # ── Public dispatcher ─────────────────────────────────────────────────────
 
     def run(
@@ -1171,6 +1430,9 @@ class CRISPRCloningDesigner:
         left_overlap_context: Optional[str] = None,
         right_overlap_context: Optional[str] = None,
         overlap_bp: Optional[int] = None,
+        # ── GoldenGateAssembly branch ─────────────────────────────────────
+        left_overhang: Optional[str] = None,
+        right_overhang: Optional[str] = None,
     ) -> dict:
         """
         Public entry point.
@@ -1209,6 +1471,8 @@ class CRISPRCloningDesigner:
             insert_sequence=insert_sequence,
             left_overlap_context=left_overlap_context,
             right_overlap_context=right_overlap_context,
+            left_overhang=left_overhang,
+            right_overhang=right_overhang,
         )
         if check["status"] == "needs_user_input":
             return check
@@ -1246,10 +1510,23 @@ class CRISPRCloningDesigner:
                 construct_name=construct_name,
             )
 
+        if method == "GoldenGateAssembly":
+            return self.design_golden_gate_fragment(
+                insert_sequence=_validate_dna(insert_sequence, "insert_sequence"),
+                left_vector_context=_validate_dna(left_overlap_context, "left_overlap_context"),
+                right_vector_context=_validate_dna(right_overlap_context, "right_overlap_context"),
+                left_overhang=_validate_dna(left_overhang, "left_overhang"),
+                right_overhang=_validate_dna(right_overhang, "right_overhang"),
+                enzyme=enzyme,
+                spec=spec,
+                construct_name=construct_name,
+            )
+
         # Should not reach here after assess_requirements, but be explicit
         raise ValueError(
             f"Unrecognised cloning_method '{method}'. "
-            "Expected: TypeIISOligoCloning, RestrictionLigation, or GibsonAssembly."
+            "Expected: TypeIISOligoCloning, RestrictionLigation, GibsonAssembly, "
+            "or GoldenGateAssembly."
         )
 
     # ── Private helpers ───────────────────────────────────────────────────────

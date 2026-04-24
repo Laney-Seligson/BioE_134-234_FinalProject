@@ -44,6 +44,11 @@
       "name": "validate_strict",
       "type": "boolean",
       "description": "Whether validation should raise on biological validation failures. Default: false."
+    },
+    {
+      "name": "force_vector",
+      "type": "boolean",
+      "description": "If true, continue with provided vector. Whether to force the use of the vector-specified CRISPR system even if the CasSelector recommends a different system. Default: false."
     }
   ],
   "outputs": [

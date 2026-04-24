@@ -6,6 +6,7 @@ from typing import Optional
 from modules.crispr_tools.tools.create_construction_file import CreateConstructionFile
 from modules.crispr_tools.tools.construction_file_validation import ValidateConstructionFile
 from modules.crispr_tools.tools.design_cas9_grna import DesignCas9Grna
+from modules.crispr_tools.tools.crispr_cas_selector import CasSelector
 from modules.crispr_tools.tools.design_cas12a_grna import DesignCas12aGrna
 from modules.crispr_tools.tools.design_cloning_oligos import CRISPRCloningDesigner
 from modules.crispr_tools.tools.fetch_target_sequence import FetchTargetSequence
@@ -59,6 +60,9 @@ class RunFullCrisprWorkflow:
         self.construction_validator = ValidateConstructionFile()
         self.construction_validator.initiate()
 
+        self.cas_selector = CasSelector()
+        self.cas_selector.initiate()
+
     def run(
         self,
         query: str,
@@ -67,6 +71,7 @@ class RunFullCrisprWorkflow:
         construct_name: Optional[str] = None,
         guide_index: int = 0,
         validate_strict: bool = False,
+        force_vector : bool = False,
     ) -> dict:
         if not query or not query.strip():
             raise ValueError("query must not be empty.")
@@ -76,45 +81,45 @@ class RunFullCrisprWorkflow:
             raise ValueError("guide_index must be a non-negative integer.")
 
         sequence_info = self.sequence_fetcher.run(query=query, organism=organism)
-    seq = sequence_info["sequence"]
-    spec = self.oligo_designer.resolve_vector(vector)
+        seq = sequence_info["sequence"]
+        spec = self.oligo_designer.resolve_vector(vector)
 
-    if spec is None:
-        raise ValueError(
-        "Custom vectors are not supported in the full workflow yet. "
-        "Please use a known vector preset or provide enzyme/overhang handling."
-    )
+        if spec is None:
+            raise ValueError(
+            "Custom vectors are not supported in the full workflow yet. "
+            "Please use a known vector preset or provide enzyme/overhang handling."
+        )
 
-    cas_recommendation = self.cas_selector.run(
-        seq=seq,
-        repair_template=False,
-    )
+        cas_recommendation = self.cas_selector.run(
+            seq=seq,
+            repair_template=False,
+        )
 
-    def normalize_system(system: str) -> str:
-        return {"SpCas9": "Cas9", "Cas9": "Cas9", "Cas12a": "Cas12a"}.get(system, system)
+        def normalize_system(system: str) -> str:
+            return {"SpCas9": "Cas9", "Cas9": "Cas9", "Cas12a": "Cas12a"}.get(system, system)
 
-    recommended_system = normalize_system(cas_recommendation["recommendation"])
-    vector_system = normalize_system(spec.nuclease_system)
+        recommended_system = normalize_system(cas_recommendation["recommendation"])
+        vector_system = normalize_system(spec.nuclease_system)
 
-    if recommended_system != vector_system:
-        return {
-            "status": "needs_user_input",
-            "sequence_info": sequence_info,
-            "cas_recommendation": cas_recommendation,
-            "selected_vector": spec.name,
-            "vector_system": vector_system,
-            "recommended_system": recommended_system,
-            "questions": [
-                f"The recommended system for this target is {recommended_system}, "
-                f"but the selected vector '{spec.name}' is meant for {vector_system}. "
-                "Do you still want to use this vector?"
-            ],
-            "options": [
-                f"Yes, continue with {spec.name} ({vector_system})",
-                f"No, switch to a {recommended_system}-compatible vector"
-            ],
-    }
-                
+        if recommended_system != vector_system and not force_vector:
+            return {
+                "status": "needs_user_input",
+                "sequence_info": sequence_info,
+                "cas_recommendation": cas_recommendation,
+                "selected_vector": spec.name,
+                "vector_system": vector_system,
+                "recommended_system": recommended_system,
+                "questions": [
+                    f"The recommended system for this target is {recommended_system}, "
+                    f"but the selected vector '{spec.name}' is meant for {vector_system}. "
+                    "Do you still want to use this vector?"
+                ],
+                "options": [
+                    f"Yes, continue with {spec.name} ({vector_system})",
+                    f"No, switch to a {recommended_system}-compatible vector"
+                ],
+            }
+                    
         if spec.nuclease_system == "SpCas9":
             guides = self.cas9_designer.run(seq)
         elif spec.nuclease_system == "Cas12a":

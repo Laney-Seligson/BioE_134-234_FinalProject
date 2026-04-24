@@ -640,7 +640,7 @@ class CRISPRCloningDesigner:
             return self._assess_gibson(
                 vector_name, insert_sequence,
                 left_overlap_context, right_overlap_context,
-            )
+            ) 
 
         return _needs_user_input(
             cloning_method=method,
@@ -673,22 +673,21 @@ class CRISPRCloningDesigner:
                 "(20 nt for SpCas9 / SaCas9, 23 nt for Cas12a; A/T/G/C only)"
             )
 
-        # For custom vectors, all overhang/enzyme info must come from the user
-        if spec is None:
-            if not top_overhang:
-                missing.append("top_overhang")
-                questions.append(
-                    "This appears to be a custom vector. "
-                    "For Cas12a (Cpf1), the nuclease determines PAM (TTTV) and guide design, "
-                    "but cloning overhangs are vector-specific. "
-                    "Please provide the top-strand 5′ overhang from the plasmid map or protocol."
-                )
+        resolved_top_overhang = top_overhang or (spec.top_overhang if spec else None)
+        if not resolved_top_overhang:
+            missing.append("top_overhang")
+            questions.append(
+                "Type IIS cloning overhangs are vector-specific and are not determined by the guide sequence. "
+                "Please provide the top-strand 5′ overhang from the plasmid map or protocol."
+            )
 
-        if not bottom_overhang:
+        resolved_bottom_overhang = bottom_overhang or (spec.bottom_overhang if spec else None)
+        if not resolved_bottom_overhang:
             missing.append("bottom_overhang")
             questions.append(
+                "Type IIS cloning overhangs are vector-specific and are not determined by the guide sequence. "
                 "Please provide the bottom-strand 5′ overhang from the plasmid map or protocol."
-            )
+                )
         if not enzyme:
             missing.append("enzyme")
             questions.append(
@@ -712,41 +711,15 @@ class CRISPRCloningDesigner:
             missing.append("u6_prefers_5prime_g")
             questions.append(
                 "Should a 5′G be prepended when the protospacer does not already "
-                "start with G? (recommended for U6-driven guides; not needed for T7)"
-            )
-        if not (top_overhang or spec.top_overhang):
-            missing.append("top_overhang")
-
-            if spec.nuclease_system == "Cas12a":
-                questions.append(
-                    f"Vector '{spec.name}' uses Cas12a (Cpf1). "
-                    "Cas12a defines PAM (TTTV) and guide structure, but cloning overhangs "
-                    "are NOT determined by the nuclease — they are vector-specific. "
-                    "Please provide the top-strand 5′ overhang from the plasmid map or Addgene protocol."
-                )
-            else:
-                questions.append(
-                    f"Vector '{spec.name}' is a known {spec.nuclease_system} vector, but its "
-                    "Type IIS top overhang is not encoded in this tool yet. Please provide "
-                    "the top-strand 5′ overhang from the plasmid map or cloning protocol."
-            )
-
-        if not (bottom_overhang or spec.bottom_overhang):
-            missing.append("bottom_overhang")
-            questions.append(
-                f"Vector '{spec.name}' is a known {spec.nuclease_system} vector, but its "
-                "Type IIS bottom overhang is not encoded in this tool yet. Please provide "
-                "the bottom-strand 5′ overhang from the plasmid map or cloning protocol."
-        )
-        if missing:
+                "start with G? (recommended for U6-driven guides; not needed for T7)")
+        if missing: 
             return _needs_user_input(
                 cloning_method="TypeIISOligoCloning",
                 vector=vector_name,
                 missing_fields=missing,
                 questions=questions,
-            )
+            )  
         return {"status": "ready"}
-
     def _assess_restriction(
         self,
         spec: Optional[VectorSpec],

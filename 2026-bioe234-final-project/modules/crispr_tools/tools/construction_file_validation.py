@@ -792,6 +792,10 @@ class ValidateConstructionFile:
         vector_forward_primer_sequence: str = "",
         vector_reverse_primer_name: str = "",
         vector_reverse_primer_sequence: str = "",
+        top_oligo_name: str = "",
+        top_oligo_sequence: str = "",
+        bottom_oligo_name: str = "",
+        bottom_oligo_sequence: str = "",
         enzyme: str = "",
         cell_strain: str = "",
         selection: str = "",
@@ -838,6 +842,10 @@ class ValidateConstructionFile:
             vector_forward_primer_sequence=vector_forward_primer_sequence,
             vector_reverse_primer_name=vector_reverse_primer_name,
             vector_reverse_primer_sequence=vector_reverse_primer_sequence,
+            top_oligo_name=top_oligo_name,
+            top_oligo_sequence=top_oligo_sequence,
+            bottom_oligo_name=bottom_oligo_name,
+            bottom_oligo_sequence=bottom_oligo_sequence,
             enzyme=enzyme,
         )
 
@@ -854,6 +862,10 @@ class ValidateConstructionFile:
             vector_forward_primer_sequence=vector_forward_primer_sequence,
             vector_reverse_primer_name=vector_reverse_primer_name,
             vector_reverse_primer_sequence=vector_reverse_primer_sequence,
+            top_oligo_name=top_oligo_name,
+            top_oligo_sequence=top_oligo_sequence,
+            bottom_oligo_name=bottom_oligo_name,
+            bottom_oligo_sequence=bottom_oligo_sequence,
         )
         validated_parts = self.builder._validate_parts(parts)
 
@@ -866,6 +878,8 @@ class ValidateConstructionFile:
             insert_reverse_primer_name=insert_reverse_primer_name,
             vector_forward_primer_name=vector_forward_primer_name,
             vector_reverse_primer_name=vector_reverse_primer_name,
+            top_oligo_name=top_oligo_name,
+            bottom_oligo_name=bottom_oligo_name,
             enzyme=enzyme,
             cell_strain=cell_strain,
             selection=selection,

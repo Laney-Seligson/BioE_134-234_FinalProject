@@ -27,7 +27,7 @@ class CreateConstructionFile:
 
     def initiate(self) -> None:
         self.allowed_input_modes = {"sequence_build", "paper_info", "paper_shorthand"}
-        self.allowed_strategies = {"GoldenGate", "Gibson", "DirectSynthesis"}
+        self.allowed_strategies = {"GoldenGate", "Gibson", "DirectSynthesis", "TypeIISOligoCloning"}
         self.allowed_paper_assembly_methods = {
             "GoldenGate",
             "Gibson",
@@ -36,7 +36,7 @@ class CreateConstructionFile:
             "Unknown",
         }
         self.allowed_part_types = {"oligo", "primer", "dsdna", "plasmid", "fragment"}
-        self.allowed_step_types = {"PCR", "GoldenGate", "Gibson", "DirectSynthesis", "Transform"}
+        self.allowed_step_types = {"PCR", "GoldenGate", "Gibson", "DirectSynthesis", "TypeIISOligoCloning", "Transform"}
         self.allowed_shorthand_ops = {
             "clone",
             "assemble",
@@ -65,6 +65,10 @@ class CreateConstructionFile:
         vector_forward_primer_sequence: str = "",
         vector_reverse_primer_name: str = "",
         vector_reverse_primer_sequence: str = "",
+        top_oligo_name: str = "",
+        top_oligo_sequence: str = "",
+        bottom_oligo_name: str = "",
+        bottom_oligo_sequence: str = "",
         enzyme: str = "",
         cell_strain: str = "",
         selection: str = "",
@@ -145,15 +149,25 @@ class CreateConstructionFile:
         self._require_nonempty_string(assembly_strategy, "assembly_strategy")
         self._require_nonempty_string(backbone_name, "backbone_name")
         self._require_nonempty_string(backbone_sequence, "backbone_sequence")
-        self._require_nonempty_string(insert_name, "insert_name")
-        self._require_nonempty_string(insert_sequence, "insert_sequence")
 
         assembly_strategy = self._normalize_assembly_strategy(assembly_strategy)
         if assembly_strategy not in self.allowed_strategies:
             raise ValueError(f"assembly_strategy must be one of {sorted(self.allowed_strategies)}.")
 
+        if assembly_strategy == "TypeIISOligoCloning":
+            # This workflow clones annealed top/bottom oligos directly into a
+            # Type IIS-digested backbone, so it does not require an insert PCR
+            # template or insert_sequence.
+            if not insert_name.strip():
+                insert_name = "guide_oligo_pair"
+            insert_sequence = insert_sequence or ""
+        else:
+            self._require_nonempty_string(insert_name, "insert_name")
+            self._require_nonempty_string(insert_sequence, "insert_sequence")
+
         backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
-        insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
+        if insert_sequence.strip():
+            insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
 
         self._validate_user_inputs(
             assembly_strategy=assembly_strategy,
@@ -165,6 +179,10 @@ class CreateConstructionFile:
             vector_forward_primer_sequence=vector_forward_primer_sequence,
             vector_reverse_primer_name=vector_reverse_primer_name,
             vector_reverse_primer_sequence=vector_reverse_primer_sequence,
+            top_oligo_name=top_oligo_name,
+            top_oligo_sequence=top_oligo_sequence,
+            bottom_oligo_name=bottom_oligo_name,
+            bottom_oligo_sequence=bottom_oligo_sequence,
             enzyme=enzyme,
         )
 
@@ -181,6 +199,10 @@ class CreateConstructionFile:
             vector_forward_primer_sequence=vector_forward_primer_sequence,
             vector_reverse_primer_name=vector_reverse_primer_name,
             vector_reverse_primer_sequence=vector_reverse_primer_sequence,
+            top_oligo_name=top_oligo_name,
+            top_oligo_sequence=top_oligo_sequence,
+            bottom_oligo_name=bottom_oligo_name,
+            bottom_oligo_sequence=bottom_oligo_sequence,
         )
         validated_parts = self._validate_parts(parts)
 
@@ -193,6 +215,8 @@ class CreateConstructionFile:
             insert_reverse_primer_name=insert_reverse_primer_name,
             vector_forward_primer_name=vector_forward_primer_name,
             vector_reverse_primer_name=vector_reverse_primer_name,
+            top_oligo_name=top_oligo_name,
+            bottom_oligo_name=bottom_oligo_name,
             enzyme=enzyme,
             cell_strain=cell_strain,
             selection=selection,
@@ -308,6 +332,10 @@ class CreateConstructionFile:
             "goldengate": "GoldenGate",
             "gibson": "Gibson",
             "directsynthesis": "DirectSynthesis",
+            "typeiis": "TypeIISOligoCloning",
+            "typeiiscloning": "TypeIISOligoCloning",
+            "typeiisoligocloning": "TypeIISOligoCloning",
+            "typeiisoligocloning": "TypeIISOligoCloning",
         }
         return mapping.get(s, strategy.strip())
 
@@ -443,7 +471,11 @@ class CreateConstructionFile:
         vector_forward_primer_sequence: str,
         vector_reverse_primer_name: str,
         vector_reverse_primer_sequence: str,
-        enzyme: str,
+        top_oligo_name: str = "",
+        top_oligo_sequence: str = "",
+        bottom_oligo_name: str = "",
+        bottom_oligo_sequence: str = "",
+        enzyme: str = "",
     ) -> None:
         if assembly_strategy in {"GoldenGate", "Gibson"}:
             required_pairs = [
@@ -468,6 +500,25 @@ class CreateConstructionFile:
                     f"Missing required fields for {assembly_strategy}: {', '.join(missing_fields)}."
                 )
 
+        if assembly_strategy == "TypeIISOligoCloning":
+            missing_fields = []
+            if not top_oligo_name.strip():
+                missing_fields.append("top_oligo_name")
+            if not top_oligo_sequence.strip():
+                missing_fields.append("top_oligo_sequence")
+            if not bottom_oligo_name.strip():
+                missing_fields.append("bottom_oligo_name")
+            if not bottom_oligo_sequence.strip():
+                missing_fields.append("bottom_oligo_sequence")
+            if not enzyme.strip():
+                missing_fields.append("enzyme")
+            if missing_fields:
+                raise ValueError(
+                    "Missing required fields for TypeIISOligoCloning: "
+                    + ", ".join(missing_fields)
+                    + "."
+                )
+
         if assembly_strategy == "GoldenGate" and not enzyme.strip():
             raise ValueError("enzyme is required for GoldenGate workflows.")
 
@@ -485,6 +536,10 @@ class CreateConstructionFile:
         vector_forward_primer_sequence: str,
         vector_reverse_primer_name: str,
         vector_reverse_primer_sequence: str,
+        top_oligo_name: str = "",
+        top_oligo_sequence: str = "",
+        bottom_oligo_name: str = "",
+        bottom_oligo_sequence: str = "",
     ) -> list:
         parts = [
             {
@@ -492,20 +547,26 @@ class CreateConstructionFile:
                 "name": backbone_name,
                 "sequence": self._normalize_sequence(backbone_sequence),
                 "description": "Backbone plasmid",
-            },
-            {
-                "part_type": "dsdna",
-                "name": insert_name,
-                "sequence": self._normalize_sequence(insert_sequence),
-                "description": "Insert sequence",
-            },
+            }
         ]
+
+        if insert_sequence.strip():
+            parts.append(
+                {
+                    "part_type": "dsdna",
+                    "name": insert_name,
+                    "sequence": self._normalize_sequence(insert_sequence),
+                    "description": "Insert sequence",
+                }
+            )
 
         primer_entries = [
             ("oligo", insert_forward_primer_name, insert_forward_primer_sequence, "Insert forward primer"),
             ("oligo", insert_reverse_primer_name, insert_reverse_primer_sequence, "Insert reverse primer"),
             ("oligo", vector_forward_primer_name, vector_forward_primer_sequence, "Vector forward primer"),
             ("oligo", vector_reverse_primer_name, vector_reverse_primer_sequence, "Vector reverse primer"),
+            ("oligo", top_oligo_name, top_oligo_sequence, "Top oligo for Type IIS oligo cloning"),
+            ("oligo", bottom_oligo_name, bottom_oligo_sequence, "Bottom oligo for Type IIS oligo cloning"),
         ]
 
         for part_type, name, sequence, description in primer_entries:
@@ -617,6 +678,8 @@ class CreateConstructionFile:
         insert_reverse_primer_name: str,
         vector_forward_primer_name: str,
         vector_reverse_primer_name: str,
+        top_oligo_name: str,
+        bottom_oligo_name: str,
         enzyme: str,
         cell_strain: str,
         selection: str,
@@ -676,6 +739,20 @@ class CreateConstructionFile:
                         "output": construct_name,
                     }
                 )
+
+        elif assembly_strategy == "TypeIISOligoCloning":
+            operations.append(
+                {
+                    "step_number": 1,
+                    "step_type": "TypeIISOligoCloning",
+                    "inputs": [top_oligo_name, bottom_oligo_name, backbone_name],
+                    "parameters": {
+                        "enzyme": enzyme,
+                        "overhangs": "vector-specific (e.g. CACC/AAAC)",
+                    },
+                    "output": construct_name,
+                }
+            )
 
         elif assembly_strategy == "DirectSynthesis":
             operations.append(
@@ -765,6 +842,14 @@ class CreateConstructionFile:
                 raise ValueError(
                     f"Gibson step {step_number} requires 'overlap_bp' or 'overlap_notes'."
                 )
+
+        elif step_type == "TypeIISOligoCloning":
+            if len(inputs) != 3:
+                raise ValueError(
+                    f"TypeIISOligoCloning step {step_number} should have top oligo, bottom oligo, and backbone inputs."
+                )
+            if "enzyme" not in parameters or not str(parameters.get("enzyme", "")).strip():
+                raise ValueError(f"TypeIISOligoCloning step {step_number} requires 'enzyme'.")
 
         elif step_type == "DirectSynthesis":
             if len(inputs) != 1:
@@ -878,6 +963,15 @@ class CreateConstructionFile:
                     f"{inputs[0] if len(inputs) > 0 else '':<14}"
                     f"{inputs[1] if len(inputs) > 1 else '':<14}"
                     f"{reagent:<18}"
+                    f"{output}"
+                )
+            elif step_type == "TypeIISOligoCloning":
+                lines.append(
+                    f"{'TypeIIS':<14}"
+                    f"{inputs[0] if len(inputs) > 0 else '':<14}"
+                    f"{inputs[1] if len(inputs) > 1 else '':<14}"
+                    f"{inputs[2] if len(inputs) > 2 else '':<18}"
+                    f"{parameters.get('enzyme', ''):<10}"
                     f"{output}"
                 )
             elif step_type == "DirectSynthesis":
@@ -1456,7 +1550,7 @@ def main() -> None:
         if normalized_mode == "sequence_build":
             construct_name = prompt_required("Construct name: ")
             assembly_strategy = prompt_required(
-                "Assembly strategy (GoldenGate, Gibson, DirectSynthesis): "
+                "Assembly strategy (GoldenGate, Gibson, DirectSynthesis, TypeIISOligoCloning): "
             )
             backbone_name = prompt_required("Backbone name: ")
             backbone_sequence = prompt_required("Backbone sequence: ")
@@ -1471,6 +1565,10 @@ def main() -> None:
             vector_forward_primer_sequence = ""
             vector_reverse_primer_name = ""
             vector_reverse_primer_sequence = ""
+            top_oligo_name = ""
+            top_oligo_sequence = ""
+            bottom_oligo_name = ""
+            bottom_oligo_sequence = ""
             enzyme = ""
 
             normalized_strategy = assembly_strategy.strip().lower().replace("_", "").replace(" ", "")
@@ -1484,6 +1582,14 @@ def main() -> None:
                 vector_forward_primer_sequence = prompt_required("Vector forward primer sequence: ")
                 vector_reverse_primer_name = prompt_required("Vector reverse primer name: ")
                 vector_reverse_primer_sequence = prompt_required("Vector reverse primer sequence: ")
+
+            if normalized_strategy in {"typeiis", "typeiiscloning", "typeiisoligocloning"}:
+                print("\n--- Type IIS oligo cloning information required ---")
+                top_oligo_name = prompt_required("Top oligo name: ")
+                top_oligo_sequence = prompt_required("Top oligo sequence: ")
+                bottom_oligo_name = prompt_required("Bottom oligo name: ")
+                bottom_oligo_sequence = prompt_required("Bottom oligo sequence: ")
+                enzyme = prompt_required("Type IIS enzyme (e.g. BbsI, BsaI): ")
 
             if normalized_strategy == "goldengate":
                 enzyme = prompt_required("Assembly enzyme: ")
@@ -1510,6 +1616,10 @@ def main() -> None:
                 vector_forward_primer_sequence=vector_forward_primer_sequence,
                 vector_reverse_primer_name=vector_reverse_primer_name,
                 vector_reverse_primer_sequence=vector_reverse_primer_sequence,
+                top_oligo_name=top_oligo_name,
+                top_oligo_sequence=top_oligo_sequence,
+                bottom_oligo_name=bottom_oligo_name,
+                bottom_oligo_sequence=bottom_oligo_sequence,
                 enzyme=enzyme,
                 cell_strain=cell_strain,
                 selection=selection,

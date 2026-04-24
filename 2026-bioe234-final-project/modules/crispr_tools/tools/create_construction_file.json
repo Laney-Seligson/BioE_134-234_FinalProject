@@ -1,24 +1,135 @@
 {
   "id": "org.bioe234.function.create_construction_file.v2",
   "name": "Create_Construction_File",
-  "description": "Generate either (1) a full DNA cloning construction file, (2) a structured paper information resource, or (3) a shorthand construction workflow derived from a paper. Always choose the correct input_mode before calling this tool.\n\nIMPORTANT:\n- For input_mode='paper_shorthand', ALWAYS provide paper_id.\n- Do NOT manually extract or pass partial paper fields (vectors, enzymes, etc.).\n- The tool will internally load the full paper information using paper_id.\n- If available, you MAY pass paper_info_json directly, but this is optional.\n\nFor sequence-based construction modes, you MUST gather ALL required fields before calling. If any required field is missing, ask for ALL missing fields in one message. NEVER pass placeholder text into sequence fields.",
+  "description": "Generate either (1) a full DNA cloning construction file, (2) a structured paper information resource, or (3) a shorthand construction workflow derived from a paper. Always choose the correct input_mode before calling this tool.\n\nIMPORTANT:\n- For input_mode='paper_shorthand', ALWAYS provide paper_id only unless paper_info_json is explicitly available.\n- Do NOT manually extract or pass partial paper fields for paper_shorthand.\n- The tool will internally load the full paper information using paper_id.\n\nFor input_mode='sequence_build', gather ALL required fields for the selected assembly_strategy before calling. NEVER pass placeholder text such as '[MISSING]' or 'Please provide...' into any field.\n\nAssembly strategies:\n- GoldenGate: PCR insert + PCR vector + Golden Gate assembly. Requires insert/vector primer names and sequences plus enzyme.\n- Gibson: PCR insert + PCR vector + Gibson assembly. Requires insert/vector primer names and sequences.\n- TypeIISOligoCloning: direct cloning of annealed top/bottom oligos into a Type IIS-digested vector. Requires top_oligo_name, top_oligo_sequence, bottom_oligo_name, bottom_oligo_sequence, backbone_name, backbone_sequence, and enzyme. Does NOT require insert_sequence or PCR primers.",
   "type": "function",
   "keywords": [
     "cloning",
     "construction file",
     "golden gate",
     "gibson",
+    "type IIS",
+    "oligo cloning",
     "dna assembly",
     "crispr",
     "workflow",
     "paper shorthand"
   ],
-
   "inputs": [
     {
       "name": "input_mode",
       "type": "string",
       "description": "Mode of operation. Options: 'sequence_build', 'paper_info', or 'paper_shorthand'."
+    },
+    {
+      "name": "construct_name",
+      "type": "string",
+      "description": "Name of the final construct. Required for sequence_build."
+    },
+    {
+      "name": "assembly_strategy",
+      "type": "string",
+      "description": "Assembly strategy for sequence_build. Options: 'GoldenGate', 'Gibson', or 'TypeIISOligoCloning'."
+    },
+    {
+      "name": "backbone_name",
+      "type": "string",
+      "description": "Backbone plasmid name. Required for sequence_build."
+    },
+    {
+      "name": "backbone_sequence",
+      "type": "string",
+      "description": "Backbone DNA sequence, resource name, resource URI, or local FASTA/GenBank path. Required for sequence_build."
+    },
+    {
+      "name": "insert_name",
+      "type": "string",
+      "description": "Insert name. Required for GoldenGate and Gibson sequence_build workflows."
+    },
+    {
+      "name": "insert_sequence",
+      "type": "string",
+      "description": "Insert DNA sequence, resource name, resource URI, or local FASTA/GenBank path. Required for GoldenGate and Gibson. Not required for TypeIISOligoCloning."
+    },
+    {
+      "name": "insert_forward_primer_name",
+      "type": "string",
+      "description": "Insert forward primer name. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "insert_forward_primer_sequence",
+      "type": "string",
+      "description": "Insert forward primer DNA sequence. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "insert_reverse_primer_name",
+      "type": "string",
+      "description": "Insert reverse primer name. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "insert_reverse_primer_sequence",
+      "type": "string",
+      "description": "Insert reverse primer DNA sequence. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "vector_forward_primer_name",
+      "type": "string",
+      "description": "Vector forward primer name. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "vector_forward_primer_sequence",
+      "type": "string",
+      "description": "Vector forward primer DNA sequence. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "vector_reverse_primer_name",
+      "type": "string",
+      "description": "Vector reverse primer name. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "vector_reverse_primer_sequence",
+      "type": "string",
+      "description": "Vector reverse primer DNA sequence. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "top_oligo_name",
+      "type": "string",
+      "description": "Top oligo name. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "top_oligo_sequence",
+      "type": "string",
+      "description": "Top oligo DNA sequence. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "bottom_oligo_name",
+      "type": "string",
+      "description": "Bottom oligo name. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "bottom_oligo_sequence",
+      "type": "string",
+      "description": "Bottom oligo DNA sequence. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "enzyme",
+      "type": "string",
+      "description": "Restriction or assembly enzyme. Required for GoldenGate and TypeIISOligoCloning."
+    },
+    {
+      "name": "cell_strain",
+      "type": "string",
+      "description": "Optional transformation host strain."
+    },
+    {
+      "name": "selection",
+      "type": "string",
+      "description": "Optional selection marker."
+    },
+    {
+      "name": "temperature_c",
+      "type": "integer",
+      "description": "Optional transformation temperature in Celsius."
     },
     {
       "name": "paper_id",
@@ -31,7 +142,6 @@
       "description": "Optional full paper information object returned from get_paper_info. If provided, it will be used directly instead of reloading."
     }
   ],
-
   "outputs": [
     {
       "type": "object",

@@ -3,15 +3,16 @@ class DesignCas9Grna:
     Description:
         Designs a Cas9 gRNA for a given DNA target sequence.
 
-        Finds the first NGG PAM, takes the 20 nt immediately upstream as the
-        protospacer, appends the tracrRNA scaffold, and converts T -> U to
-        produce the gRNA.
+        Scans a DNA target sequence for all NGG PAM sites, takes the 20 nt
+        immediately upstream of each as the protospacer, appends the tracrRNA
+        scaffold, and converts T -> U to produce the gRNA. Returns up to 10
+        candidates in order of appearance.
 
     Input:
         seq (str): DNA target sequence (A, T, G, C only).
 
     Output:
-        dict: A dictionary with keys:
+        list: Up to 10 dictionaries, each with keys:
             - grna_sequence (str): Full RNA gRNA (protospacer + scaffold).
             - protospacer (str): The 20 nt DNA protospacer.
             - pam_site (str): The 3 bp NGG PAM immediately after the protospacer.
@@ -36,7 +37,7 @@ class DesignCas9Grna:
     def initiate(self) -> None:
         self._tracrRNA = "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGC"
 
-    def run(self, seq: str) -> dict:
+    def run(self, seq: str) -> list:
         seq = seq.upper()
 
         if not seq:
@@ -46,18 +47,23 @@ class DesignCas9Grna:
         if invalid:
             raise ValueError(f"Invalid base(s) in sequence: {sorted(invalid)}.")
 
+        results = []
+
         for i in range(20, len(seq) - 2):
-            if seq[i+1] == "G" and seq[i+2] == "G":
+            if seq[i+1:i+3] == "GG":
                 pam = seq[i:i+3]
                 protospacer = seq[i-20:i]
                 grna_rna = (protospacer + self._tracrRNA).replace("T", "U")
-                return {
+                results.append({
                     "grna_sequence": grna_rna,
                     "protospacer": protospacer,
                     "pam_site": pam,
-                }
+                })
 
-        raise ValueError("No NGG PAM site found in sequence.")
+        if not results:
+            raise ValueError("No NGG PAM site found in sequence.")
+
+        return results[:10]
 
 
 _instance = DesignCas9Grna()

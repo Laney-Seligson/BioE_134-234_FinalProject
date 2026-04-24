@@ -1,0 +1,75 @@
+{
+  "id": "org.bioe234.function.crispr.run_full_crispr_workflow.v1",
+  "name": "Run Full CRISPR Workflow",
+  "description": "Runs a full Cas9 CRISPR workflow: resolves a target sequence from raw DNA, local resource, or gene name plus organism; designs Cas9 guides; selects one protospacer; designs cloning oligos for a chosen vector; creates a sequence_build construction file; and validates the resulting construction inputs.",
+  "type": "function",
+  "keywords": [
+    "CRISPR",
+    "Cas9",
+    "guide RNA",
+    "cloning oligos",
+    "construction file",
+    "validation",
+    "sequence fetch"
+  ],
+  "date_created": null,
+  "date_last_modified": null,
+  "inputs": [
+    {
+      "name": "query",
+      "type": "string",
+      "description": "Raw DNA sequence, local resource name, or gene symbol to resolve."
+    },
+    {
+      "name": "organism",
+      "type": "string",
+      "description": "Organism name used when query must be fetched from NCBI. Default: Escherichia coli."
+    },
+    {
+      "name": "vector",
+      "type": "string",
+      "description": "Vector preset name to use for cloning oligo design, such as px330."
+    },
+    {
+      "name": "construct_name",
+      "type": "string",
+      "description": "Optional final construct name to include in construction inputs."
+    },
+    {
+      "name": "guide_index",
+      "type": "integer",
+      "description": "Zero-based guide index to select from the designed Cas9 guide list. Default: 0."
+    },
+    {
+      "name": "validate_strict",
+      "type": "boolean",
+      "description": "Whether validation should raise on biological validation failures. Default: false."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A full workflow result containing sequence_info, guides, selected_guide, cloning, construction_file_inputs, construction, and validation."
+    }
+  ],
+  "examples": [
+    {
+      "input": {
+        "query": "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC",
+        "vector": "px330"
+      },
+      "output": {
+        "status": "ready",
+        "protospacer": "AGAAACCTGCCAGTTTGCTG"
+      }
+    }
+  ],
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/run_full_crispr_workflow.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "crispr_run_full_workflow"
+  }
+}

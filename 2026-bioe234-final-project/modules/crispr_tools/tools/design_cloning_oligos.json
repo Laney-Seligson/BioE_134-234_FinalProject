@@ -1,70 +1,141 @@
 {
-  "id": "org.bioe234.function.crispr.design_cloning_oligos.v1",
-  "name": "CRISPR Cloning Oligo Designer",
-  "description": "Designs top and bottom strand DNA oligos for cloning a CRISPR protospacer into a restriction-digested vector. When organism or target_reference is provided, the protospacer is verified against a downloaded local reference sequence before oligos are returned. The result includes construction_file_inputs that can be passed directly to create_construction_file.",
+  "id": "org.bioe234.function.crispr.design_cloning_oligos.v2",
+  "name": "CRISPR Cloning Workflow Designer",
+  "description": "Guided wet-lab simulation tool for three CRISPR guide-cloning workflows: TypeIISOligoCloning (BbsI/BsmBI/BsaI annealed-oligo ligation), RestrictionLigation (e.g. SpeI for pTargetF), and GibsonAssembly (overlap-based seamless assembly). If all required inputs are present the tool designs oligos/primers and returns results (status='ready'). If inputs are missing it returns a structured 'needs_user_input' response with human-readable questions instead of an error. Known vectors: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322. Pass vector='custom' to design with any other vector.",
   "type": "function",
-  "keywords": ["CRISPR", "cloning", "oligo", "protospacer", "BbsI", "pX330", "ligation", "guide RNA", "construction file", "local reference"],
+  "keywords": ["CRISPR", "cloning", "oligo", "protospacer", "BbsI", "BsmBI", "BsaI", "SpeI", "Gibson", "pX330", "lentiCRISPR", "pDR274", "pCRISPR", "pTargetF", "guide RNA", "sgRNA", "construction file", "local reference", "Type IIS"],
   "date_created": null,
   "date_last_modified": null,
 
   "inputs": [
     {
-      "name": "protospacer",
-      "type": "string",
-      "description": "The DNA protospacer sequence to clone (20 bp for Cas9, 23 bp for Cas12a). Raw DNA string only — A, T, G, C bases."
-    },
-    {
       "name": "vector",
       "type": "string",
-      "description": "Optional known vector name. Supported values include px330, lenticrispr_v2, pdr274, pcrispr, pET28a, and pBR322. If omitted, local references choose defaults when available: ecoli_rpsl uses pcrispr."
+      "description": "Vector name. Known presets: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322. Pass 'custom' to design with a vector not in this list. If omitted and organism/target_reference is supplied, a default is chosen automatically (ecoli_rpsl → pcrispr)."
+    },
+    {
+      "name": "cloning_method",
+      "type": "string",
+      "description": "Required when vector='custom'. One of: TypeIISOligoCloning, RestrictionLigation, GibsonAssembly. Inferred automatically from known vector presets."
+    },
+    {
+      "name": "protospacer",
+      "type": "string",
+      "description": "The target DNA protospacer sequence (20 bp for SpCas9/SaCas9, 23 bp for Cas12a). A/T/G/C only. Required for TypeIISOligoCloning."
     },
     {
       "name": "top_overhang",
       "type": "string",
-      "description": "5' overhang for the top strand oligo, determined by the restriction enzyme used to linearize the vector. Default is 'CACC' for BbsI-digested pX330."
+      "description": "5' overhang for the top-strand oligo, left by the Type IIS enzyme digest. Required for vector='custom' with TypeIISOligoCloning. Inferred from preset vectors (e.g. CACC for pX330)."
     },
     {
       "name": "bottom_overhang",
       "type": "string",
-      "description": "5' overhang for the bottom strand oligo. Default is 'AAAC' for BbsI-digested pX330."
+      "description": "5' overhang for the bottom-strand oligo. Required for vector='custom' with TypeIISOligoCloning. Inferred from preset vectors (e.g. AAAC for pX330)."
     },
     {
       "name": "prepend_g",
       "type": "boolean",
-      "description": "Optional override for adding a 5' G when promoter compatibility requires it. If omitted, the selected vector controls this behavior."
+      "description": "Override for whether to prepend a 5' G to the protospacer when it does not already start with G. If omitted, the preset vector's u6_prefers_5prime_g setting controls this."
+    },
+    {
+      "name": "enzyme",
+      "type": "string",
+      "description": "Restriction enzyme name. Required for vector='custom'. Inferred from preset vectors."
+    },
+    {
+      "name": "scaffold_in_vector",
+      "type": "boolean",
+      "description": "Whether the sgRNA scaffold is already encoded in the vector. Required for vector='custom' with TypeIISOligoCloning."
+    },
+    {
+      "name": "promoter",
+      "type": "string",
+      "description": "Promoter driving guide RNA expression (e.g. U6, H1, T7, J23119). Required for vector='custom' with TypeIISOligoCloning."
+    },
+    {
+      "name": "u6_prefers_5prime_g",
+      "type": "boolean",
+      "description": "Whether to prefer a 5' G for promoter compatibility. Required for vector='custom' with TypeIISOligoCloning when promoter context is unknown."
+    },
+    {
+      "name": "guide_cassette_sequence",
+      "type": "string",
+      "description": "Full guide cassette DNA sequence (promoter + spacer + scaffold if scaffold is not in vector). Required for RestrictionLigation. A/T/G/C only."
+    },
+    {
+      "name": "restriction_site_sequence",
+      "type": "string",
+      "description": "Restriction enzyme recognition sequence to add to PCR primer 5' tails (e.g. ACTAGT for SpeI). Required for vector='custom' with RestrictionLigation. Inferred from preset vectors."
+    },
+    {
+      "name": "insert_sequence",
+      "type": "string",
+      "description": "Insert sequence for Gibson assembly (without overlap regions — overlaps are computed from the context). Required for GibsonAssembly. A/T/G/C only."
+    },
+    {
+      "name": "left_overlap_context",
+      "type": "string",
+      "description": "Vector sequence immediately 5' of the Gibson insertion site. Provide at least 20–30 bp. Required for GibsonAssembly."
+    },
+    {
+      "name": "right_overlap_context",
+      "type": "string",
+      "description": "Vector sequence immediately 3' of the Gibson insertion site. Provide at least 20–30 bp. Required for GibsonAssembly."
+    },
+    {
+      "name": "overlap_bp",
+      "type": "integer",
+      "description": "Gibson overlap length in bp. Defaults to the vector preset's recommended_overlap_bp (usually 20). Only needed to override the default."
     },
     {
       "name": "organism",
       "type": "string",
-      "description": "Optional organism name or alias. Supported local references include E. coli rpsL. If supplied, the protospacer must be found in the local reference."
+      "description": "Optional organism name or alias for target verification. Supported local references: E. coli (ecoli_rpsl). If supplied, the protospacer must be found in the local reference."
     },
     {
       "name": "target_reference",
       "type": "string",
-      "description": "Optional explicit local target reference name. Supported value is ecoli_rpsl. If supplied, the protospacer must be found in that local reference."
+      "description": "Explicit local reference key for target verification. Supported: ecoli_rpsl."
     },
     {
       "name": "construct_name",
       "type": "string",
-      "description": "Optional final construct name to include in construction_file_inputs."
+      "description": "Optional name for the final construct, used in construction_file_inputs."
     }
   ],
 
   "outputs": [
     {
       "type": "object",
-      "description": "A dictionary with top_oligo, bottom_oligo, g_prepended, final_protospacer, target_verification, and construction_file_inputs. construction_file_inputs is ready for create_construction_file."
+      "description": "Direct return object. If status='ready': design result with cloning_method, vector, enzyme, citations, workflow-specific oligos/primers, target_verification, and construction_file_inputs (compatible with create_construction_file sequence_build mode, assembly_strategy='DirectSynthesis'). If status='needs_user_input': structured dict with missing_fields and human-readable questions."
     }
   ],
 
   "examples": [
     {
-      "input":  { "protospacer": "ACAGAAACCTGCCAGTTTGC", "vector": "px330" },
-      "output": { "result": { "top_oligo": "CACCGACAGAAACCTGCCAGTTTGC", "bottom_oligo": "AAACGCAAACTGGCAGGTTTCTGT", "g_prepended": true, "construction_file_inputs": { "assembly_strategy": "DirectSynthesis" } } }
+      "input":  { "vector": "px330", "protospacer": "ACAGAAACCTGCCAGTTTGC" },
+      "output": { "status": "ready", "cloning_method": "TypeIISOligoCloning", "top_oligo": "CACCGACAGAAACCTGCCAGTTTGC", "bottom_oligo": "AAACGCAAACTGGCAGGTTTCTGTC", "g_prepended": true }
+    },
+    {
+      "input":  { "vector": "px330" },
+      "output": { "status": "needs_user_input", "missing_fields": ["protospacer"], "questions": ["What is the protospacer sequence?"] }
+    },
+    {
+      "input":  { "vector": "custom", "cloning_method": "TypeIISOligoCloning", "protospacer": "ACAGAAACCTGCCAGTTTGC", "top_overhang": "CACC", "bottom_overhang": "AAAC", "enzyme": "BbsI", "scaffold_in_vector": true, "promoter": "U6", "u6_prefers_5prime_g": true },
+      "output": { "status": "ready", "cloning_method": "TypeIISOligoCloning", "vector": "custom", "top_oligo": "CACCACAGAAACCTGCCAGTTTGC" }
+    },
+    {
+      "input":  { "vector": "ptargetf", "guide_cassette_sequence": "TTGACAGCTAGCTCAGTCCTAGGTATAATGCTAGCGTTTTACAGAAACCTGCCAGTTTGCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAG" },
+      "output": { "status": "ready", "cloning_method": "RestrictionLigation", "restriction_site": "ACTAGT" }
+    },
+    {
+      "input":  { "vector": "px458_gibson", "insert_sequence": "ACAGAAACCTGCCAGTTTGCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGG", "left_overlap_context": "GGCCGGCCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTT", "right_overlap_context": "GCACCGACTCGGTGCCACTTTTTCAAGTTGATAACGGACTAGCCTTATTTTAACTTGCTA" },
+      "output": { "status": "ready", "cloning_method": "GibsonAssembly", "overlap_bp": 20 }
     },
     {
       "input":  { "protospacer": "TACTTTACGCAGCGCGGAGT", "organism": "E. coli", "target_reference": "ecoli_rpsl" },
-      "output": { "result": { "vector": "pcrispr", "top_oligo": "AAACTACTTTACGCAGCGCGGAGT", "bottom_oligo": "AAAACACTCCGCGCTGCGTAAAGTA", "g_prepended": false, "target_verification": { "verified": true, "reference": "ecoli_rpsl" } } }
+      "output": { "status": "ready", "vector": "pCRISPR::rpsL", "target_verification": { "verified": true, "reference": "ecoli_rpsl" } }
     }
   ],
 
@@ -74,7 +145,6 @@
     "initialization": "initiate",
     "execution": "run",
     "disposal": null,
-
     "mcp_name": "crispr_design_cloning_oligos"
   }
 }

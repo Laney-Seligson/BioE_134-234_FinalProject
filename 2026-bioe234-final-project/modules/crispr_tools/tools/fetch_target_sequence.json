@@ -1,0 +1,57 @@
+{
+  "id": "org.bioe234.function.crispr.fetch_target_sequence.v1",
+  "name": "Fetch Target Sequence",
+  "description": "Resolves a gene name, local resource name, or raw DNA sequence into a clean DNA string ready for guide design. Resolution order: (1) raw DNA string — returned as-is; (2) local MCP resource name (e.g. 'ecoli_rpsl', 'pBR322') — read from bundled file; (3) gene name + organism — fetched live from NCBI Entrez. Use this tool at the start of any workflow where you have a gene name but not yet a sequence.",
+  "type": "function",
+  "keywords": ["NCBI", "Entrez", "gene", "sequence", "fetch", "target", "FASTA", "DNA", "resource"],
+  "date_created": null,
+  "date_last_modified": null,
+
+  "inputs": [
+    {
+      "name": "query",
+      "type": "string",
+      "description": "A raw DNA sequence (A/T/G/C only), a local resource name (e.g. 'ecoli_rpsl', 'pBR322'), or a gene name (e.g. 'rpsL', 'lacZ', 'recA'). The tool resolves whichever form is provided."
+    },
+    {
+      "name": "organism",
+      "type": "string",
+      "description": "Organism for NCBI gene search. Only used when query is a gene name. Default: 'Escherichia coli'. Examples: 'Homo sapiens', 'Mus musculus', 'Danio rerio'."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dictionary with: sequence (clean uppercase DNA string), source ('raw_input' | 'local_resource' | 'ncbi'), resource (resource key or gene name used), organism (organism queried), length (int, bp), note (provenance note). NCBI results also include ncbi_gene_id and ncbi_accession."
+    }
+  ],
+
+  "examples": [
+    {
+      "input":  { "query": "ecoli_rpsl" },
+      "output": { "result": { "source": "local_resource", "resource": "ecoli_rpsl", "length": 377 } }
+    },
+    {
+      "input":  { "query": "rpsL", "organism": "Escherichia coli" },
+      "output": { "result": { "source": "ncbi", "resource": "rpsL", "organism": "Escherichia coli" } }
+    },
+    {
+      "input":  { "query": "lacZ", "organism": "Escherichia coli" },
+      "output": { "result": { "source": "ncbi", "resource": "lacZ", "organism": "Escherichia coli" } }
+    },
+    {
+      "input":  { "query": "ATGCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGG" },
+      "output": { "result": { "source": "raw_input", "length": 38 } }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/fetch_target_sequence.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "crispr_fetch_target_sequence"
+  }
+}

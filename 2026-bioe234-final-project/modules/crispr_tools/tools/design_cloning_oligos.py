@@ -1,487 +1,1396 @@
-from dataclasses import dataclass
+"""
+CRISPR Cloning Workflow Designer
+=================================
+A guided wet-lab simulation tool for three CRISPR guide-cloning workflows:
+
+  1. TypeIISOligoCloning  — BbsI/BsmBI/BsaI annealed-oligo sticky-end ligation
+  2. RestrictionLigation  — conventional RE cloning (e.g. SpeI for pTargetF)
+  3. GibsonAssembly       — overlap-based seamless assembly
+
+Behavior
+--------
+- If all required inputs are present → design the oligos/primers and return results.
+- If inputs are missing → return a "needs_user_input" dict with human-readable
+  questions instead of raising an error.
+- Hard errors are reserved for invalid DNA strings and genuinely broken biology.
+
+construction_file_inputs compatibility
+---------------------------------------
+All three branches return construction_file_inputs compatible with
+create_construction_file(input_mode="sequence_build"). Because that tool's
+assembly_strategy is limited to {"GoldenGate", "Gibson", "DirectSynthesis"},
+and Gibson/GoldenGate require all four PCR-primer fields (including vector
+linearisation primers this tool does not design), all branches emit
+assembly_strategy="DirectSynthesis". The biologically honest cloning_method
+is carried as a separate field in both the result and construction_file_inputs.
+
+DISCLAIMER: For educational planning only. Validate designs against the actual
+plasmid map before ordering reagents.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 
-@dataclass(frozen=True)
-class VectorConfig:
-    assembly_method: str
-    enzyme: str
-    top_overhang: str
-    bottom_overhang: str
-    u6_requires_5prime_g: bool
-    backbone_resource: Optional[str] = None
-    cell_strain: str = ""
-    selection: str = ""
-    notes: str = ""
-    source: str = ""
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
 
-
-@dataclass(frozen=True)
-class LocalReference:
-    organism: str
-    resource_name: str
-    path: Path
-    description: str
-
-
-TOOL_DIR = Path(__file__).resolve().parent
+TOOL_DIR        = Path(__file__).resolve().parent
 CRISPR_TOOLS_DIR = TOOL_DIR.parent
 BUNDLED_DATA_DIR = CRISPR_TOOLS_DIR / "data"
 
 
-VECTOR_CONFIG = {
-    "px330": VectorConfig(
-        assembly_method="annealed_oligos",
+# ---------------------------------------------------------------------------
+# Dataclasses
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Citation:
+    """One structured literature or Addgene citation."""
+    label: str            # e.g. "Cong et al. Science 2013"
+    url_or_reference: str # DOI, Addgene URL, or ISBN
+    claim: str            # what this citation supports
+
+
+@dataclass(frozen=True)
+class VectorSpec:
+    """
+    Describes one cloning vector preset.
+
+    cloning_method controls which branch .run() dispatches to:
+      "TypeIISOligoCloning"  — annealed-oligo guide insertion via Type IIS RE
+      "RestrictionLigation"  — conventional RE cloning with compatible sticky ends
+      "GibsonAssembly"       — overlap-based seamless assembly
+
+    dna_source is the physical form of the insert in a real experiment:
+      "annealed_oligos"      — two synthetic oligos annealed together
+      "pcr_product"          — PCR-amplified with RE-site-tailed primers
+      "overlap_fragment"     — synthesised fragment carrying designed overlaps
+    """
+    name: str
+    cloning_method: str        # see docstring
+    dna_source: str
+    enzyme: str
+    promoter: str
+    nuclease_system: str
+    guide_type: str
+    scaffold_in_vector: bool
+
+    # TypeIIS-specific (empty string when not applicable)
+    recognition_site: str = ""
+    top_overhang: str = ""
+    bottom_overhang: str = ""
+    # "prefers" not "requires" — U6 efficiency is higher with 5′G but the
+    # guide still works without it.
+    u6_prefers_5prime_g: bool = False
+
+    # RestrictionLigation-specific
+    restriction_site_sequence: str = ""  # RE recognition seq added to PCR primer tails
+
+    # GibsonAssembly-specific
+    recommended_overlap_bp: int = 20
+
+    # Resource / strain metadata
+    backbone_resource: Optional[str] = None  # key in BACKBONE_RESOURCES
+    cell_strain: str = ""
+    selection: str = ""
+    notes: str = ""
+    citations: tuple[Citation, ...] = field(default_factory=tuple)
+
+
+# ---------------------------------------------------------------------------
+# File-system registries
+# ---------------------------------------------------------------------------
+
+BACKBONE_RESOURCES: dict[str, Path] = {
+    "pET28a":        BUNDLED_DATA_DIR / "pET28a.gb",
+    "pBR322":        BUNDLED_DATA_DIR / "pBR322.gb",
+    "pCRISPR_rpsL":  BUNDLED_DATA_DIR / "pCRISPR_rpsL.gbk",
+}
+
+
+# ---------------------------------------------------------------------------
+# Vector preset registry
+# ---------------------------------------------------------------------------
+
+VECTOR_SPECS: dict[str, VectorSpec] = {
+
+    # ── TypeIIS / Annealed-Oligo Cloning ─────────────────────────────────────
+    # The vector backbone encodes a Type IIS enzyme site adjacent to the guide
+    # scaffold.  Digest leaves 4-nt 5′ overhangs whose sequence is vector-specific.
+    # Two synthetic oligos with matching overhangs are annealed and ligated in.
+    # No PCR of the insert is required.
+
+    "px330": VectorSpec(
+        name="pX330",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
         enzyme="BbsI",
+        promoter="U6",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="GAAGAC",
         top_overhang="CACC",
         bottom_overhang="AAAC",
-        u6_requires_5prime_g=True,
-        notes="Standard mammalian Cas9 cloning vector.",
-        source=(
-            "pX330/Addgene #42230; Cong et al. Science 2013; "
-            "Ran et al. Nat Protoc 2013 sgRNA cloning protocol; "
-            "BbsI-compatible CACC/AAAC-style oligo overhangs."
+        u6_prefers_5prime_g=True,
+        cell_strain="Any mammalian",
+        selection="Amp",
+        notes=(
+            "All-in-one SpCas9 + sgRNA vector.  BbsI digest leaves CACC/AAAC "
+            "overhangs.  5′G is prepended when absent because U6 transcription "
+            "efficiency is higher when the +1 position is a guanosine."
+        ),
+        citations=(
+            Citation("Cong et al. Science 2013",
+                     "https://doi.org/10.1126/science.1231143",
+                     "Introduced pX330 for mammalian CRISPR-Cas9 editing"),
+            Citation("Ran et al. Nat Protoc 2013",
+                     "https://doi.org/10.1038/nprot.2013.143",
+                     "BbsI CACC/AAAC annealed-oligo cloning protocol"),
+            Citation("Addgene #42230",
+                     "https://www.addgene.org/42230/",
+                     "pX330 plasmid repository record"),
         ),
     ),
-    "lenticrispr_v2": VectorConfig(
-        assembly_method="annealed_oligos",
+
+    "lenticrispr_v2": VectorSpec(
+        name="lentiCRISPR v2",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
         enzyme="BsmBI",
+        promoter="U6",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="CGTCTC",
         top_overhang="CACC",
         bottom_overhang="AAAC",
-        u6_requires_5prime_g=True,
-        notes="LentiCRISPR v2-style Cas9 cloning vector.",
-        source=(
-            "lentiCRISPR v2/Addgene #52961; Sanjana et al. Nat Methods 2014; "
-            "Zhang lab lentiCRISPR target-guide cloning protocol uses BsmBI "
-            "with CACC/AAAC-style guide oligos."
+        u6_prefers_5prime_g=True,
+        cell_strain="Any mammalian (lentiviral delivery)",
+        selection="Puro",
+        notes=(
+            "Lentiviral all-in-one vector for stable Cas9 + guide integration.  "
+            "BsmBI is a Type IIS enzyme that leaves the same CACC/AAAC overhangs "
+            "as pX330-BbsI — identical oligo design logic."
+        ),
+        citations=(
+            Citation("Sanjana et al. Nat Methods 2014",
+                     "https://doi.org/10.1038/nmeth.3047",
+                     "lentiCRISPR v2 BsmBI CACC/AAAC cloning protocol"),
+            Citation("Addgene #52961",
+                     "https://www.addgene.org/52961/",
+                     "lentiCRISPR v2 plasmid repository record"),
         ),
     ),
-    "pdr274": VectorConfig(
-        assembly_method="golden_gate",
+
+    "pdr274": VectorSpec(
+        name="pDR274",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
         enzyme="BsaI",
+        promoter="T7",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="GGTCTC",
         top_overhang="TAGG",
         bottom_overhang="AAAC",
-        u6_requires_5prime_g=True,
-        notes="Common zebrafish sgRNA cloning vector.",
-        source=(
-            "pDR274/Addgene #42250; Hwang et al. PLoS One 2013; "
-            "Auer et al. Genome Res 2014 and Varshney et al. Nat Protoc 2016 "
-            "describe BsaI cloning using TAGG/AAAC guide oligo overhangs."
+        # T7 requires G at +1, but the TAGG overhang already provides it as its
+        # last base — no additional prepend is applied (u6_prefers_5prime_g=False).
+        u6_prefers_5prime_g=False,
+        cell_strain="Zebrafish embryo (microinjection)",
+        selection="Kan",
+        notes=(
+            "Zebrafish T7-driven sgRNA vector.  TAGG overhang encodes the "
+            "required +1 G; no extra 5′G is prepended."
+        ),
+        citations=(
+            Citation("Hwang et al. PLoS One 2013",
+                     "https://doi.org/10.1371/journal.pone.0068708",
+                     "pDR274 BsaI TAGG/AAAC zebrafish sgRNA cloning"),
+            Citation("Varshney et al. Nat Protoc 2016",
+                     "https://doi.org/10.1038/nprot.2016.099",
+                     "Zebrafish guide RNA cloning and microinjection protocol"),
+            Citation("Addgene #42250",
+                     "https://www.addgene.org/42250/",
+                     "pDR274 plasmid repository record"),
         ),
     ),
-    "pcrispr": VectorConfig(
-        assembly_method="golden_gate",
+
+    "pcrispr": VectorSpec(
+        name="pCRISPR::rpsL",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
         enzyme="BsaI",
+        promoter="J23119",
+        nuclease_system="SpCas9",      # Cas9 lives on companion pCas9 plasmid
+        guide_type="spacer_array",
+        scaffold_in_vector=True,
+        recognition_site="GGTCTC",
         top_overhang="AAAC",
-        bottom_overhang="AAAAC",
-        u6_requires_5prime_g=False,
+        bottom_overhang="AAAAC",       # 5-nt bottom overhang is specific to this vector
+        u6_prefers_5prime_g=False,
         backbone_resource="pCRISPR_rpsL",
         cell_strain="HME63 or MG1655 carrying pCas9",
         selection="Kan",
         notes=(
-            "E. coli pCRISPR::rpsL guide-array plasmid used with a separate "
-            "pCas9 plasmid carrying tracrRNA and Cas9. The local backbone "
-            "sequence is Addgene plasmid #44505, pCRISPR::rpsL. Jiang et al. "
-            "used this two-plasmid system with Lambda Red recombineering for "
-            "efficient genome editing."
+            "Two-plasmid E. coli system: pCRISPR::rpsL carries the spacer array; "
+            "pCas9 provides Cas9 and tracrRNA.  BsaI flanks an rpsL counter-"
+            "selection cassette.  The AAAAC bottom overhang (5 nt) is specific to "
+            "this architecture and wider than the mammalian 4-nt AAAC."
         ),
-        source=(
-            "Jiang et al. Nat Biotechnol 2013, doi:10.1038/nbt.2508; "
-            "Addgene plasmid #44505 pCRISPR::rpsL; pCas9 carries tracrRNA/Cas9 "
-            "and pCRISPR carries the spacer array. Supplementary Fig. 9 and "
-            "Supplementary Table 2 describe BsaI insertion of spacers into "
-            "pCRISPR using AAAC/AAAAC-style oligos."
+        citations=(
+            Citation("Jiang et al. Nat Biotechnol 2013",
+                     "https://doi.org/10.1038/nbt.2508",
+                     "pCas9/pCRISPR two-plasmid system; BsaI AAAC/AAAAC guide insertion"),
+            Citation("Addgene #44505",
+                     "https://www.addgene.org/44505/",
+                     "pCRISPR::rpsL plasmid repository record"),
         ),
     ),
-    "pet28a": VectorConfig(
-        assembly_method="golden_gate",
+"prc11_lbcpf1": VectorSpec(
+    name="pRC11-U6-DR-crRNA-BsmBI(x2); EFS-Puro-WPRE",
+    cloning_method="TypeIISOligoCloning",
+    dna_source="annealed_oligos",
+    enzyme="BsmBI",
+    promoter="U6",
+    nuclease_system="Cas12a",
+    guide_type="crRNA",
+    scaffold_in_vector=True,
+    recognition_site="CGTCTC",
+    top_overhang="",
+    bottom_overhang="",
+    u6_prefers_5prime_g=False,
+    cell_strain="Mammalian lentiviral delivery",
+    selection="Puro",
+    notes=(
+        "LbCpf1/Cas12a crRNA cloning vector. Uses a U6 direct-repeat crRNA cassette "
+        "and BsmBI cloning. Overhangs must be verified from the plasmid map/protocol."
+    ),
+    citations=(
+        Citation("Addgene #123360",
+                "https://www.addgene.org/123360/",
+                "LbCpf1 crRNA cloning cassette using BsmBI"),
+    ),
+),
+
+"bpk4446_fncas12a": VectorSpec(
+    name="pUC19-U6-FnCas12a crRNA-BsmBI cassette (BPK4446)",
+    cloning_method="TypeIISOligoCloning",
+    dna_source="annealed_oligos",
+    enzyme="BsmBI",
+    promoter="U6",
+    nuclease_system="Cas12a",
+    guide_type="crRNA",
+    scaffold_in_vector=True,
+    recognition_site="CGTCTC",
+    top_overhang="",
+    bottom_overhang="",
+    u6_prefers_5prime_g=False,
+    cell_strain="Mammalian / cloning entry vector",
+    selection="Amp",
+    notes=(
+        "FnCas12a crRNA entry vector with U6 promoter; spacer oligos are cloned "
+        "into a BsmBI cassette. Overhangs must be verified from the plasmid map/protocol."
+    ),
+    citations=(
+        Citation("Addgene #114087",
+                "https://www.addgene.org/114087/",
+                "FnCas12a crRNA entry vector; clone spacer oligos into BsmBI cassette"),
+    ),
+),
+
+    # ── Standard Restriction Ligation ────────────────────────────────────────
+    # The insert is PCR-amplified with primers whose 5′ tails carry the RE site.
+    # Digest of both PCR product and vector yields compatible sticky ends for
+    # T4 ligation.  The enzyme cuts the same site in insert and vector — the
+    # recognition site is disrupted at the ligation junction.
+    # This is biologically distinct from Type IIS cloning.
+
+    "ptargetf": VectorSpec(
+        name="pTargetF",
+        cloning_method="RestrictionLigation",
+        dna_source="pcr_product",
+        enzyme="SpeI",
+        promoter="J23119",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=False,      # full cassette (promoter+guide+scaffold) is the insert
+        recognition_site="ACTAGT",     # SpeI: A↓CTAGT → 5′-CTAG-3′ overhang
+        top_overhang="CTAGT",
+        bottom_overhang="A",
+        u6_prefers_5prime_g=False,
+        restriction_site_sequence="ACTAGT",
+        cell_strain="E. coli MG1655 or equivalent",
+        selection="Amp",
+        notes=(
+            "Used with companion pCas9-CR4 plasmid for E. coli editing.  The "
+            "sgRNA cassette (J23119 + guide + scaffold) is PCR-amplified with "
+            "SpeI-site-tailed primers, then restriction-ligated into pTargetF.  "
+            "SpeI and XbaI leave compatible CTAG overhangs — the ligation product "
+            "is not re-cuttable by either enzyme alone."
+        ),
+        citations=(
+            Citation("Jiang et al. Nat Biotechnol 2015",
+                     "https://doi.org/10.1038/nbt.3234",
+                     "pTargetF/pCas9-CR4 two-plasmid system; SpeI restriction ligation"),
+            Citation("Addgene #62226",
+                     "https://www.addgene.org/62226/",
+                     "pTargetF plasmid repository record"),
+            Citation("NEB SpeI product page",
+                     "https://www.neb.com/en-us/products/r0133-spei-hf",
+                     "SpeI recognition ACTAGT; leaves 5′-CTAG-3′ overhang"),
+        ),
+    ),
+
+    # ── Gibson Assembly ──────────────────────────────────────────────────────
+    # Isothermal single-tube reaction (T5 exonuclease + Phusion polymerase +
+    # Taq ligase).  Adjacent fragments share 15–30 bp of homologous sequence.
+    # No RE sites or sticky ends in the final product.
+
+    "px458_gibson": VectorSpec(
+        name="pX458 (Gibson)",
+        cloning_method="GibsonAssembly",
+        dna_source="overlap_fragment",
+        enzyme="Gibson",
+        promoter="U6",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        u6_prefers_5prime_g=True,
+        recommended_overlap_bp=20,
+        cell_strain="Any mammalian",
+        selection="Amp",
+        notes=(
+            "pX458 can accept a guide insert by Gibson assembly if the insert "
+            "carries overlaps matching the sequences flanking the linearisation "
+            "site.  Vector linearisation primers are NOT designed by this tool."
+        ),
+        citations=(
+            Citation("Ran et al. Nat Protoc 2013",
+                     "https://doi.org/10.1038/nprot.2013.143",
+                     "pX458 plasmid for Cas9 + GFP reporter"),
+            Citation("Addgene #48138",
+                     "https://www.addgene.org/48138/",
+                     "pX458 plasmid repository record"),
+            Citation("Gibson et al. Nat Methods 2009",
+                     "https://doi.org/10.1038/nmeth.1318",
+                     "Gibson assembly isothermal multi-fragment cloning"),
+        ),
+    ),
+
+    # ── Educational / backbone-only presets ─────────────────────────────────
+    "pet28a": VectorSpec(
+        name="pET28a",
+        cloning_method="RestrictionLigation",
+        dna_source="pcr_product",
         enzyme="BsaI",
+        promoter="T7",
+        nuclease_system="N/A",
+        guide_type="N/A",
+        scaffold_in_vector=False,
+        recognition_site="GGTCTC",
         top_overhang="TAGT",
         bottom_overhang="AAAC",
-        u6_requires_5prime_g=False,
+        restriction_site_sequence="GGTCTC",
         backbone_resource="pET28a",
         cell_strain="Mach1",
         selection="Kan",
-        notes="Bundled pET28a backbone GenBank file for local verification.",
-        source=(
-            "Local project GenBank file modules/crispr_tools/data/pET28a.gb. "
-            "This is a construction-file test backbone, not a published CRISPR "
-            "guide-cloning vector configuration."
+        notes="Bundled pET28a GenBank for backbone-validation tests. Not a CRISPR guide vector.",
+        citations=(
+            Citation("Local project file", "modules/crispr_tools/data/pET28a.gb",
+                     "Bundled pET28a backbone"),
         ),
     ),
-    "pbr322": VectorConfig(
-        assembly_method="annealed_oligos",
+
+    "pbr322": VectorSpec(
+        name="pBR322",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
         enzyme="N/A",
+        promoter="N/A",
+        nuclease_system="N/A",
+        guide_type="N/A",
+        scaffold_in_vector=False,
         top_overhang="CACC",
         bottom_overhang="AAAC",
-        u6_requires_5prime_g=False,
         backbone_resource="pBR322",
         cell_strain="DH5alpha",
         selection="Amp",
-        notes="Bundled pBR322 backbone GenBank file for local verification.",
-        source=(
-            "Local project GenBank file modules/crispr_tools/data/pBR322.gb. "
-            "This is a construction-file test backbone, not a published CRISPR "
-            "guide-cloning vector configuration."
+        notes="Bundled pBR322 GenBank for backbone-validation tests. Not a CRISPR guide vector.",
+        citations=(
+            Citation("Local project file", "modules/crispr_tools/data/pBR322.gb",
+                     "Bundled pBR322 backbone"),
         ),
     ),
 }
 
-
-BACKBONE_RESOURCES = {
-    "pET28a": BUNDLED_DATA_DIR / "pET28a.gb",
-    "pBR322": BUNDLED_DATA_DIR / "pBR322.gb",
-    "pCRISPR_rpsL": BUNDLED_DATA_DIR / "pCRISPR_rpsL.gbk",
-}
-
-
-LOCAL_REFERENCES = {
-    "ecoli_rpsl": LocalReference(
-        organism="Escherichia coli str. K-12 substr. MG1655",
-        resource_name="ecoli_rpsl",
-        path=(
-            BUNDLED_DATA_DIR
-            / "references"
-            / "ecoli_rpsl"
-            / "ncbi_dataset"
-            / "data"
-            / "gene.fna"
-        ),
-        description="Downloaded NCBI rpsL gene FASTA for E. coli K-12 MG1655.",
+# Workflow-level citations (method references independent of any vector)
+WORKFLOW_CITATIONS: dict[str, tuple[Citation, ...]] = {
+    "TypeIISOligoCloning": (
+        Citation("Ran et al. Nat Protoc 2013",
+                 "https://doi.org/10.1038/nprot.2013.143",
+                 "General annealed-oligo Type IIS guide cloning protocol"),
+    ),
+    "RestrictionLigation": (
+        Citation("Sambrook & Russell, Molecular Cloning 4th ed.",
+                 "ISBN 978-1-936113-42-2",
+                 "Standard restriction enzyme ligation cloning methodology"),
+    ),
+    "GibsonAssembly": (
+        Citation("Gibson et al. Nat Methods 2009",
+                 "https://doi.org/10.1038/nmeth.1318",
+                 "Isothermal Gibson assembly of overlapping DNA fragments"),
+        Citation("NEB HiFi Assembly usage guidelines",
+                 "https://www.neb.com/en-us/tools-and-resources/usage-guidelines/nebuilder-hifi-dna-assembly",
+                 "Practical overlap design guidelines: 15–30 bp, Tm ≥ 55 °C"),
     ),
 }
 
 
-ORGANISM_ALIASES = {
-    "e coli": "ecoli_rpsl",
-    "e. coli": "ecoli_rpsl",
-    "e_coli": "ecoli_rpsl",
-    "ecoli": "ecoli_rpsl",
-    "escherichia coli": "ecoli_rpsl",
-    "rpsl": "ecoli_rpsl",
-    "stra": "ecoli_rpsl",
-}
+# ---------------------------------------------------------------------------
+# Sequence utilities
+# ---------------------------------------------------------------------------
+
+_COMPLEMENT: dict[str, str] = {"A": "T", "T": "A", "G": "C", "C": "G"}
 
 
-DEFAULT_VECTOR_BY_REFERENCE = {
-    "ecoli_rpsl": "pcrispr",
-}
+def _validate_dna(seq: str, label: str) -> str:
+    seq = seq.upper().strip()
+    if not seq:
+        raise ValueError(f"{label} must not be empty.")
+    invalid = sorted(set(seq) - set("ATGC"))
+    if invalid:
+        raise ValueError(
+            f"Invalid base(s) in {label}: {invalid}. Only A, T, G, C are accepted."
+        )
+    return seq
 
 
-class DesignCloningOligos:
+def _reverse_complement(seq: str) -> str:
+    return "".join(_COMPLEMENT[b] for b in reversed(seq))
+
+
+def _read_sequence_file(path: Path) -> str:
+    """Return uppercase DNA string from a FASTA or GenBank file."""
+    if not path.exists():
+        raise ValueError(f"Required local sequence file is missing: {path}")
+    text = path.read_text()
+
+    if path.suffix.lower() in {".fa", ".fasta", ".fna"}:
+        seq = "".join(
+            line.strip()
+            for line in text.splitlines()
+            if line.strip() and not line.startswith(">")
+        )
+        return _validate_dna(seq, path.name)
+
+    if path.suffix.lower() in {".gb", ".gbk", ".genbank"}:
+        in_origin, parts = False, []
+        for line in text.splitlines():
+            if line.startswith("ORIGIN"):
+                in_origin = True
+                continue
+            if in_origin and line.startswith("//"):
+                break
+            if in_origin:
+                parts.extend(c for c in line if c.isalpha())
+        return _validate_dna("".join(parts), path.name)
+
+    raise ValueError(f"Unsupported sequence file type: {path.suffix}")
+
+
+def _format_citations(citations: tuple[Citation, ...]) -> list[dict]:
+    return [{"label": c.label, "reference": c.url_or_reference, "claim": c.claim}
+            for c in citations]
+
+
+def _needs_user_input(
+    cloning_method: str,
+    vector: str,
+    missing_fields: list[str],
+    questions: list[str],
+    note: str = "",
+) -> dict:
+    """Construct a standard 'needs_user_input' response."""
+    return {
+        "status": "needs_user_input",
+        "cloning_method": cloning_method,
+        "vector": vector,
+        "missing_fields": missing_fields,
+        "questions": questions,
+        "notes": note,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main class
+# ---------------------------------------------------------------------------
+
+class CRISPRCloningDesigner:
     """
-    Design top and bottom strand oligos for cloning a CRISPR protospacer into a
-    restriction-digested vector. The returned construction_file_inputs dict is
-    intentionally shaped so it can be passed to create_construction_file.
+    Guided CRISPR cloning workflow designer.
+
+    Behaves like a cloning assistant:
+      - If enough information is present → design and return results.
+      - If inputs are missing → return a structured 'needs_user_input' dict
+        with human-readable questions rather than raising an error.
+      - Hard errors are reserved for invalid DNA sequences and broken biology.
+
+    Entry point: .run(...)
+    Harness compatibility: .initiate() + .run() pattern is preserved.
     """
 
     def initiate(self) -> None:
-        self._complement = {"A": "T", "T": "A", "G": "C", "C": "G"}
+        """No mutable state; exists for JSON tool harness compatibility."""
+        pass
 
-    def _reverse_complement(self, seq: str) -> str:
-        return "".join(self._complement[b] for b in reversed(seq))
+    # ── Vector resolution ────────────────────────────────────────────────────
+    cas12a_aliases = {"cpf1", "cas12a", "cas12a_custom", "cpf1_custom"}
 
-    def _validate_dna(self, seq: str, label: str) -> str:
-        seq = seq.upper().strip()
-
-        if not seq:
-            raise ValueError(f"{label} must not be empty.")
-
-        invalid = sorted(set(seq) - set("ATGC"))
-        if invalid:
-            raise ValueError(
-                f"Invalid base(s) in {label}: {invalid}. "
-                "Only A, T, G, C are accepted."
-            )
-
-        return seq
-
-    def _read_sequence_file(self, path: Path) -> str:
-        if not path.exists():
-            raise ValueError(f"Required local sequence file is missing: {path}")
-
-        text = path.read_text()
-        if path.suffix.lower() in {".fa", ".fasta", ".fna"}:
-            sequence = "".join(
-                line.strip()
-                for line in text.splitlines()
-                if line.strip() and not line.startswith(">")
-            )
-            return self._validate_dna(sequence, path.name)
-
-        if path.suffix.lower() in {".gb", ".gbk", ".genbank"}:
-            in_origin = False
-            sequence_parts = []
-            for line in text.splitlines():
-                if line.startswith("ORIGIN"):
-                    in_origin = True
-                    continue
-                if in_origin and line.startswith("//"):
-                    break
-                if in_origin:
-                    sequence_parts.extend(char for char in line if char.isalpha())
-            return self._validate_dna("".join(sequence_parts), path.name)
-
-        raise ValueError(f"Unsupported local sequence file type: {path}")
-
-    def _resolve_local_reference(
-        self,
-        organism: Optional[str],
-        target_reference: Optional[str],
-    ) -> Optional[LocalReference]:
-        if target_reference:
-            key = target_reference.strip().lower().replace(" ", "_")
-            key = ORGANISM_ALIASES.get(key, key)
-        elif organism:
-            organism_key = organism.strip().lower().replace("-", " ")
-            key = ORGANISM_ALIASES.get(organism_key)
-        else:
+    def resolve_vector(self, vector: Optional[str]) -> Optional[VectorSpec]:
+        """
+        Return the VectorSpec for a known vector key, or None for "custom".
+        Raises ValueError only for a non-empty, non-custom, unrecognised name.
+        """
+        if not vector or vector.lower().strip() == "custom":
             return None
-
-        if not key or key not in LOCAL_REFERENCES:
-            valid = ", ".join(sorted(LOCAL_REFERENCES))
+        key = vector.lower().strip()
+        if key in self.cas12a_aliases:
+            return None 
+        if key not in VECTOR_SPECS:
             raise ValueError(
-                "This tool only verifies targets against downloaded local "
-                f"references. Use one of: {valid}."
+                f"Unknown vector '{vector}'. "
+                f"Known vectors: {', '.join(sorted(VECTOR_SPECS))}. "
+                "Pass vector='custom' to design with a vector not in this list."
             )
+        return VECTOR_SPECS[key]
 
-        reference = LOCAL_REFERENCES[key]
-        if not reference.path.exists():
-            raise ValueError(
-                f"Local reference '{key}' is configured but missing at {reference.path}."
-            )
-        return reference
+    # ── Requirements assessment ──────────────────────────────────────────────
 
-    def _verify_protospacer_in_reference(
+    def assess_requirements(
         self,
-        protospacer: str,
-        reference: Optional[LocalReference],
-    ) -> dict:
-        if reference is None:
-            return {
-                "verified": False,
-                "note": (
-                    "No local organism/reference was supplied, so the protospacer "
-                    "was not checked against a downloaded sequence."
-                ),
-            }
-
-        reference_sequence = self._read_sequence_file(reference.path)
-        reverse_complement = self._reverse_complement(protospacer)
-        forward_index = reference_sequence.find(protospacer)
-        reverse_index = reference_sequence.find(reverse_complement)
-
-        if forward_index == -1 and reverse_index == -1:
-            raise ValueError(
-                f"Protospacer was not found in local reference '{reference.resource_name}'. "
-                "Choose a protospacer from the downloaded target sequence before "
-                "generating cloning oligos."
-            )
-
-        if forward_index != -1:
-            strand = "+"
-            position = forward_index
-        else:
-            strand = "-"
-            position = reverse_index
-
-        return {
-            "verified": True,
-            "organism": reference.organism,
-            "reference": reference.resource_name,
-            "reference_file": str(reference.path),
-            "description": reference.description,
-            "strand": strand,
-            "zero_based_position": position,
-        }
-
-    def _resolve_vector(
-        self,
-        vector: Optional[str],
+        cloning_method: Optional[str],
+        spec: Optional[VectorSpec],
+        # TypeIIS inputs
+        protospacer: Optional[str],
         top_overhang: Optional[str],
         bottom_overhang: Optional[str],
-        prepend_g: Optional[bool],
-    ):
-        if vector is not None:
-            key = vector.lower().strip()
-            if key not in VECTOR_CONFIG:
-                valid = ", ".join(sorted(VECTOR_CONFIG))
-                raise ValueError(
-                    f"Unknown vector '{vector}'. Known vectors: {valid}."
-                )
-            cfg = VECTOR_CONFIG[key]
+        enzyme: Optional[str],
+        u6_prefers_5prime_g: Optional[bool],
+        scaffold_in_vector: Optional[bool],
+        promoter: Optional[str],
+        # RE ligation inputs
+        guide_cassette_sequence: Optional[str],
+        restriction_site_sequence: Optional[str],
+        # Gibson inputs
+        insert_sequence: Optional[str],
+        left_overlap_context: Optional[str],
+        right_overlap_context: Optional[str],
+    ) -> dict:
+        """
+        Inspect available inputs and decide whether we can proceed.
 
-            resolved_top = cfg.top_overhang if top_overhang is None else top_overhang
-            resolved_bottom = (
-                cfg.bottom_overhang if bottom_overhang is None else bottom_overhang
-            )
-            resolved_prepend_g = (
-                cfg.u6_requires_5prime_g if prepend_g is None else prepend_g
-            )
-            vector_notes = f"Vector '{key}' uses {cfg.enzyme} cloning. {cfg.notes}"
-            return key, cfg, resolved_top, resolved_bottom, resolved_prepend_g, vector_notes
+        Returns {"status": "ready"} if all required fields are present.
+        Returns {"status": "needs_user_input", ...} with missing fields and
+        human-readable questions if any required inputs are absent.
 
-        cfg = VectorConfig(
-            assembly_method="annealed_oligos",
-            enzyme="N/A",
-            top_overhang="CACC",
-            bottom_overhang="AAAC",
-            u6_requires_5prime_g=False,
-            notes="No vector specified. Using default overhangs CACC / AAAC.",
+        This method never raises — it is the place where missing information
+        is surfaced as structured guidance rather than hard errors.
+        """
+        # Infer cloning_method from spec if not supplied directly
+        method = cloning_method or (spec.cloning_method if spec else None)
+
+        if not method:
+            return _needs_user_input(
+                cloning_method="unknown",
+                vector="unknown",
+                missing_fields=["cloning_method"],
+                questions=[
+                    "Which cloning method do you want to use? "
+                    "Options: TypeIISOligoCloning, RestrictionLigation, GibsonAssembly."
+                ],
+                note=(
+                    "No vector was recognised and no cloning_method was specified. "
+                    "Provide a known vector name or set vector='custom' and specify "
+                    "the cloning_method."
+                ),
+            )
+
+        vector_name = spec.name if spec else "custom"
+
+        if method == "TypeIISOligoCloning":
+            return self._assess_typeIIS(
+                spec, vector_name, protospacer, top_overhang, bottom_overhang,
+                enzyme, u6_prefers_5prime_g, scaffold_in_vector, promoter,
+            )
+
+        if method == "RestrictionLigation":
+            return self._assess_restriction(
+                spec, vector_name, guide_cassette_sequence,
+                restriction_site_sequence, enzyme,
+            )
+
+        if method == "GibsonAssembly":
+            return self._assess_gibson(
+                vector_name, insert_sequence,
+                left_overlap_context, right_overlap_context,
+            )
+
+        return _needs_user_input(
+            cloning_method=method,
+            vector=vector_name,
+            missing_fields=["cloning_method"],
+            questions=[
+                f"'{method}' is not a recognised cloning method. "
+                "Use: TypeIISOligoCloning, RestrictionLigation, or GibsonAssembly."
+            ],
         )
-        resolved_top = "CACC" if top_overhang is None else top_overhang
-        resolved_bottom = "AAAC" if bottom_overhang is None else bottom_overhang
-        resolved_prepend_g = False if prepend_g is None else prepend_g
-        return None, cfg, resolved_top, resolved_bottom, resolved_prepend_g, cfg.notes
 
-    def _default_vector_for_reference(
+    def _assess_typeIIS(
         self,
-        reference: Optional[LocalReference],
-    ) -> Optional[str]:
-        if reference is None:
-            return None
-        return DEFAULT_VECTOR_BY_REFERENCE.get(reference.resource_name)
+        spec: Optional[VectorSpec],
+        vector_name: str,
+        protospacer: Optional[str],
+        top_overhang: Optional[str],
+        bottom_overhang: Optional[str],
+        enzyme: Optional[str],
+        u6_prefers_5prime_g: Optional[bool],
+        scaffold_in_vector: Optional[bool],
+        promoter: Optional[str],
+    ) -> dict:
+        missing, questions = [], []
 
-    def _resolve_backbone(self, vector_key: Optional[str], cfg: VectorConfig) -> tuple[str, str]:
-        backbone_resource = cfg.backbone_resource
-        if backbone_resource is None and vector_key in BACKBONE_RESOURCES:
-            backbone_resource = vector_key
+        if not protospacer:
+            missing.append("protospacer")
+            questions.append(
+                "What is the protospacer sequence? "
+                "(20 nt for SpCas9 / SaCas9, 23 nt for Cas12a; A/T/G/C only)"
+            )
 
-        if backbone_resource is None:
-            return vector_key or "guide_backbone", "N"
+        # For custom vectors, all overhang/enzyme info must come from the user
+        if spec is None:
+            if not top_overhang:
+                missing.append("top_overhang")
+                questions.append(
+                    "This appears to be a custom vector. "
+                    "For Cas12a (Cpf1), the nuclease determines PAM (TTTV) and guide design, "
+                    "but cloning overhangs are vector-specific. "
+                    "Please provide the top-strand 5′ overhang from the plasmid map or protocol."
+                )
 
-        if backbone_resource not in BACKBONE_RESOURCES:
-            raise ValueError(f"No local backbone resource configured for {backbone_resource}.")
+        if not bottom_overhang:
+            missing.append("bottom_overhang")
+            questions.append(
+                "Please provide the bottom-strand 5′ overhang from the plasmid map or protocol."
+            )
+        if not enzyme:
+            missing.append("enzyme")
+            questions.append(
+                "Which Type IIS restriction enzyme does your vector use? "
+                "(e.g. BbsI, BsmBI, BsaI)"
+            )
+        if scaffold_in_vector is None:
+            missing.append("scaffold_in_vector")
+            questions.append(
+                "Is the sgRNA scaffold already encoded in the vector? "
+                "(True for most guide-cloning vectors; False if you are cloning "
+                "the entire guide + scaffold as the insert)"
+            )
+        if promoter is None:
+            missing.append("promoter")
+            questions.append(
+                "What promoter does your vector use to drive the guide RNA? "
+                "(e.g. U6, H1, T7 — affects whether a 5′G is needed)"
+            )
+        if u6_prefers_5prime_g is None:
+            missing.append("u6_prefers_5prime_g")
+            questions.append(
+                "Should a 5′G be prepended when the protospacer does not already "
+                "start with G? (recommended for U6-driven guides; not needed for T7)"
+            )
+        if not (top_overhang or spec.top_overhang):
+            missing.append("top_overhang")
 
-        return backbone_resource, self._read_sequence_file(BACKBONE_RESOURCES[backbone_resource])
+            if spec.nuclease_system == "Cas12a":
+                questions.append(
+                    f"Vector '{spec.name}' uses Cas12a (Cpf1). "
+                    "Cas12a defines PAM (TTTV) and guide structure, but cloning overhangs "
+                    "are NOT determined by the nuclease — they are vector-specific. "
+                    "Please provide the top-strand 5′ overhang from the plasmid map or Addgene protocol."
+                )
+            else:
+                questions.append(
+                    f"Vector '{spec.name}' is a known {spec.nuclease_system} vector, but its "
+                    "Type IIS top overhang is not encoded in this tool yet. Please provide "
+                    "the top-strand 5′ overhang from the plasmid map or cloning protocol."
+            )
 
-    def run(
+        if not (bottom_overhang or spec.bottom_overhang):
+            missing.append("bottom_overhang")
+            questions.append(
+                f"Vector '{spec.name}' is a known {spec.nuclease_system} vector, but its "
+                "Type IIS bottom overhang is not encoded in this tool yet. Please provide "
+                "the bottom-strand 5′ overhang from the plasmid map or cloning protocol."
+        )
+        if missing:
+            return _needs_user_input(
+                cloning_method="TypeIISOligoCloning",
+                vector=vector_name,
+                missing_fields=missing,
+                questions=questions,
+            )
+        return {"status": "ready"}
+
+    def _assess_restriction(
+        self,
+        spec: Optional[VectorSpec],
+        vector_name: str,
+        guide_cassette_sequence: Optional[str],
+        restriction_site_sequence: Optional[str],
+        enzyme: Optional[str],
+    ) -> dict:
+        missing, questions = [], []
+
+        if not guide_cassette_sequence:
+            missing.append("guide_cassette_sequence")
+            questions.append(
+                "What is the full guide cassette sequence to clone? "
+                "This should include the promoter, spacer, and sgRNA scaffold "
+                "if the scaffold is not already in the vector. "
+                "(A/T/G/C only)"
+            )
+
+        if spec is None:
+            if not enzyme:
+                missing.append("enzyme")
+                questions.append(
+                    "Which restriction enzyme will you use to linearise the vector "
+                    "and digest the insert? (e.g. SpeI, EcoRI, HindIII)"
+                )
+            if not restriction_site_sequence:
+                missing.append("restriction_site_sequence")
+                questions.append(
+                    "What is the restriction enzyme recognition sequence to add to "
+                    "your PCR primer 5′ tails? "
+                    "(e.g. ACTAGT for SpeI, GAATTC for EcoRI)"
+                )
+
+        if missing:
+            return _needs_user_input(
+                cloning_method="RestrictionLigation",
+                vector=vector_name,
+                missing_fields=missing,
+                questions=questions,
+                note=(
+                    "For restriction ligation, provide the full guide cassette "
+                    "sequence. This tool will design PCR primers with RE-site tails."
+                ),
+            )
+        return {"status": "ready"}
+
+    def _assess_gibson(
+        self,
+        vector_name: str,
+        insert_sequence: Optional[str],
+        left_overlap_context: Optional[str],
+        right_overlap_context: Optional[str],
+    ) -> dict:
+        missing, questions = [], []
+
+        if not insert_sequence:
+            missing.append("insert_sequence")
+            questions.append(
+                "What is the insert sequence? "
+                "(The sequence you want to introduce into the vector, "
+                "without overlap regions — those are computed from the context.)"
+            )
+        if not left_overlap_context:
+            missing.append("left_overlap_context")
+            questions.append(
+                "What is the vector sequence immediately 5′ of the insertion site? "
+                "Provide at least 20–30 bp so an overlap region can be defined. "
+                "(Copy from your plasmid map upstream of where the insert goes.)"
+            )
+        if not right_overlap_context:
+            missing.append("right_overlap_context")
+            questions.append(
+                "What is the vector sequence immediately 3′ of the insertion site? "
+                "Provide at least 20–30 bp for the right overlap region."
+            )
+
+        if missing:
+            return _needs_user_input(
+                cloning_method="GibsonAssembly",
+                vector=vector_name,
+                missing_fields=missing,
+                questions=questions,
+                note=(
+                    "Gibson assembly joins fragments by designed sequence overlaps. "
+                    "The left and right overlap contexts come from your plasmid map, "
+                    "not from the guide sequence itself."
+                ),
+            )
+        return {"status": "ready"}
+
+    def _resolve_backbone(self, spec: Optional[VectorSpec]) -> tuple[str, str]:
+        """Return (backbone_name, backbone_sequence_or_placeholder)."""
+        if spec is None or spec.backbone_resource is None:
+            name = spec.name if spec else "custom_vector"
+            return name, "N"
+        key = spec.backbone_resource
+        if key not in BACKBONE_RESOURCES:
+            raise ValueError(f"No local backbone file configured for '{key}'.")
+        return key, _read_sequence_file(BACKBONE_RESOURCES[key])
+
+    # ── Workflow branch A: TypeIIS / Annealed-Oligo Cloning ──────────────────
+
+    def design_typeIIS_oligos(
         self,
         protospacer: str,
-        vector: Optional[str] = None,
-        top_overhang: Optional[str] = None,
-        bottom_overhang: Optional[str] = None,
-        prepend_g: Optional[bool] = None,
-        organism: Optional[str] = None,
-        target_reference: Optional[str] = None,
+        spec: Optional[VectorSpec],
+        # Custom-vector overrides (ignored when spec is not None, unless provided)
+        top_overhang_override: Optional[str] = None,
+        bottom_overhang_override: Optional[str] = None,
+        prepend_g_override: Optional[bool] = None,
+        enzyme_override: Optional[str] = None,
         construct_name: Optional[str] = None,
     ) -> dict:
         """
-        Design top and bottom cloning oligos.
+        Design top and bottom annealed oligos for Type IIS guide cloning.
 
-        If organism or target_reference is supplied, the protospacer must be
-        present in a downloaded local sequence. This keeps MCP runs anchored to
-        organisms/data that the project can actually verify.
+        Wet-lab steps simulated
+        -----------------------
+        1. Digest vector with Type IIS enzyme (BbsI, BsmBI, or BsaI).
+           The enzyme recognition site is in the backbone; cutting downstream
+           leaves 4-nt 5′ overhangs whose sequence is fixed by the vector.
+        2. Design two synthetic oligos:
+               top    = 5′-[top_overhang][protospacer]-3′
+               bottom = 5′-[bottom_overhang][RC(protospacer)]-3′
+        3. Anneal oligos (95 °C → slow-cool) → dsDNA insert with 4-nt overhangs.
+        4. Ligate annealed insert into digested vector (T4 ligase, 16 °C o/n).
+
+        The overhangs are properties of the vector, not the guide. Only the
+        central portion of each oligo changes when you change the protospacer.
+
+        construction_file_inputs uses assembly_strategy="DirectSynthesis" because
+        annealed oligos are synthesized directly — no backbone PCR occurs.
         """
-        protospacer = self._validate_dna(protospacer, "protospacer")
-        local_reference = self._resolve_local_reference(organism, target_reference)
-        target_verification = self._verify_protospacer_in_reference(
-            protospacer=protospacer,
-            reference=local_reference,
+        top_oh = top_overhang_override or (spec.top_overhang if spec else "")
+        bot_oh = bottom_overhang_override or (spec.bottom_overhang if spec else "")
+        use_g  = prepend_g_override if prepend_g_override is not None else (
+            spec.u6_prefers_5prime_g if spec else False
         )
-        if vector is None:
-            vector = self._default_vector_for_reference(local_reference)
+        enz = enzyme_override or (spec.enzyme if spec else "N/A")
 
-        (
-            vector_key,
-            vector_cfg,
-            top_overhang,
-            bottom_overhang,
-            prepend_g,
-            vector_notes,
-        ) = self._resolve_vector(
-            vector=vector,
-            top_overhang=top_overhang,
-            bottom_overhang=bottom_overhang,
-            prepend_g=prepend_g,
-        )
-
-        top_overhang = self._validate_dna(top_overhang, "top_overhang")
-        bottom_overhang = self._validate_dna(bottom_overhang, "bottom_overhang")
+        top_oh = _validate_dna(top_oh, "top_overhang")
+        bot_oh = _validate_dna(bot_oh, "bottom_overhang")
 
         g_prepended = False
-        original_protospacer = protospacer
-
-        if prepend_g and protospacer[0] != "G":
+        original    = protospacer
+        if use_g and protospacer[0] != "G":
             protospacer = "G" + protospacer
             g_prepended = True
 
-        rc = self._reverse_complement(protospacer)
-        top_oligo = top_overhang + protospacer
-        bottom_oligo = bottom_overhang + rc
+        top_oligo = top_oh + protospacer
+        bot_oligo = bot_oh + _reverse_complement(protospacer)
 
-        guide_label = vector_key or "guide"
-        top_oligo_name = f"{guide_label}_top_oligo"
-        bottom_oligo_name = f"{guide_label}_bottom_oligo"
-        backbone_name, backbone_sequence = self._resolve_backbone(vector_key, vector_cfg)
-        insert_name = f"{guide_label}_annealed_guide_insert"
-        resolved_construct_name = construct_name or f"{guide_label}_guide_construct"
+        slug       = (spec.name if spec else "custom").lower().replace(" ", "_")
+        top_name   = f"{slug}_guide_top"
+        bot_name   = f"{slug}_guide_bottom"
+        ins_name   = f"{slug}_annealed_guide_insert"
+        final_name = construct_name or f"{slug}_guide_construct"
 
-        notes = [vector_notes]
-        if target_verification["verified"]:
-            notes.append(
-                "Target verified against local reference "
-                f"{target_verification['reference']} "
-                f"({target_verification['organism']}, strand "
-                f"{target_verification['strand']}, zero-based position "
-                f"{target_verification['zero_based_position']})."
-            )
-        else:
-            notes.append(target_verification["note"])
-
-        if g_prepended:
-            notes.append(
-                "A 5' G was prepended for promoter compatibility, so the cloned "
-                "guide sequence is one base longer than the original protospacer."
-            )
-        else:
-            notes.append("No 5' G was added.")
-
-        if protospacer != original_protospacer:
-            notes.append(f"Original protospacer: {original_protospacer}")
-            notes.append(f"Modified protospacer: {protospacer}")
+        backbone_name, backbone_seq = self._resolve_backbone(spec)
+        notes = self._typeIIS_notes(spec, enz, g_prepended, original, protospacer)
 
         construction_file_inputs = {
-            "construct_name": resolved_construct_name,
+            "construct_name": final_name,
+            "cloning_method": "TypeIISOligoCloning",
             "assembly_strategy": "DirectSynthesis",
             "backbone_name": backbone_name,
-            "backbone_sequence": backbone_sequence,
-            "insert_name": insert_name,
+            "backbone_sequence": backbone_seq,
+            "insert_name": ins_name,
             "insert_sequence": protospacer,
-            "insert_forward_primer_name": top_oligo_name,
+            "insert_forward_primer_name": top_name,
             "insert_forward_primer_sequence": top_oligo,
-            "insert_reverse_primer_name": bottom_oligo_name,
-            "insert_reverse_primer_sequence": bottom_oligo,
+            "insert_reverse_primer_name": bot_name,
+            "insert_reverse_primer_sequence": bot_oligo,
             "vector_forward_primer_name": "",
             "vector_forward_primer_sequence": "",
             "vector_reverse_primer_name": "",
             "vector_reverse_primer_sequence": "",
-            "enzyme": "" if vector_cfg.enzyme == "N/A" else vector_cfg.enzyme,
-            "cell_strain": vector_cfg.cell_strain,
-            "selection": vector_cfg.selection,
+            "enzyme": "" if enz == "N/A" else enz,
+            "cell_strain": spec.cell_strain if spec else "",
+            "selection": spec.selection if spec else "",
             "temperature_c": 37,
-            "notes": " ".join(notes),
+            "notes": " ".join(notes) + " This insert is an sgRNA protospacer oligo (annealed oligo cloning), not a gene or multi-fragment insert.",
         }
 
+        all_citations = (spec.citations if spec else ()) + WORKFLOW_CITATIONS["TypeIISOligoCloning"]
+
         return {
-            "vector": vector_key,
-            "enzyme": vector_cfg.enzyme,
-            "source": vector_cfg.source,
-            "assembly_method": vector_cfg.assembly_method,
-            "top_overhang": top_overhang,
-            "bottom_overhang": bottom_overhang,
-            "top_oligo_name": top_oligo_name,
-            "bottom_oligo_name": bottom_oligo_name,
+            "status": "ready",
+            "cloning_method": "TypeIISOligoCloning",
+            "vector": spec.name if spec else "custom",
+            "enzyme": enz,
+            "citations": _format_citations(all_citations),
+            "top_overhang": top_oh,
+            "bottom_overhang": bot_oh,
+            "top_oligo_name": top_name,
+            "bottom_oligo_name": bot_name,
             "top_oligo": top_oligo,
-            "bottom_oligo": bottom_oligo,
+            "bottom_oligo": bot_oligo,
             "g_prepended": g_prepended,
             "final_protospacer": protospacer,
-            "target_verification": target_verification,
             "construction_file_inputs": construction_file_inputs,
         }
 
+    # ── Workflow branch B: Standard Restriction Ligation ─────────────────────
 
-_instance = DesignCloningOligos()
+    def design_restriction_insert(
+        self,
+        guide_cassette_sequence: str,
+        spec: Optional[VectorSpec],
+        enzyme_override: Optional[str] = None,
+        restriction_site_override: Optional[str] = None,
+        construct_name: Optional[str] = None,
+    ) -> dict:
+        """
+        Design PCR primers for standard restriction-enzyme-based guide cloning.
+
+        This is biologically distinct from Type IIS cloning:
+          • The RE site is added to PCR primer 5′ tails, not encoded in the backbone.
+          • After digest, sticky ends are fixed by the enzyme's cut pattern —
+            independent of the guide sequence.
+          • The enzyme recognition site is disrupted at the ligation junction.
+
+        Wet-lab steps simulated
+        -----------------------
+        1. Design PCR primers:
+               fwd = [4-nt clamp][RE site][first 20 nt of cassette]
+               rev = [4-nt clamp][RE site][RC of last 20 nt of cassette]
+        2. PCR-amplify the guide cassette.
+        3. Digest PCR product + vector with RE.
+        4. Gel-purify; dephosphorylate vector (CIP).
+        5. Ligate (T4, 16 °C overnight); transform; screen.
+
+        SpeI / XbaI note: both leave a 5′-CTAG-3′ overhang. Their ligation
+        product is not re-cuttable by either enzyme alone.
+
+        construction_file_inputs uses assembly_strategy="DirectSynthesis" because
+        create_construction_file has no RestrictionLigation strategy and the
+        Gibson/GoldenGate strategies require vector PCR primers not designed here.
+        """
+        re_site = (
+            restriction_site_override
+            or (spec.restriction_site_sequence if spec else "")
+        )
+        enz = enzyme_override or (spec.enzyme if spec else "")
+
+        if not re_site:
+            raise ValueError(
+                "restriction_site_sequence is required for RestrictionLigation design "
+                "but was not provided and is not set on the vector spec."
+            )
+
+        clamp = "AAAA"  # 4-nt clamp improves RE digestion efficiency near PCR termini
+        fwd_primer = clamp + re_site + guide_cassette_sequence[:20]
+        rv_primer  = clamp + re_site + _reverse_complement(guide_cassette_sequence[-20:])
+
+        slug       = (spec.name if spec else "custom").lower().replace(" ", "_")
+        fwd_name   = f"{slug}_fwd_re_primer"
+        rv_name    = f"{slug}_rv_re_primer"
+        final_name = construct_name or f"{slug}_re_construct"
+
+        backbone_name, backbone_seq = self._resolve_backbone(spec)
+
+        note_lines = [
+            f"Restriction ligation into {spec.name if spec else 'custom vector'} using {enz}.",
+            f"RE site ({enz}: {re_site}) added to primer 5′ tails with {len(clamp)}-nt clamp.",
+            f"Digest both PCR product and vector with {enz} before ligation.",
+        ]
+
+        construction_file_inputs = {
+            "construct_name": final_name,
+            "cloning_method": "RestrictionLigation",
+            "assembly_strategy": "DirectSynthesis",
+            "backbone_name": backbone_name,
+            "backbone_sequence": backbone_seq,
+            "insert_name": f"{slug}_guide_cassette",
+            "insert_sequence": guide_cassette_sequence,
+            "insert_forward_primer_name": fwd_name,
+            "insert_forward_primer_sequence": fwd_primer,
+            "insert_reverse_primer_name": rv_name,
+            "insert_reverse_primer_sequence": rv_primer,
+            "vector_forward_primer_name": "",
+            "vector_forward_primer_sequence": "",
+            "vector_reverse_primer_name": "",
+            "vector_reverse_primer_sequence": "",
+            "enzyme": enz,
+            "cell_strain": spec.cell_strain if spec else "",
+            "selection": spec.selection if spec else "",
+            "temperature_c": 37,
+            "notes": " ".join(note_lines),
+        }
+
+        all_citations = (spec.citations if spec else ()) + WORKFLOW_CITATIONS["RestrictionLigation"]
+
+        return {
+            "status": "ready",
+            "cloning_method": "RestrictionLigation",
+            "vector": spec.name if spec else "custom",
+            "enzyme": enz,
+            "restriction_site": re_site,
+            "citations": _format_citations(all_citations),
+            "forward_primer_name": fwd_name,
+            "reverse_primer_name": rv_name,
+            "forward_primer": fwd_primer,
+            "reverse_primer": rv_primer,
+            "guide_cassette_sequence": guide_cassette_sequence,
+            "construction_file_inputs": construction_file_inputs,
+        }
+
+    # ── Workflow branch C: Gibson Assembly ───────────────────────────────────
+
+    def design_gibson_fragment(
+        self,
+        insert_sequence: str,
+        left_overlap_context: str,
+        right_overlap_context: str,
+        spec: Optional[VectorSpec],
+        overlap_bp: Optional[int] = None,
+        construct_name: Optional[str] = None,
+    ) -> dict:
+        """
+        Design a Gibson assembly insert with overlap regions.
+
+        Gibson assembly is not restriction-enzyme cloning:
+          • No sticky ends or RE scars in the final product.
+          • Fragment order is set entirely by overlap sequences.
+          • Multiple fragments can be joined in one tube.
+
+        Inputs
+        ------
+        insert_sequence       — sequence to introduce (without overlap regions)
+        left_overlap_context  — vector sequence immediately 5′ of insertion site
+        right_overlap_context — vector sequence immediately 3′ of insertion site
+
+        Outputs include:
+          assembled_fragment   — left_overlap + insert + right_overlap
+          overlap_forward_primer — left_overlap tail + first 20 nt of insert
+          overlap_reverse_primer — right_overlap tail + RC of last 20 nt of insert
+
+        construction_file_inputs uses assembly_strategy="DirectSynthesis" because
+        the Gibson strategy in create_construction_file requires all four primer
+        fields including vector linearisation primers this tool does not design.
+        To use assembly_strategy="Gibson", supply vector linearisation primers
+        separately and change the field before calling create_construction_file.
+
+        Verify overlap Tm ≥ 55 °C and avoid repetitive sequences in the overlap.
+        """
+        obs = overlap_bp or (spec.recommended_overlap_bp if spec else 20)
+
+        if len(left_overlap_context) < obs:
+            raise ValueError(
+                f"left_overlap_context ({len(left_overlap_context)} bp) is shorter "
+                f"than the requested overlap ({obs} bp)."
+            )
+        if len(right_overlap_context) < obs:
+            raise ValueError(
+                f"right_overlap_context ({len(right_overlap_context)} bp) is shorter "
+                f"than the requested overlap ({obs} bp)."
+            )
+
+        left_overlap  = left_overlap_context[-obs:]
+        right_overlap = right_overlap_context[:obs]
+        assembled     = left_overlap + insert_sequence + right_overlap
+
+        fwd_primer = left_overlap  + insert_sequence[:20]
+        rv_primer  = right_overlap + _reverse_complement(insert_sequence[-20:])
+
+        slug       = (spec.name if spec else "custom").lower().replace(" ", "_")
+        fwd_name   = f"{slug}_gibson_fwd"
+        rv_name    = f"{slug}_gibson_rv"
+        final_name = construct_name or f"{slug}_gibson_construct"
+
+        backbone_name, backbone_seq = self._resolve_backbone(spec)
+
+        note_lines = [
+            f"Gibson assembly into {spec.name if spec else 'custom vector'}.  "
+            f"Overlap: {obs} bp.",
+            f"Left overlap: {left_overlap}  Right overlap: {right_overlap}.",
+            "Incubate with NEBuilder HiFi or Gibson Assembly kit at 50 °C, 60 min.",
+            "Vector linearisation primers are NOT included — add them manually to "
+            "use assembly_strategy='Gibson' with create_construction_file.",
+        ]
+
+        construction_file_inputs = {
+            "construct_name": final_name,
+            "cloning_method": "GibsonAssembly",
+            "assembly_strategy": "DirectSynthesis",
+            "backbone_name": backbone_name,
+            "backbone_sequence": backbone_seq,
+            "insert_name": f"{slug}_gibson_fragment",
+            "insert_sequence": assembled,
+            "insert_forward_primer_name": fwd_name,
+            "insert_forward_primer_sequence": fwd_primer,
+            "insert_reverse_primer_name": rv_name,
+            "insert_reverse_primer_sequence": rv_primer,
+            "vector_forward_primer_name": "",
+            "vector_forward_primer_sequence": "",
+            "vector_reverse_primer_name": "",
+            "vector_reverse_primer_sequence": "",
+            "enzyme": "",
+            "cell_strain": spec.cell_strain if spec else "",
+            "selection": spec.selection if spec else "",
+            "temperature_c": 50,
+            "notes": " ".join(note_lines),
+        }
+
+        all_citations = (spec.citations if spec else ()) + WORKFLOW_CITATIONS["GibsonAssembly"]
+
+        return {
+            "status": "ready",
+            "cloning_method": "GibsonAssembly",
+            "vector": spec.name if spec else "custom",
+            "enzyme": "Gibson (isothermal)",
+            "overlap_bp": obs,
+            "citations": _format_citations(all_citations),
+            "left_overlap": left_overlap,
+            "right_overlap": right_overlap,
+            "assembled_fragment": assembled,
+            "overlap_forward_primer_name": fwd_name,
+            "overlap_reverse_primer_name": rv_name,
+            "overlap_forward_primer": fwd_primer,
+            "overlap_reverse_primer": rv_primer,
+            "insert_sequence": insert_sequence,
+            "construction_file_inputs": construction_file_inputs,
+        }
+
+    # ── Public dispatcher ─────────────────────────────────────────────────────
+
+    def run(
+        self,
+        # ── universal ─────────────────────────────────────────────────────
+        vector: Optional[str] = None,
+        cloning_method: Optional[str] = None,
+        construct_name: Optional[str] = None,
+        # ── TypeIIS branch ────────────────────────────────────────────────
+        protospacer: Optional[str] = None,
+        top_overhang: Optional[str] = None,
+        bottom_overhang: Optional[str] = None,
+        prepend_g: Optional[bool] = None,
+        enzyme: Optional[str] = None,
+        scaffold_in_vector: Optional[bool] = None,
+        promoter: Optional[str] = None,
+        u6_prefers_5prime_g: Optional[bool] = None,
+        # ── RestrictionLigation branch ────────────────────────────────────
+        guide_cassette_sequence: Optional[str] = None,
+        restriction_site_sequence: Optional[str] = None,
+        # ── GibsonAssembly branch ─────────────────────────────────────────
+        insert_sequence: Optional[str] = None,
+        left_overlap_context: Optional[str] = None,
+        right_overlap_context: Optional[str] = None,
+        overlap_bp: Optional[int] = None,
+    ) -> dict:
+        """
+        Public entry point.
+
+        Returns one of:
+          - A "needs_user_input" dict if required information is missing.
+          - A design result dict (with status="ready") if all inputs are present.
+
+        Dispatch is by the cloning_method encoded in the resolved VectorSpec,
+        or by the cloning_method argument when vector="custom".
+
+        For known vectors: pass a vector name and the workflow-specific inputs.
+        For custom vectors: pass vector="custom", cloning_method, and all
+          workflow-specific parameters for your vector.
+
+        """
+        # Resolve vector spec (None for custom)
+        spec = self.resolve_vector(vector)
+
+        # Determine effective cloning method
+        method = cloning_method or (spec.cloning_method if spec else None)
+
+        # Requirements check — may return early with needs_user_input
+        check = self.assess_requirements(
+            cloning_method=method,
+            spec=spec,
+            protospacer=protospacer,
+            top_overhang=top_overhang,
+            bottom_overhang=bottom_overhang,
+            enzyme=enzyme,
+            u6_prefers_5prime_g=u6_prefers_5prime_g,
+            scaffold_in_vector=scaffold_in_vector,
+            promoter=promoter,
+            guide_cassette_sequence=guide_cassette_sequence,
+            restriction_site_sequence=restriction_site_sequence,
+            insert_sequence=insert_sequence,
+            left_overlap_context=left_overlap_context,
+            right_overlap_context=right_overlap_context,
+        )
+        if check["status"] == "needs_user_input":
+            return check
+
+        # All required inputs present — dispatch to design branch
+        if method == "TypeIISOligoCloning":
+            clean = _validate_dna(protospacer, "protospacer")
+            return self.design_typeIIS_oligos(
+                protospacer=clean,
+                spec=spec,
+                top_overhang_override=top_overhang,
+                bottom_overhang_override=bottom_overhang,
+                prepend_g_override=prepend_g,
+                enzyme_override=enzyme,
+                construct_name=construct_name,
+            )
+
+        if method == "RestrictionLigation":
+            clean = _validate_dna(guide_cassette_sequence, "guide_cassette_sequence")
+            return self.design_restriction_insert(
+                guide_cassette_sequence=clean,
+                spec=spec,
+                enzyme_override=enzyme,
+                restriction_site_override=restriction_site_sequence,
+                construct_name=construct_name,
+            )
+
+        if method == "GibsonAssembly":
+            return self.design_gibson_fragment(
+                insert_sequence=_validate_dna(insert_sequence, "insert_sequence"),
+                left_overlap_context=_validate_dna(left_overlap_context, "left_overlap_context"),
+                right_overlap_context=_validate_dna(right_overlap_context, "right_overlap_context"),
+                spec=spec,
+                overlap_bp=overlap_bp,
+                construct_name=construct_name,
+            )
+
+        # Should not reach here after assess_requirements, but be explicit
+        raise ValueError(
+            f"Unrecognised cloning_method '{method}'. "
+            "Expected: TypeIISOligoCloning, RestrictionLigation, or GibsonAssembly."
+        )
+
+    # ── Private helpers ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _typeIIS_notes(
+        spec: Optional[VectorSpec],
+        enzyme: str,
+        g_prepended: bool,
+        original: str,
+        final: str,
+    ) -> list[str]:
+        name  = spec.name if spec else "custom vector"
+        notes = [f"Vector '{name}' — {enzyme} (TypeIIS) cloning."]
+        if spec:
+            notes.append(spec.notes)
+        if g_prepended:
+            notes.append(
+                "5′G prepended for promoter compatibility — "
+                "cloned guide is one base longer than the original protospacer."
+            )
+            notes.append(f"Original: {original}  Modified: {final}")
+        else:
+            notes.append("No 5′G added.")
+        return notes
+
+
+# ---------------------------------------------------------------------------
+# Module-level singleton (harness compatibility)
+# ---------------------------------------------------------------------------
+
+_instance = CRISPRCloningDesigner()
 _instance.initiate()
 design_cloning_oligos = _instance.run
+
+
+# ---------------------------------------------------------------------------
+# Example usage
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    print("── 1. TypeIIS pX330 — complete inputs ──────────────────────────────")
+    r = design_cloning_oligos(vector="px330", protospacer="ACAGAAACCTGCCAGTTTGC")
+    print(f"  status       : {r['status']}")
+    print(f"  top_oligo    : {r['top_oligo']}")
+    print(f"  bottom_oligo : {r['bottom_oligo']}")
+    print(f"  g_prepended  : {r['g_prepended']}")
+    print()
+
+    print("── 2. TypeIIS — missing protospacer → needs_user_input ─────────────")
+    r2 = design_cloning_oligos(vector="px330")
+    print(f"  status          : {r2['status']}")
+    print(f"  missing_fields  : {r2['missing_fields']}")
+    print(f"  question        : {r2['questions'][0]}")
+    print()
+
+    print("── 3. Custom TypeIIS — missing overhangs → needs_user_input ────────")
+    r3 = design_cloning_oligos(
+        vector="custom",
+        cloning_method="TypeIISOligoCloning",
+        protospacer="ACAGAAACCTGCCAGTTTGC",
+    )
+    print(f"  status          : {r3['status']}")
+    print(f"  missing_fields  : {r3['missing_fields']}")
+    print()
+
+    print("── 4. Custom TypeIIS — all inputs provided ─────────────────────────")
+    r4 = design_cloning_oligos(
+        vector="custom",
+        cloning_method="TypeIISOligoCloning",
+        protospacer="ACAGAAACCTGCCAGTTTGC",
+        top_overhang="CACC",
+        bottom_overhang="AAAC",
+        enzyme="BbsI",
+        scaffold_in_vector=True,
+        promoter="U6",
+        u6_prefers_5prime_g=True,
+    )
+    print(f"  status       : {r4['status']}")
+    print(f"  top_oligo    : {r4['top_oligo']}")
+    print()
+
+    print("── 5. RestrictionLigation pTargetF ─────────────────────────────────")
+    cassette = (
+        "TTGACAGCTAGCTCAGTCCTAGGTATAATGCTAGCGTTTTACAGAAACCTGCCAGTTTGC"
+        "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAG"
+    )
+    r5 = design_cloning_oligos(
+        vector="ptargetf",
+        guide_cassette_sequence=cassette,
+    )
+    print(f"  status          : {r5['status']}")
+    print(f"  forward_primer  : {r5['forward_primer']}")
+    print(f"  restriction_site: {r5['restriction_site']}")
+    print()
+
+    print("── 6. GibsonAssembly — missing contexts → needs_user_input ─────────")
+    r6 = design_cloning_oligos(
+        vector="px458_gibson",
+        insert_sequence="ACAGAAACCTGCCAGTTTGCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGG",
+    )
+    print(f"  status         : {r6['status']}")
+    print(f"  missing_fields : {r6['missing_fields']}")
+    print()
+
+    print("── 7. GibsonAssembly — all inputs ──────────────────────────────────")
+    r7 = design_cloning_oligos(
+        vector="px458_gibson",
+        insert_sequence="ACAGAAACCTGCCAGTTTGCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGG",
+        left_overlap_context="GGCCGGCCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTT",
+        right_overlap_context="GCACCGACTCGGTGCCACTTTTTCAAGTTGATAACGGACTAGCCTTATTTTAACTTGCTA",
+    )
+    print(f"  status         : {r7['status']}")
+    print(f"  left_overlap   : {r7['left_overlap']}")
+    print(f"  overlap_bp     : {r7['overlap_bp']}")
+    print()
+

@@ -123,6 +123,45 @@ def _prompt_result_to_contents(prompt_result: Any) -> List[types.Content]:
         if texts:
             out.append(types.Content(role=role, parts=[types.Part.from_text(text="\n".join(texts))]))
     return out
+
+
+def _coerce_function_response_payload(tool_result: Any) -> Dict[str, Any]:
+    """
+    Preserve structured tool outputs when possible.
+
+    FastMCP may return:
+      - a list of content items
+      - an object with a .content list
+      - a plain Python object
+
+    For tool results that are JSON objects serialized as text, parse and return
+    the object directly so downstream function responses are not wrapped as
+    {"result": "{\"status\": ... }"}.
+    """
+    if isinstance(tool_result, dict):
+        return tool_result
+
+    text_parts: List[str] = []
+    if isinstance(tool_result, list):
+        text_parts = [getattr(item, "text", str(item)) for item in tool_result]
+    elif hasattr(tool_result, "content"):
+        text_parts = [getattr(item, "text", str(item)) for item in tool_result.content]
+    else:
+        text_parts = [str(tool_result)]
+
+    result_text = "\n".join(text_parts).strip()
+
+    if result_text:
+        try:
+            parsed = json.loads(result_text)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+        if parsed is not None:
+            return {"result": parsed}
+
+    return {"result": result_text}
  
  
 # ---------------------------------------------------------------------------
@@ -188,18 +227,7 @@ async def _run_tool_loop(
  
             try:
                 tool_result = await mcp.call_tool(tool_name, tool_args)
-                # Safely extract text from whatever FastMCP returns
-                if isinstance(tool_result, list):
-                    result_data = "\n".join(
-                        getattr(item, "text", str(item)) for item in tool_result
-                    )
-                elif hasattr(tool_result, "content"):
-                    result_data = "\n".join(
-                        getattr(item, "text", str(item)) for item in tool_result.content
-                    )
-                else:
-                    result_data = str(tool_result)
-                fn_response = {"result": result_data}
+                fn_response = _coerce_function_response_payload(tool_result)
             except Exception as e:
                 fn_response = {"error": str(e)}
  

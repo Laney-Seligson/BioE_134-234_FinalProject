@@ -1,9 +1,9 @@
 {
   "id": "org.bioe234.function.crispr.design_cas9_grna.v1",
   "name": "Cas9 gRNA Designer",
-  "description": "Scans a DNA sequence for all NGG PAM sites, scores each candidate protospacer using Doench et al. 2016 efficiency rules (GC content, poly-T avoidance, terminal G), and returns the optimal Cas9 gRNA sequence.",
+  "description": "Scans a DNA target sequence for all NGG PAM sites, takes the 20 nt immediately upstream of each as the protospacer, appends the SpCas9 tracrRNA scaffold, and returns up to 10 candidates in order of appearance. No scoring or ranking.",
   "type": "function",
-  "keywords": ["CRISPR", "Cas9", "gRNA", "guide RNA", "PAM", "NGG", "protospacer", "Doench"],
+  "keywords": ["CRISPR", "Cas9", "gRNA", "guide RNA", "PAM", "NGG", "protospacer", "SpCas9", "tracrRNA"],
   "date_created": null,
   "date_last_modified": null,
 
@@ -11,21 +11,21 @@
     {
       "name": "seq",
       "type": "string",
-      "description": "DNA target sequence to scan for Cas9 gRNA candidates. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves the format automatically."
+      "description": "DNA target sequence to scan for the first NGG PAM site. Accepts a resource name (e.g. 'ecoli_rpsl'), a raw sequence string, FASTA content, or GenBank content. The framework resolves the format automatically."
     }
   ],
 
   "outputs": [
     {
       "type": "object",
-      "description": "A dictionary with grna_sequence (full RNA gRNA), protospacer (20 bp DNA), pam_site (NGG), gc_fraction, efficiency_score (0-3 per Doench et al. 2016), warnings (list of rule violations), and candidates_evaluated (int)."
+      "description": "A list of up to 10 candidates in order of position. Each has grna_sequence (full RNA gRNA: protospacer + tracrRNA scaffold, T→U), protospacer (20 bp DNA), and pam_site (3 bp NGG)."
     }
   ],
 
   "examples": [
     {
       "input":  { "seq": "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" },
-      "output": { "result": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "pam_site": "TGG", "efficiency_score": 3, "warnings": [] } }
+      "output": { "result": { "protospacer": "TCAGAAACCTGCCAGTTTGC", "pam_site": "TGG", "grna_sequence": "UCAGAAACCUGCCAGUUUGCGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGCACCGAGUCGGUGC" } }
     }
   ],
 

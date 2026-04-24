@@ -3,15 +3,17 @@ class DesignCas12aCrrna:
     Description:
         Designs an LbCas12a crRNA for a given DNA target sequence.
 
-        Finds the first TTTV PAM (TTTA, TTTC, or TTTG), takes the 23 nt
-        immediately downstream as the protospacer, prepends the LbCas12a
-        direct repeat, and converts T -> U to produce the crRNA.
+        Scans a DNA target sequence for all TTTV PAM sites (TTTA, TTTC, or
+        TTTG), takes the 23 nt immediately downstream of each as the
+        protospacer, prepends the LbCas12a direct repeat, and converts T -> U
+        to produce the crRNA. Returns up to 10 candidates in order of
+        appearance.
 
     Input:
         seq (str): DNA target sequence (A, T, G, C only).
 
     Output:
-        dict: A dictionary with keys:
+        list: Up to 10 dictionaries, each with keys:
             - crrna_sequence (str): Full RNA crRNA (direct repeat + spacer).
             - protospacer (str): The 23 nt DNA protospacer.
             - pam_site (str): The 4 bp TTTV PAM immediately before the protospacer.
@@ -36,7 +38,7 @@ class DesignCas12aCrrna:
     def initiate(self) -> None:
         self._direct_repeat = "AATTTCTACTAAGTGTAGAT"
 
-    def run(self, seq: str) -> dict:
+    def run(self, seq: str) -> list:
         seq = seq.upper()
 
         if not seq:
@@ -46,18 +48,23 @@ class DesignCas12aCrrna:
         if invalid:
             raise ValueError(f"Invalid base(s) in sequence: {sorted(invalid)}.")
 
+        results = []
+
         for i in range(len(seq) - 26):
             if seq[i:i+3] == "TTT" and seq[i+3] in "ACG":
                 pam = seq[i:i+4]
                 protospacer = seq[i+4:i+27]
                 crrna_rna = (self._direct_repeat + protospacer).replace("T", "U")
-                return {
+                results.append({
                     "crrna_sequence": crrna_rna,
                     "protospacer": protospacer,
                     "pam_site": pam,
-                }
+                })
 
-        raise ValueError("No TTTV PAM site found in sequence.")
+        if not results:
+            raise ValueError("No TTTV PAM site found in sequence.")
+
+        return results[:10]
 
 
 _instance = DesignCas12aCrrna()

@@ -1070,10 +1070,12 @@ class CRISPRCloningDesigner:
             "backbone_sequence": backbone_seq,
             "insert_name": ins_name,
             "insert_sequence": protospacer,
-            "insert_forward_primer_name": top_name,
-            "insert_forward_primer_sequence": top_oligo,
-            "insert_reverse_primer_name": bot_name,
-            "insert_reverse_primer_sequence": bot_oligo,
+            # Type IIS annealed-oligo cloning uses dedicated top/bottom oligo
+            # fields; reusing the insert primer fields creates duplicate parts.
+            "insert_forward_primer_name": "",
+            "insert_forward_primer_sequence": "",
+            "insert_reverse_primer_name": "",
+            "insert_reverse_primer_sequence": "",
             "top_oligo_name": top_name,
             "top_oligo_sequence": top_oligo,
             "bottom_oligo_name": bot_name,
@@ -1724,4 +1726,3 @@ if __name__ == "__main__":
     print(f"  left_overlap   : {r7['left_overlap']}")
     print(f"  overlap_bp     : {r7['overlap_bp']}")
     print()
-

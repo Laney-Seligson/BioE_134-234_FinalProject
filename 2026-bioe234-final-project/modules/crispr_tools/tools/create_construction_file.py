@@ -27,7 +27,7 @@ class CreateConstructionFile:
 
     def initiate(self) -> None:
         self.allowed_input_modes = {"sequence_build", "paper_info", "paper_shorthand"}
-        self.allowed_strategies = {"GoldenGate", "Gibson", "DirectSynthesis", "TypeIISOligoCloning"}
+        self.allowed_strategies = {"GoldenGate", "Gibson", "DirectSynthesis", "TypeIISOligoCloning", "RestrictionLigation"}
         self.allowed_paper_assembly_methods = {
             "GoldenGate",
             "Gibson",
@@ -36,7 +36,7 @@ class CreateConstructionFile:
             "Unknown",
         }
         self.allowed_part_types = {"oligo", "primer", "dsdna", "plasmid", "fragment"}
-        self.allowed_step_types = {"PCR", "GoldenGate", "Gibson", "DirectSynthesis", "TypeIISOligoCloning", "Transform"}
+        self.allowed_step_types = {"PCR", "GoldenGate", "Gibson", "DirectSynthesis", "TypeIISOligoCloning", "Transform", "RestrictionLigation"}
         self.allowed_shorthand_ops = {
             "clone",
             "assemble",
@@ -331,11 +331,13 @@ class CreateConstructionFile:
         mapping = {
             "goldengate": "GoldenGate",
             "gibson": "Gibson",
+            "gibsonassembly": "Gibson",
             "directsynthesis": "DirectSynthesis",
             "typeiis": "TypeIISOligoCloning",
             "typeiiscloning": "TypeIISOligoCloning",
             "typeiisoligocloning": "TypeIISOligoCloning",
-            "typeiisoligocloning": "TypeIISOligoCloning",
+            "restrictionligation": "RestrictionLigation",
+            "restrictionfragmentligation": "RestrictionLigation",
         }
         return mapping.get(s, strategy.strip())
 
@@ -477,7 +479,7 @@ class CreateConstructionFile:
         bottom_oligo_sequence: str = "",
         enzyme: str = "",
     ) -> None:
-        if assembly_strategy in {"GoldenGate", "Gibson"}:
+        if assembly_strategy == "GoldenGate":
             required_pairs = [
                 ("insert_forward_primer", insert_forward_primer_name, insert_forward_primer_sequence),
                 ("insert_reverse_primer", insert_reverse_primer_name, insert_reverse_primer_sequence),
@@ -492,12 +494,27 @@ class CreateConstructionFile:
                 if not primer_seq.strip():
                     missing_fields.append(f"{label}_sequence")
 
-            if assembly_strategy == "GoldenGate" and not enzyme.strip():
+            if not enzyme.strip():
                 missing_fields.append("enzyme")
 
             if missing_fields:
                 raise ValueError(
-                    f"Missing required fields for {assembly_strategy}: {', '.join(missing_fields)}."
+                    f"Missing required fields for GoldenGate: {', '.join(missing_fields)}."
+                )
+
+        if assembly_strategy == "Gibson":
+            missing_fields = []
+            if not insert_forward_primer_name.strip():
+                missing_fields.append("insert_forward_primer_name")
+            if not insert_forward_primer_sequence.strip():
+                missing_fields.append("insert_forward_primer_sequence")
+            if not insert_reverse_primer_name.strip():
+                missing_fields.append("insert_reverse_primer_name")
+            if not insert_reverse_primer_sequence.strip():
+                missing_fields.append("insert_reverse_primer_sequence")
+            if missing_fields:
+                raise ValueError(
+                    f"Missing required fields for Gibson: {', '.join(missing_fields)}."
                 )
 
         if assembly_strategy == "TypeIISOligoCloning":
@@ -515,6 +532,25 @@ class CreateConstructionFile:
             if missing_fields:
                 raise ValueError(
                     "Missing required fields for TypeIISOligoCloning: "
+                    + ", ".join(missing_fields)
+                    + "."
+                )
+
+        if assembly_strategy == "RestrictionLigation":
+            missing_fields = []
+            if not insert_forward_primer_name.strip():
+                missing_fields.append("insert_forward_primer_name")
+            if not insert_forward_primer_sequence.strip():
+                missing_fields.append("insert_forward_primer_sequence")
+            if not insert_reverse_primer_name.strip():
+                missing_fields.append("insert_reverse_primer_name")
+            if not insert_reverse_primer_sequence.strip():
+                missing_fields.append("insert_reverse_primer_sequence")
+            if not enzyme.strip():
+                missing_fields.append("enzyme")
+            if missing_fields:
+                raise ValueError(
+                    "Missing required fields for RestrictionLigation: "
                     + ", ".join(missing_fields)
                     + "."
                 )
@@ -690,6 +726,68 @@ class CreateConstructionFile:
         if assembly_strategy in {"GoldenGate", "Gibson"}:
             insert_pcr_product = f"{insert_name}_pcr"
             vector_pcr_product = f"{backbone_name}_pcr"
+            has_vector_primers = (
+                vector_forward_primer_name.strip() and vector_reverse_primer_name.strip()
+            )
+
+            operations.append(
+                {
+                    "step_number": 1,
+                    "step_type": "PCR",
+                    "inputs": [insert_forward_primer_name, insert_reverse_primer_name, insert_name],
+                    "parameters": {
+                        "forward_primer": insert_forward_primer_name,
+                        "reverse_primer": insert_reverse_primer_name,
+                        "template": insert_name,
+                    },
+                    "output": insert_pcr_product,
+                }
+            )
+
+            if has_vector_primers:
+                operations.append(
+                    {
+                        "step_number": 2,
+                        "step_type": "PCR",
+                        "inputs": [vector_forward_primer_name, vector_reverse_primer_name, backbone_name],
+                        "parameters": {
+                            "forward_primer": vector_forward_primer_name,
+                            "reverse_primer": vector_reverse_primer_name,
+                            "template": backbone_name,
+                        },
+                        "output": vector_pcr_product,
+                    }
+                )
+
+            assembly_inputs = (
+                [vector_pcr_product, insert_pcr_product]
+                if has_vector_primers
+                else [backbone_name, insert_pcr_product]
+            )
+
+            if assembly_strategy == "GoldenGate":
+                operations.append(
+                    {
+                        "step_number": len(operations) + 1,
+                        "step_type": "GoldenGate",
+                        "inputs": assembly_inputs,
+                        "parameters": {"enzyme": enzyme},
+                        "output": construct_name,
+                    }
+                )
+            else:
+                operations.append(
+                    {
+                        "step_number": len(operations) + 1,
+                        "step_type": "Gibson",
+                        "inputs": assembly_inputs,
+                        "parameters": {"reagent": "GibsonMix", "overlap_bp": 20},
+                        "output": construct_name,
+                    }
+                )
+
+        elif assembly_strategy == "RestrictionLigation":
+            insert_pcr_product = f"{insert_name}_pcr"
 
             operations.append(
                 {
@@ -708,37 +806,12 @@ class CreateConstructionFile:
             operations.append(
                 {
                     "step_number": 2,
-                    "step_type": "PCR",
-                    "inputs": [vector_forward_primer_name, vector_reverse_primer_name, backbone_name],
-                    "parameters": {
-                        "forward_primer": vector_forward_primer_name,
-                        "reverse_primer": vector_reverse_primer_name,
-                        "template": backbone_name,
-                    },
-                    "output": vector_pcr_product,
+                    "step_type": "RestrictionLigation",
+                    "inputs": [backbone_name, insert_pcr_product],
+                    "parameters": {"enzyme": enzyme},
+                    "output": construct_name,
                 }
             )
-
-            if assembly_strategy == "GoldenGate":
-                operations.append(
-                    {
-                        "step_number": 3,
-                        "step_type": "GoldenGate",
-                        "inputs": [vector_pcr_product, insert_pcr_product],
-                        "parameters": {"enzyme": enzyme},
-                        "output": construct_name,
-                    }
-                )
-            else:
-                operations.append(
-                    {
-                        "step_number": 3,
-                        "step_type": "Gibson",
-                        "inputs": [vector_pcr_product, insert_pcr_product],
-                        "parameters": {"reagent": "GibsonMix", "overlap_bp": 20},
-                        "output": construct_name,
-                    }
-                )
 
         elif assembly_strategy == "TypeIISOligoCloning":
             operations.append(
@@ -850,6 +923,12 @@ class CreateConstructionFile:
                 )
             if "enzyme" not in parameters or not str(parameters.get("enzyme", "")).strip():
                 raise ValueError(f"TypeIISOligoCloning step {step_number} requires 'enzyme'.")
+
+        elif step_type == "RestrictionLigation":
+            if len(inputs) != 2:
+                raise ValueError(f"RestrictionLigation step {step_number} should have vector and insert inputs.")
+            if "enzyme" not in parameters or not str(parameters.get("enzyme", "")).strip():
+                raise ValueError(f"RestrictionLigation step {step_number} requires 'enzyme'.")
 
         elif step_type == "DirectSynthesis":
             if len(inputs) != 1:
@@ -972,6 +1051,14 @@ class CreateConstructionFile:
                     f"{inputs[1] if len(inputs) > 1 else '':<14}"
                     f"{inputs[2] if len(inputs) > 2 else '':<18}"
                     f"{parameters.get('enzyme', ''):<10}"
+                    f"{output}"
+                )
+            elif step_type == "RestrictionLigation":
+                lines.append(
+                    f"{'Ligate':<14}"
+                    f"{inputs[0] if len(inputs) > 0 else '':<14}"
+                    f"{inputs[1] if len(inputs) > 1 else '':<14}"
+                    f"{parameters.get('enzyme', ''):<18}"
                     f"{output}"
                 )
             elif step_type == "DirectSynthesis":

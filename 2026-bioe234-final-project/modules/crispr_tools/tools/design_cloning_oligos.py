@@ -1065,7 +1065,7 @@ class CRISPRCloningDesigner:
         construction_file_inputs = {
             "construct_name": final_name,
             "cloning_method": "TypeIISOligoCloning",
-            "assembly_strategy": "DirectSynthesis",
+            "assembly_strategy": "TypeIISOligoCloning",
             "backbone_name": backbone_name,
             "backbone_sequence": backbone_seq,
             "insert_name": ins_name,
@@ -1074,6 +1074,10 @@ class CRISPRCloningDesigner:
             "insert_forward_primer_sequence": top_oligo,
             "insert_reverse_primer_name": bot_name,
             "insert_reverse_primer_sequence": bot_oligo,
+            "top_oligo_name": top_name,
+            "top_oligo_sequence": top_oligo,
+            "bottom_oligo_name": bot_name,
+            "bottom_oligo_sequence": bot_oligo,
             "vector_forward_primer_name": "",
             "vector_forward_primer_sequence": "",
             "vector_reverse_primer_name": "",
@@ -1172,7 +1176,7 @@ class CRISPRCloningDesigner:
         construction_file_inputs = {
             "construct_name": final_name,
             "cloning_method": "RestrictionLigation",
-            "assembly_strategy": "DirectSynthesis",
+            "assembly_strategy": "RestrictionLigation",
             "backbone_name": backbone_name,
             "backbone_sequence": backbone_seq,
             "insert_name": f"{slug}_guide_cassette",
@@ -1286,7 +1290,7 @@ class CRISPRCloningDesigner:
         construction_file_inputs = {
             "construct_name": final_name,
             "cloning_method": "GibsonAssembly",
-            "assembly_strategy": "DirectSynthesis",
+            "assembly_strategy": "Gibson",
             "backbone_name": backbone_name,
             "backbone_sequence": backbone_seq,
             "insert_name": f"{slug}_gibson_fragment",

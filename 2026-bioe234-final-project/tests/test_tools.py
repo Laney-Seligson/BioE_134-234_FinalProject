@@ -22,6 +22,7 @@ from modules.crispr_tools.tools.construction_file_validation import (
     validate_construction_record,
 )
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
+from modules.crispr_tools.tools.rank_guides import rank_guides
 from modules.crispr_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.lab_sheet import lab_sheet
 from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
@@ -696,4 +697,123 @@ def test_lookup_gene_sequence_cds_extraction(monkeypatch):
     assert result["product"] == "beta-galactosidase"
     assert result["source"] == "CDS annotation"
     assert len(result["sequence"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# verify_edit primer Tm validation tests
+# ---------------------------------------------------------------------------
+
+def test_verify_edit_returns_primer_tm_fields():
+    protospacer = "TCAGAAACCTGCCAGTTTGC"
+    reference = "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" + "A" * 200
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas9")
+    assert "forward_primer_tm" in result
+    assert "reverse_primer_tm" in result
+    assert "tm_difference" in result
+    assert "primer_warnings" in result
+    assert isinstance(result["primer_warnings"], list)
+    # Tm should be a reasonable Wallace-rule value for 20bp primer (somewhere 40-80)
+    assert 30 <= result["forward_primer_tm"] <= 90
+    assert 30 <= result["reverse_primer_tm"] <= 90
+    # tm_difference should be non-negative
+    assert result["tm_difference"] >= 0
+
+
+def test_verify_edit_flags_high_gc_primer_warning():
+    # Build a reference where primers fall in a GC-rich zone -> should warn
+    # Put the cut site in the middle of a GC-rich reference
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = "G" * 160 + protospacer + "AGG" + "G" * 160
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # Warnings should contain something about GC or Tm being too high
+    assert len(result["primer_warnings"]) > 0
+
+
+def test_verify_edit_balanced_primers_have_no_warnings():
+    # Build a balanced reference with ~50% GC around the cut site
+    flank = "ATGCATGCATGCATGCATGC" * 10  # 200bp, 50% GC, no poly-N
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = flank + protospacer + "AGG" + flank
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # Tms should be ~60 (Wallace: 10 AT * 2 + 10 GC * 4 = 60)
+    assert 55 <= result["forward_primer_tm"] <= 65
+    assert 55 <= result["reverse_primer_tm"] <= 65
+    assert result["tm_difference"] <= 5
+
+
+# ---------------------------------------------------------------------------
+# rank_guides tests
+# ---------------------------------------------------------------------------
+
+def test_rank_guides_scores_single_guide_cas9():
+    # GC = 50%, no TTTT, ends in G -> efficiency max (3)
+    protospacer = "ATGCATGCATGCATGCATGG"
+    reference = protospacer + "AGG" + "C" * 60
+    result = rank_guides(
+        guides=[{"protospacer": protospacer}],
+        reference=reference,
+        nuclease="cas9",
+    )
+    top = result["ranked_guides"][0]
+    assert top["efficiency_score"] == 3
+    assert top["efficiency_details"]["gc_content_ok"] is True
+    assert top["efficiency_details"]["no_polyt_run"] is True
+    assert top["efficiency_details"]["g_at_pam_proximal"] is True
+    assert result["best_guide"] is top
+    assert "scoring_rationale" in result
+
+
+def test_rank_guides_penalizes_polyt_and_low_gc():
+    # all A's: GC = 0% (fail), no TTTT but no G at PAM-proximal
+    bad = "AAAAAAAAAAAAAAAAAAAA"
+    # balanced good guide
+    good = "ATGCATGCATGCATGCATGG"
+    reference = good + "AGG" + "C" * 40 + bad + "AGG" + "C" * 40
+    result = rank_guides(
+        guides=[{"protospacer": bad}, {"protospacer": good}],
+        reference=reference,
+        nuclease="cas9",
+    )
+    # good should rank first
+    assert result["best_guide"]["protospacer"] == good
+    assert result["ranked_guides"][0]["efficiency_score"] >= result["ranked_guides"][1]["efficiency_score"]
+
+
+def test_rank_guides_empty_list_raises():
+    with pytest.raises(ValueError):
+        rank_guides(guides=[], reference="ATGATGATG", nuclease="cas9")
+
+
+def test_rank_guides_invalid_nuclease_raises():
+    with pytest.raises(ValueError):
+        rank_guides(
+            guides=[{"protospacer": "ATGATGATGATGATGATGAG"}],
+            reference="ATGATGATGATGATGATGAGAGG",
+            nuclease="cas13",
+        )
+
+
+def test_rank_guides_missing_protospacer_raises():
+    with pytest.raises(ValueError):
+        rank_guides(
+            guides=[{"not_a_protospacer": "ATGATGATGATGATGATGAG"}],
+            reference="ATGATGATGATGATGATGAGAGG",
+            nuclease="cas9",
+        )
+
+
+def test_rank_guides_cas12a_max_efficiency_is_two():
+    # Cas12a has no PAM-proximal G bonus -> max efficiency = 2
+    protospacer = "ATGATGATGATGATGATGATGAT"  # 23 bp, GC ~ 33% actually -> fails GC
+    # Use a balanced 23-mer: GC 40-70%, no TTTT
+    protospacer = "ATGCATGCATGCATGCATGCATG"  # GC = 52%
+    reference = "TTTA" + protospacer + "A" * 40
+    result = rank_guides(
+        guides=[{"protospacer": protospacer}],
+        reference=reference,
+        nuclease="cas12a",
+    )
+    top = result["ranked_guides"][0]
+    assert top["efficiency_score"] <= 2
+    assert "g_at_pam_proximal" not in top["efficiency_details"]
 

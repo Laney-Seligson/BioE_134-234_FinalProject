@@ -23,6 +23,8 @@ from modules.crispr_tools.tools.construction_file_validation import (
 )
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.rank_guides import rank_guides
+from modules.crispr_tools.tools.colony_calculator import colony_calculator
+from modules.crispr_tools.tools.interpret_ice_tide import interpret_ice_tide
 from modules.crispr_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.lab_sheet import lab_sheet
 from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
@@ -816,4 +818,125 @@ def test_rank_guides_cas12a_max_efficiency_is_two():
     top = result["ranked_guides"][0]
     assert top["efficiency_score"] <= 2
     assert "g_at_pam_proximal" not in top["efficiency_details"]
+
+
+# ---------------------------------------------------------------------------
+# colony_calculator tests
+# ---------------------------------------------------------------------------
+
+def test_colony_calculator_50pct_efficiency_one_clone():
+    # P(X>=1) = 1 - 0.5^n >= 0.95 -> n=5 (1-0.5^5=0.96875)
+    result = colony_calculator(editing_efficiency=0.5, desired_clones=1, confidence=0.95)
+    assert result["colonies_to_pick"] == 5
+    assert result["probability_at_chosen_n"] >= 0.95
+
+
+def test_colony_calculator_low_efficiency_high_burden():
+    # 5% efficiency, 1 clone, 95% conf -> 59 colonies
+    # log(0.05)/log(0.95) = -2.9957/-0.0513 = 58.4 -> 59
+    result = colony_calculator(editing_efficiency=0.05, desired_clones=1, confidence=0.95)
+    assert result["colonies_to_pick"] == 59
+
+
+def test_colony_calculator_zero_efficiency_raises():
+    with pytest.raises(ValueError):
+        colony_calculator(editing_efficiency=0, desired_clones=1)
+
+
+def test_colony_calculator_efficiency_above_one_raises():
+    with pytest.raises(ValueError):
+        colony_calculator(editing_efficiency=1.5)
+
+
+def test_colony_calculator_preset_hdr_mammalian():
+    result = colony_calculator(preset="hdr_mammalian", desired_clones=3, confidence=0.95)
+    # 3 HDR clones at 5% efficiency requires many colonies
+    assert result["colonies_to_pick"] > 60
+    assert result["editing_efficiency"] == 0.05
+
+
+def test_colony_calculator_unknown_preset_raises():
+    with pytest.raises(ValueError):
+        colony_calculator(preset="not_a_real_preset")
+
+
+def test_colony_calculator_no_inputs_raises():
+    with pytest.raises(ValueError):
+        colony_calculator()
+
+
+def test_colony_calculator_safety_margin_is_1_5x():
+    result = colony_calculator(editing_efficiency=0.5, desired_clones=1, confidence=0.95)
+    # 5 * 1.5 = 7.5 -> ceil -> 8
+    assert result["safety_margin_recommendation"] == 8
+
+
+# ---------------------------------------------------------------------------
+# interpret_ice_tide tests
+# ---------------------------------------------------------------------------
+
+def test_interpret_ice_tide_excellent_result():
+    result = interpret_ice_tide(editing_pct=85, r_squared=0.95, tool="ice")
+    assert result["efficiency_classification"] == "EXCELLENT"
+    assert result["fit_quality"] == "HIGH"
+    assert result["is_reliable"] is True
+    assert result["warnings"] == []
+    assert len(result["next_steps"]) >= 1
+
+
+def test_interpret_ice_tide_failed_editing():
+    result = interpret_ice_tide(editing_pct=5, r_squared=0.95)
+    assert result["efficiency_classification"] == "FAILED"
+    assert result["is_reliable"] is True
+
+
+def test_interpret_ice_tide_unreliable_fit():
+    result = interpret_ice_tide(editing_pct=85, r_squared=0.5, tool="ice")
+    assert result["is_reliable"] is False
+    assert any("R^2" in w for w in result["warnings"])
+    # next_steps should suggest re-sequencing
+    assert any("re-sequence" in step.lower() or "re-pcr" in step.lower() for step in result["next_steps"])
+
+
+def test_interpret_ice_tide_marginal_efficiency():
+    result = interpret_ice_tide(editing_pct=20, r_squared=0.92)
+    assert result["efficiency_classification"] == "MARGINAL"
+    assert result["is_reliable"] is True
+
+
+def test_interpret_ice_tide_invalid_editing_pct_raises():
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=-5, r_squared=0.9)
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=150, r_squared=0.9)
+
+
+def test_interpret_ice_tide_invalid_r_squared_raises():
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=50, r_squared=1.5)
+
+
+def test_interpret_ice_tide_invalid_tool_raises():
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=50, r_squared=0.9, tool="bogus")
+
+
+def test_interpret_ice_tide_indel_distribution_dominant():
+    result = interpret_ice_tide(
+        editing_pct=70,
+        r_squared=0.95,
+        indel_distribution={"+1": 45.0, "-3": 15.0, "0": 30.0, "+2": 10.0},
+    )
+    assert result["dominant_indel"] == "+1"
+    assert result["dominant_indel_pct"] == 45.0
+
+
+def test_interpret_ice_tide_unedited_dominant_warns():
+    result = interpret_ice_tide(
+        editing_pct=30,
+        r_squared=0.95,
+        indel_distribution={"+1": 15.0, "0": 60.0, "-3": 10.0, "+2": 15.0},
+    )
+    assert result["dominant_indel"] == "0"
+    assert any("unedited" in w.lower() for w in result["warnings"])
 

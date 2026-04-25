@@ -503,15 +503,18 @@ class CreateConstructionFile:
                 )
 
         if assembly_strategy == "Gibson":
+            required_pairs = [
+                ("insert_forward_primer", insert_forward_primer_name, insert_forward_primer_sequence),
+                ("insert_reverse_primer", insert_reverse_primer_name, insert_reverse_primer_sequence),
+                ("vector_forward_primer", vector_forward_primer_name, vector_forward_primer_sequence),
+                ("vector_reverse_primer", vector_reverse_primer_name, vector_reverse_primer_sequence),
+            ]
             missing_fields = []
-            if not insert_forward_primer_name.strip():
-                missing_fields.append("insert_forward_primer_name")
-            if not insert_forward_primer_sequence.strip():
-                missing_fields.append("insert_forward_primer_sequence")
-            if not insert_reverse_primer_name.strip():
-                missing_fields.append("insert_reverse_primer_name")
-            if not insert_reverse_primer_sequence.strip():
-                missing_fields.append("insert_reverse_primer_sequence")
+            for label, primer_name, primer_seq in required_pairs:
+                if not primer_name.strip():
+                    missing_fields.append(f"{label}_name")
+                if not primer_seq.strip():
+                    missing_fields.append(f"{label}_sequence")
             if missing_fields:
                 raise ValueError(
                     f"Missing required fields for Gibson: {', '.join(missing_fields)}."
@@ -726,9 +729,6 @@ class CreateConstructionFile:
         if assembly_strategy in {"GoldenGate", "Gibson"}:
             insert_pcr_product = f"{insert_name}_pcr"
             vector_pcr_product = f"{backbone_name}_pcr"
-            has_vector_primers = (
-                vector_forward_primer_name.strip() and vector_reverse_primer_name.strip()
-            )
 
             operations.append(
                 {
@@ -744,33 +744,26 @@ class CreateConstructionFile:
                 }
             )
 
-            if has_vector_primers:
-                operations.append(
-                    {
-                        "step_number": 2,
-                        "step_type": "PCR",
-                        "inputs": [vector_forward_primer_name, vector_reverse_primer_name, backbone_name],
-                        "parameters": {
-                            "forward_primer": vector_forward_primer_name,
-                            "reverse_primer": vector_reverse_primer_name,
-                            "template": backbone_name,
-                        },
-                        "output": vector_pcr_product,
-                    }
-                )
-
-            assembly_inputs = (
-                [vector_pcr_product, insert_pcr_product]
-                if has_vector_primers
-                else [backbone_name, insert_pcr_product]
+            operations.append(
+                {
+                    "step_number": 2,
+                    "step_type": "PCR",
+                    "inputs": [vector_forward_primer_name, vector_reverse_primer_name, backbone_name],
+                    "parameters": {
+                        "forward_primer": vector_forward_primer_name,
+                        "reverse_primer": vector_reverse_primer_name,
+                        "template": backbone_name,
+                    },
+                    "output": vector_pcr_product,
+                }
             )
 
             if assembly_strategy == "GoldenGate":
                 operations.append(
                     {
-                        "step_number": len(operations) + 1,
+                        "step_number": 3,
                         "step_type": "GoldenGate",
-                        "inputs": assembly_inputs,
+                        "inputs": [vector_pcr_product, insert_pcr_product],
                         "parameters": {"enzyme": enzyme},
                         "output": construct_name,
                     }
@@ -778,9 +771,9 @@ class CreateConstructionFile:
             else:
                 operations.append(
                     {
-                        "step_number": len(operations) + 1,
+                        "step_number": 3,
                         "step_type": "Gibson",
-                        "inputs": assembly_inputs,
+                        "inputs": [vector_pcr_product, insert_pcr_product],
                         "parameters": {"reagent": "GibsonMix", "overlap_bp": 20},
                         "output": construct_name,
                     }

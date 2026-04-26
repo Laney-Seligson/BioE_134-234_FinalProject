@@ -1,0 +1,72 @@
+{
+  "id": "org.bioe234.function.crispr.rank_guides.v1",
+  "name": "CRISPR Guide Ranker",
+  "description": "Ranks a list of CRISPR gRNA candidates by combined on-target efficiency (Doench 2016 rules: GC content 40-70%, no poly-T run, G at PAM-proximal position for Cas9) and off-target specificity (via predict_offtargets: HIGH-risk count, MEDIUM-risk count, total off-target count). Replaces the default 'pick guides[0]' behavior in pipelines with evidence-based guide selection and returns a plain-English rationale for the top pick.",
+  "type": "function",
+  "keywords": ["CRISPR", "gRNA", "ranking", "scoring", "Doench", "efficiency", "specificity", "guide selection", "Cas9", "Cas12a"],
+  "date_created": "2026-04-24",
+  "date_last_modified": "2026-04-24",
+
+  "inputs": [
+    {
+      "name": "guides",
+      "type": "array",
+      "description": "List of guide dicts as returned by design_cas9_grna or design_cas12a_crrna. Each dict must have a 'protospacer' key."
+    },
+    {
+      "name": "reference",
+      "type": "string",
+      "description": "Genome or plasmid sequence to scan for off-targets. Accepts a resource name, raw sequence, FASTA, or GenBank."
+    },
+    {
+      "name": "nuclease",
+      "type": "string",
+      "optional": true,
+      "description": "Which nuclease the guides target: 'cas9' (default) or 'cas12a'. Affects scoring (Cas9 adds a PAM-proximal G bonus) and PAM recognition in off-target prediction."
+    },
+    {
+      "name": "max_mismatches",
+      "type": "integer",
+      "optional": true,
+      "description": "Mismatch threshold passed through to predict_offtargets for the specificity score. Default 3."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dict with keys: ranked_guides (input guides with added efficiency_score, specificity_score, total_score, and detail dicts; sorted best-first), best_guide (the top-ranked guide), and scoring_rationale (plain-English explanation of why the best guide won)."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "guides": [{"protospacer": "ATGATGATGATGATGATGAG"}],
+        "reference": "ATGATGATGATGATGATGAGAGGCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+        "nuclease": "cas9"
+      },
+      "output": {
+        "result": {
+          "best_guide": {
+            "protospacer": "ATGATGATGATGATGATGAG",
+            "efficiency_score": 3,
+            "total_score": 6
+          },
+          "scoring_rationale": "Best guide 'ATGATGATGATGATGATGAG' scored 6 (efficiency 3, specificity 3)."
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/rank_guides.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_rank_guides",
+    "seq_params": ["reference"]
+  }
+}

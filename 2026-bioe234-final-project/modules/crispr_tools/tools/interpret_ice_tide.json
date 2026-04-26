@@ -1,0 +1,87 @@
+{
+  "id": "org.bioe234.function.crispr.interpret_ice_tide.v1",
+  "name": "ICE/TIDE Result Interpreter",
+  "description": "Translates raw ICE (Synthego) or TIDE (Brinkman et al. 2014) output into a plain-English interpretation with actionable next steps. Classifies editing efficiency (FAILED/MARGINAL/GOOD/EXCELLENT) and fit quality (HIGH/MODERATE/LOW), flags unreliable results when R^2 < 0.80, and analyzes the indel distribution to detect background-noise artifacts. Closes the loop on the verify_edit protocol — verify_edit tells the user how to set up sequencing, this tool tells them what the results mean.",
+  "type": "function",
+  "keywords": ["CRISPR", "ICE", "TIDE", "indel", "editing efficiency", "Sanger", "interpretation", "Brinkman", "Synthego"],
+  "date_created": "2026-04-25",
+  "date_last_modified": "2026-04-25",
+
+  "inputs": [
+    {
+      "name": "editing_pct",
+      "type": "number",
+      "description": "Percent of reads with indels reported by ICE (KO score) or TIDE (total efficiency). Range 0-100."
+    },
+    {
+      "name": "r_squared",
+      "type": "number",
+      "description": "R^2 of the indel deconvolution fit. Range 0-1. Below 0.80 the result is considered unreliable."
+    },
+    {
+      "name": "tool",
+      "type": "string",
+      "optional": true,
+      "description": "Which tool the result came from: 'ice' (default) or 'tide'. Affects naming in the report."
+    },
+    {
+      "name": "indel_distribution",
+      "type": "object",
+      "optional": true,
+      "description": "Optional dict mapping indel size (e.g. '+1', '-3', '0' for unedited) to its percentage. Enables dominant-indel reporting and background-noise warnings."
+    },
+    {
+      "name": "sample_id",
+      "type": "string",
+      "optional": true,
+      "description": "Optional sample label included in the summary."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dict with efficiency_classification, fit_quality, is_reliable, dominant indel info, list of warnings, list of next_steps, and a plain-English summary."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "editing_pct": 85,
+        "r_squared": 0.95,
+        "tool": "ice"
+      },
+      "output": {
+        "result": {
+          "efficiency_classification": "EXCELLENT",
+          "fit_quality": "HIGH",
+          "is_reliable": true
+        }
+      }
+    },
+    {
+      "input": {
+        "editing_pct": 85,
+        "r_squared": 0.5
+      },
+      "output": {
+        "result": {
+          "is_reliable": false,
+          "warnings": ["R^2 too low — re-sequence"]
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/interpret_ice_tide.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_interpret_ice_tide",
+    "seq_params": []
+  }
+}

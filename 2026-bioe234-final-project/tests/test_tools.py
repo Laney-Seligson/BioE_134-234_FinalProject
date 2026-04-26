@@ -22,6 +22,9 @@ from modules.crispr_tools.tools.construction_file_validation import (
     validate_construction_record,
 )
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
+from modules.crispr_tools.tools.rank_guides import rank_guides
+from modules.crispr_tools.tools.colony_calculator import colony_calculator
+from modules.crispr_tools.tools.interpret_ice_tide import interpret_ice_tide
 from modules.crispr_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.lab_sheet import lab_sheet
 from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
@@ -696,4 +699,244 @@ def test_lookup_gene_sequence_cds_extraction(monkeypatch):
     assert result["product"] == "beta-galactosidase"
     assert result["source"] == "CDS annotation"
     assert len(result["sequence"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# verify_edit primer Tm validation tests
+# ---------------------------------------------------------------------------
+
+def test_verify_edit_returns_primer_tm_fields():
+    protospacer = "TCAGAAACCTGCCAGTTTGC"
+    reference = "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTTTAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC" + "A" * 200
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas9")
+    assert "forward_primer_tm" in result
+    assert "reverse_primer_tm" in result
+    assert "tm_difference" in result
+    assert "primer_warnings" in result
+    assert isinstance(result["primer_warnings"], list)
+    # Tm should be a reasonable Wallace-rule value for 20bp primer (somewhere 40-80)
+    assert 30 <= result["forward_primer_tm"] <= 90
+    assert 30 <= result["reverse_primer_tm"] <= 90
+    # tm_difference should be non-negative
+    assert result["tm_difference"] >= 0
+
+
+def test_verify_edit_flags_high_gc_primer_warning():
+    # Build a reference where primers fall in a GC-rich zone -> should warn
+    # Put the cut site in the middle of a GC-rich reference
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = "G" * 160 + protospacer + "AGG" + "G" * 160
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # Warnings should contain something about GC or Tm being too high
+    assert len(result["primer_warnings"]) > 0
+
+
+def test_verify_edit_balanced_primers_have_no_warnings():
+    # Build a balanced reference with ~50% GC around the cut site
+    flank = "ATGCATGCATGCATGCATGC" * 10  # 200bp, 50% GC, no poly-N
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = flank + protospacer + "AGG" + flank
+    result = verify_edit(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # Tms should be ~60 (Wallace: 10 AT * 2 + 10 GC * 4 = 60)
+    assert 55 <= result["forward_primer_tm"] <= 65
+    assert 55 <= result["reverse_primer_tm"] <= 65
+    assert result["tm_difference"] <= 5
+
+
+# ---------------------------------------------------------------------------
+# rank_guides tests
+# ---------------------------------------------------------------------------
+
+def test_rank_guides_scores_single_guide_cas9():
+    # GC = 50%, no TTTT, ends in G -> efficiency max (3)
+    protospacer = "ATGCATGCATGCATGCATGG"
+    reference = protospacer + "AGG" + "C" * 60
+    result = rank_guides(
+        guides=[{"protospacer": protospacer}],
+        reference=reference,
+        nuclease="cas9",
+    )
+    top = result["ranked_guides"][0]
+    assert top["efficiency_score"] == 3
+    assert top["efficiency_details"]["gc_content_ok"] is True
+    assert top["efficiency_details"]["no_polyt_run"] is True
+    assert top["efficiency_details"]["g_at_pam_proximal"] is True
+    assert result["best_guide"] is top
+    assert "scoring_rationale" in result
+
+
+def test_rank_guides_penalizes_polyt_and_low_gc():
+    # all A's: GC = 0% (fail), no TTTT but no G at PAM-proximal
+    bad = "AAAAAAAAAAAAAAAAAAAA"
+    # balanced good guide
+    good = "ATGCATGCATGCATGCATGG"
+    reference = good + "AGG" + "C" * 40 + bad + "AGG" + "C" * 40
+    result = rank_guides(
+        guides=[{"protospacer": bad}, {"protospacer": good}],
+        reference=reference,
+        nuclease="cas9",
+    )
+    # good should rank first
+    assert result["best_guide"]["protospacer"] == good
+    assert result["ranked_guides"][0]["efficiency_score"] >= result["ranked_guides"][1]["efficiency_score"]
+
+
+def test_rank_guides_empty_list_raises():
+    with pytest.raises(ValueError):
+        rank_guides(guides=[], reference="ATGATGATG", nuclease="cas9")
+
+
+def test_rank_guides_invalid_nuclease_raises():
+    with pytest.raises(ValueError):
+        rank_guides(
+            guides=[{"protospacer": "ATGATGATGATGATGATGAG"}],
+            reference="ATGATGATGATGATGATGAGAGG",
+            nuclease="cas13",
+        )
+
+
+def test_rank_guides_missing_protospacer_raises():
+    with pytest.raises(ValueError):
+        rank_guides(
+            guides=[{"not_a_protospacer": "ATGATGATGATGATGATGAG"}],
+            reference="ATGATGATGATGATGATGAGAGG",
+            nuclease="cas9",
+        )
+
+
+def test_rank_guides_cas12a_max_efficiency_is_two():
+    # Cas12a has no PAM-proximal G bonus -> max efficiency = 2
+    protospacer = "ATGATGATGATGATGATGATGAT"  # 23 bp, GC ~ 33% actually -> fails GC
+    # Use a balanced 23-mer: GC 40-70%, no TTTT
+    protospacer = "ATGCATGCATGCATGCATGCATG"  # GC = 52%
+    reference = "TTTA" + protospacer + "A" * 40
+    result = rank_guides(
+        guides=[{"protospacer": protospacer}],
+        reference=reference,
+        nuclease="cas12a",
+    )
+    top = result["ranked_guides"][0]
+    assert top["efficiency_score"] <= 2
+    assert "g_at_pam_proximal" not in top["efficiency_details"]
+
+
+# ---------------------------------------------------------------------------
+# colony_calculator tests
+# ---------------------------------------------------------------------------
+
+def test_colony_calculator_50pct_efficiency_one_clone():
+    # P(X>=1) = 1 - 0.5^n >= 0.95 -> n=5 (1-0.5^5=0.96875)
+    result = colony_calculator(editing_efficiency=0.5, desired_clones=1, confidence=0.95)
+    assert result["colonies_to_pick"] == 5
+    assert result["probability_at_chosen_n"] >= 0.95
+
+
+def test_colony_calculator_low_efficiency_high_burden():
+    # 5% efficiency, 1 clone, 95% conf -> 59 colonies
+    # log(0.05)/log(0.95) = -2.9957/-0.0513 = 58.4 -> 59
+    result = colony_calculator(editing_efficiency=0.05, desired_clones=1, confidence=0.95)
+    assert result["colonies_to_pick"] == 59
+
+
+def test_colony_calculator_zero_efficiency_raises():
+    with pytest.raises(ValueError):
+        colony_calculator(editing_efficiency=0, desired_clones=1)
+
+
+def test_colony_calculator_efficiency_above_one_raises():
+    with pytest.raises(ValueError):
+        colony_calculator(editing_efficiency=1.5)
+
+
+def test_colony_calculator_preset_hdr_mammalian():
+    result = colony_calculator(preset="hdr_mammalian", desired_clones=3, confidence=0.95)
+    # 3 HDR clones at 5% efficiency requires many colonies
+    assert result["colonies_to_pick"] > 60
+    assert result["editing_efficiency"] == 0.05
+
+
+def test_colony_calculator_unknown_preset_raises():
+    with pytest.raises(ValueError):
+        colony_calculator(preset="not_a_real_preset")
+
+
+def test_colony_calculator_no_inputs_raises():
+    with pytest.raises(ValueError):
+        colony_calculator()
+
+
+def test_colony_calculator_safety_margin_is_1_5x():
+    result = colony_calculator(editing_efficiency=0.5, desired_clones=1, confidence=0.95)
+    # 5 * 1.5 = 7.5 -> ceil -> 8
+    assert result["safety_margin_recommendation"] == 8
+
+
+# ---------------------------------------------------------------------------
+# interpret_ice_tide tests
+# ---------------------------------------------------------------------------
+
+def test_interpret_ice_tide_excellent_result():
+    result = interpret_ice_tide(editing_pct=85, r_squared=0.95, tool="ice")
+    assert result["efficiency_classification"] == "EXCELLENT"
+    assert result["fit_quality"] == "HIGH"
+    assert result["is_reliable"] is True
+    assert result["warnings"] == []
+    assert len(result["next_steps"]) >= 1
+
+
+def test_interpret_ice_tide_failed_editing():
+    result = interpret_ice_tide(editing_pct=5, r_squared=0.95)
+    assert result["efficiency_classification"] == "FAILED"
+    assert result["is_reliable"] is True
+
+
+def test_interpret_ice_tide_unreliable_fit():
+    result = interpret_ice_tide(editing_pct=85, r_squared=0.5, tool="ice")
+    assert result["is_reliable"] is False
+    assert any("R^2" in w for w in result["warnings"])
+    # next_steps should suggest re-sequencing
+    assert any("re-sequence" in step.lower() or "re-pcr" in step.lower() for step in result["next_steps"])
+
+
+def test_interpret_ice_tide_marginal_efficiency():
+    result = interpret_ice_tide(editing_pct=20, r_squared=0.92)
+    assert result["efficiency_classification"] == "MARGINAL"
+    assert result["is_reliable"] is True
+
+
+def test_interpret_ice_tide_invalid_editing_pct_raises():
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=-5, r_squared=0.9)
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=150, r_squared=0.9)
+
+
+def test_interpret_ice_tide_invalid_r_squared_raises():
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=50, r_squared=1.5)
+
+
+def test_interpret_ice_tide_invalid_tool_raises():
+    with pytest.raises(ValueError):
+        interpret_ice_tide(editing_pct=50, r_squared=0.9, tool="bogus")
+
+
+def test_interpret_ice_tide_indel_distribution_dominant():
+    result = interpret_ice_tide(
+        editing_pct=70,
+        r_squared=0.95,
+        indel_distribution={"+1": 45.0, "-3": 15.0, "0": 30.0, "+2": 10.0},
+    )
+    assert result["dominant_indel"] == "+1"
+    assert result["dominant_indel_pct"] == 45.0
+
+
+def test_interpret_ice_tide_unedited_dominant_warns():
+    result = interpret_ice_tide(
+        editing_pct=30,
+        r_squared=0.95,
+        indel_distribution={"+1": 15.0, "0": 60.0, "-3": 10.0, "+2": 15.0},
+    )
+    assert result["dominant_indel"] == "0"
+    assert any("unedited" in w.lower() for w in result["warnings"])
 

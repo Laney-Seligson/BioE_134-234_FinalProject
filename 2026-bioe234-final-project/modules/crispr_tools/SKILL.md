@@ -1,3 +1,8 @@
+---
+name: crispr_tools
+description: CRISPR pipeline tools — guide RNA design, off-target prediction, cloning oligo design, edit verification, and ICE/TIDE interpretation.
+---
+
 # crispr_tools — Skill Guidance for Gemini
 
 This file is read by the client at startup and injected into Gemini's system prompt.
@@ -419,6 +424,48 @@ Use when the user asks:
 1. PCR-amplify the amplicon using the returned primers
 2. Sanger-sequence the PCR product
 3. Upload the .ab1 trace to ICE (Synthego) or TIDE (Brinkman et al. 2014) with the amplicon sequence and cut offset
+4. Once the user has their ICE/TIDE results, use `interpret_ice_tide` to interpret them (see below)
+
+**Required follow-up:** After presenting the verify_edit output, always close with:
+
+> "Once you have your ICE or TIDE results, come back and I can interpret the editing efficiency for you — just share the KO score (ICE) or indel percentage (TIDE) and the R² fit value."
+
+---
+
+### `interpret_ice_tide`
+Interprets the output of an ICE (Synthego) or TIDE (Brinkman et al. 2014) analysis and gives a plain-English verdict with actionable next steps. This closes the loop started by `crispr_verify_edit`.
+
+Use when the user:
+- Shares an ICE or TIDE result ("my ICE score is 45%, R² = 0.93")
+- Asks "what does this editing efficiency mean?"
+- Asks "is my CRISPR experiment working?"
+- Asks "what should I do next based on my ICE/TIDE result?"
+
+**Inputs:**
+- `editing_pct` (float): the KO score (ICE) or total indel percentage (TIDE). Range 0–100.
+- `r_squared` (float): the R² fit quality reported by the tool. Range 0–1.
+- `tool` (str): `"ice"` or `"tide"` (default `"ice"`).
+- `indel_distribution` (dict, optional): mapping of indel size to percentage, e.g. `{"+1": 45.2, "-3": 12.1, "0": 42.7}`. If provided, the dominant indel is highlighted and contradictions with `editing_pct` are flagged.
+- `sample_id` (str, optional): a label for the report.
+
+**What it returns:**
+- `efficiency_classification`: `FAILED` (<10%), `MARGINAL` (10–30%), `GOOD` (30–70%), or `EXCELLENT` (≥70%)
+- `fit_quality`: `HIGH` (R²≥0.90), `MODERATE` (0.80–0.89), or `LOW` (<0.80)
+- `is_reliable`: False if R²<0.80 — result should not be trusted regardless of editing percentage
+- `warnings`: list of issues (low fit quality, unedited reads dominating, etc.)
+- `next_steps`: list of concrete recommended actions
+- `summary`: one-paragraph plain-English verdict
+
+**Thresholds (Hsiau et al. 2019, Brinkman et al. 2014):**
+- R²<0.80 → unreliable; re-sequence before drawing any conclusions
+- <10% editing → FAILED; check guide design, delivery, and PAM
+- 10–30% → MARGINAL; consider re-transfecting or higher dose
+- 30–70% → GOOD; pick colonies and screen single clones
+- ≥70% → EXCELLENT; proceed directly to clone isolation
+
+Always present the `summary`, `warnings`, and `next_steps` fields clearly. If `is_reliable` is False, lead with the reliability warning before the editing percentage.
+
+---
 
 ### `crispr_design_cloning_oligos`
 Designs the top and bottom strand DNA oligos needed to clone a protospacer
@@ -451,11 +498,24 @@ When the user asks to "design CRISPR cloning oligos" or "design a guide RNA and 
    - If Cas9 → call `crispr_design_cas9_grna` with the same sequence.
    - If Cas12a → call `crispr_design_cas12a_crrna` with the same sequence.
 3. Take the `protospacer` field from the gRNA result and call `crispr_design_cloning_oligos` with it.
-4. Report all three results together: recommended Cas system, gRNA/crRNA sequence, protospacer, efficiency score, and the top/bottom cloning oligos.
+4. Call `crispr_predict_offtargets` with the `protospacer` and the same reference sequence to check for off-target sites.
+5. Report all four results together: recommended Cas system, gRNA/crRNA sequence, protospacer, efficiency score, top/bottom cloning oligos, and the off-target specificity summary.
+6. **Only after all steps above are complete**, ask:
+
+   > "All CRISPR design and validation steps are complete. Would you like me to generate:
+   > **(a) a construction file** — a structured record of the cloning workflow,
+   > **(b) a lab sheet** — bench-ready step-by-step protocol (requires a construction file),
+   > **(c) both**, or
+   > **(d) neither**?"
+
+   - If **(a) construction file only**: call `create_construction_file`, present the result, then offer the lab sheet per the section above.
+   - If **(b) lab sheet only** or **(c) both**: call `create_construction_file` first, present the result, then immediately call `crispr_lab_sheet` with the returned `structured_construction_file`.
+   - If **(d) neither**: acknowledge and stop.
 
 Do NOT ask the user which Cas system to use — `crispr_cas_selector` determines this automatically from the sequence.
 Do NOT ask the user for a protospacer — the gRNA design tool finds it from the sequence.
-Do NOT stop between steps to ask for confirmation.
+Do NOT stop between steps 1–5 to ask for confirmation.
+Do NOT offer the construction file or lab sheet before step 5 is complete.
 
 ---
 

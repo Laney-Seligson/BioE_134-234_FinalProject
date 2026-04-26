@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from modules.crispr_tools.tools._citations import cites, format_citations
+
 _SUPPORTED_NUCLEASES = {"cas9", "cas12a"}
 
 
@@ -414,6 +416,20 @@ class VerifyEdit:
             f"signal. No mixed peaks should appear at the cut site."
         )
 
+        # Cite the cut-site mechanism papers (which justify cut_position),
+        # the primer-design rules (Wallace Tm + Dieffenbach QC), and the
+        # ICE/TIDE protocol papers (which justify the interpretation_guide).
+        if nuclease == "cas9":
+            citation_keys = ["jinek_2012"]
+        else:
+            citation_keys = ["zetsche_2015", "fonfara_2016"]
+        citation_keys.extend([
+            "wallace_1979",
+            "dieffenbach_1993",
+            "hsiau_2019_ice",
+            "brinkman_2014_tide",
+        ])
+
         return {
             "protospacer": protospacer,
             "nuclease": nuclease,
@@ -433,6 +449,7 @@ class VerifyEdit:
             "amplicon_length": amplicon_length,
             "cut_offset_in_amplicon": cut_offset_in_amplicon,
             "interpretation_guide": interpretation_guide,
+            "citations": format_citations(cites(*citation_keys)),
         }
 
 

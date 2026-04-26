@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from modules.crispr_tools.tools._citations import cites, format_citations
+
 
 # Quality and efficiency thresholds drawn from published guidance and the
 # Synthego ICE / Brinkman TIDE manuals.
@@ -246,6 +248,12 @@ class InterpretIceTide:
                     f" Dominant indel: {dominant_indel} at {dominant_pct:.1f}%."
                 )
 
+        # Cite the paper that defines the analysis tool the user ran.
+        if tool == "ice":
+            citation_keys = ["hsiau_2019_ice"]
+        else:
+            citation_keys = ["brinkman_2014_tide"]
+
         return {
             "sample_id": sample_id,
             "tool": tool,
@@ -259,6 +267,7 @@ class InterpretIceTide:
             "warnings": warnings,
             "next_steps": next_steps,
             "summary": summary,
+            "citations": format_citations(cites(*citation_keys)),
         }
 
 

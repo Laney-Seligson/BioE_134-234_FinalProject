@@ -1075,3 +1075,87 @@ def test_predict_offtargets_no_pam_cfd_is_zero():
             assert s["cfd_score"] == 0.0
 
 
+# ---------------------------------------------------------------------------
+# Citation-field smoke tests — every Jillian tool must emit a "citations"
+# field shaped like Laney's: list of {"label", "reference", "claim"} dicts.
+# ---------------------------------------------------------------------------
+
+def _assert_well_formed_citations(citations):
+    assert isinstance(citations, list)
+    assert len(citations) > 0
+    for c in citations:
+        assert isinstance(c, dict)
+        assert set(c.keys()) == {"label", "reference", "claim"}
+        assert all(isinstance(c[k], str) and c[k] for k in c)
+
+
+def test_rank_guides_emits_citations():
+    result = rank_guides(
+        guides=[{"protospacer": "ATGCATGCATGCATGCATGG"}],
+        reference="ATGCATGCATGCATGCATGGAGG" + "C" * 50,
+        nuclease="cas9",
+    )
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_predict_offtargets_emits_citations():
+    result = predict_offtargets(
+        protospacer="ATGCATGCATGCATGCATGG",
+        reference="ATGCATGCATGCATGCATGGAGG" + "C" * 50,
+        nuclease="cas9",
+    )
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_predict_editing_efficiency_emits_citations():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG",
+        pam="AGG",
+        nuclease="cas9",
+        delivery="rnp",
+        outcome="nhej",
+    )
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_colony_calculator_emits_citations_for_preset():
+    result = colony_calculator(preset="hdr_mammalian", desired_clones=1)
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_colony_calculator_emits_citations_for_custom_efficiency():
+    result = colony_calculator(editing_efficiency=0.5, desired_clones=1)
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_interpret_ice_tide_cites_ice_paper_for_ice():
+    result = interpret_ice_tide(editing_pct=80, r_squared=0.95, tool="ice")
+    _assert_well_formed_citations(result["citations"])
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Hsiau" in labels
+
+
+def test_interpret_ice_tide_cites_tide_paper_for_tide():
+    result = interpret_ice_tide(editing_pct=80, r_squared=0.95, tool="tide")
+    _assert_well_formed_citations(result["citations"])
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Brinkman" in labels
+
+
+def test_verify_edit_emits_citations():
+    reference = (
+        "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTT"
+        "TAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC"
+    )
+    result = verify_edit(
+        protospacer="TCAGAAACCTGCCAGTTTGC",
+        reference=reference,
+        nuclease="cas9",
+    )
+    _assert_well_formed_citations(result["citations"])
+    labels = " ".join(c["label"] for c in result["citations"])
+    # Cas9 mechanism + primer Tm + ICE/TIDE protocol papers should all appear
+    assert "Jinek" in labels
+    assert "Wallace" in labels
+
+

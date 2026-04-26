@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from modules.crispr_tools.tools._citations import cites, format_citations
+
 _SUPPORTED_NUCLEASES = {"cas9", "cas12a"}
 
 # Seed region lengths by nuclease (positions from the PAM-proximal end).
@@ -335,6 +337,14 @@ class PredictOfftargets:
             if s["cfd_score"] > max_off_cfd:
                 max_off_cfd = s["cfd_score"]
 
+        # Citations: seed-region scoring (Hsu/Kim) and CFD weights (Doench).
+        # Cas9 → Hsu 2013 + Jinek (PAM) + Doench (CFD).
+        # Cas12a → Zetsche + Kim (seed) + Doench (CFD adapted).
+        if nuclease == "cas9":
+            citation_keys = ["jinek_2012", "hsu_2013", "doench_2016"]
+        else:
+            citation_keys = ["zetsche_2015", "kim_2016_cas12a", "doench_2016"]
+
         return {
             "protospacer": protospacer,
             "nuclease": nuclease,
@@ -346,6 +356,7 @@ class PredictOfftargets:
             "aggregate_offtarget_cfd": round(cfd_off_sum, 4),
             "max_offtarget_cfd": round(max_off_cfd, 4),
             "specificity_summary": specificity_summary,
+            "citations": format_citations(cites(*citation_keys)),
         }
 
 

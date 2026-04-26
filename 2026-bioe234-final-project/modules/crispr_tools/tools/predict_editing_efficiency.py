@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from modules.crispr_tools.tools._citations import cites, format_citations
+
 
 # ---------------------------------------------------------------------------
 # Position-specific nucleotide weights (Cas9, 20 nt protospacer).
@@ -357,6 +359,24 @@ class PredictEditingEfficiency:
             f"{base_pct}%."
         )
 
+        # Build citation list based on which features fired during this call.
+        # Always cite Doench (the core scoring model). Add others conditionally.
+        citation_keys = ["doench_2016"]
+        if nuclease == "cas9":
+            citation_keys.append("hsu_2013")  # NAG vs NGG, seed region
+        else:
+            citation_keys.extend(["zetsche_2015", "kim_2018_cas12a"])
+        if "TTTT" in protospacer:
+            citation_keys.append("polIII_termination")
+        if outcome == "hdr":
+            citation_keys.append("paquet_2016")
+        elif outcome == "base_edit":
+            citation_keys.append("komor_2016")
+        elif outcome == "prime_edit":
+            citation_keys.append("anzalone_2019")
+        if delivery == "rnp":
+            citation_keys.extend(["kim_2014_rnp", "lin_2014"])
+
         return {
             "protospacer": protospacer,
             "nuclease": nuclease,
@@ -370,6 +390,7 @@ class PredictEditingEfficiency:
             "feature_contributions": feature_contributions,
             "interpretation": interpretation,
             "warnings": warnings,
+            "citations": format_citations(cites(*citation_keys)),
         }
 
 

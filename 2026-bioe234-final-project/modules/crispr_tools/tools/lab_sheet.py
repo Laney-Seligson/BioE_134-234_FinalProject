@@ -1,6 +1,23 @@
 from __future__ import annotations
 
+from modules.crispr_tools.tools._protocols import (
+    PROTOCOLS,
+    reagent_block,
+    protocol_source_record,
+)
+
 _RESCUE_ANTIBIOTICS = {"Spec", "spectinomycin", "Spc"}
+
+# Disclaimer included in every lab sheet output. The lab sheet is a
+# convenience starting point — the user is expected to verify volumes
+# against current manufacturer documentation before running the protocol.
+_VERIFY_DISCLAIMER = (
+    "Volumes and conditions in this lab sheet are transcribed from canonical "
+    "sources (NEB, Zymo, original method papers) into the project's protocol "
+    "registry. They reflect those sources as of the registry's last update — "
+    "ALWAYS confirm against current manufacturer documentation and your lab's "
+    "SOPs before benchwork. See the 'protocol_sources' field for citations."
+)
 
 _ENZYME_NOTE = (
     "note:\n"
@@ -136,25 +153,16 @@ def _format_assemble_section(op: dict, thread: str) -> str:
 
     dna_mix = "\n".join(f"5 uL {inp}" for inp in inputs)
 
+    # Recipe volumes come from the protocol registry, not hard-coded here.
+    # See _protocols.PROTOCOLS for sources (Engler 2008, Gibson 2009, NEB).
     if strategy == "GoldenGate":
-        enzyme = params.get("enzyme", "BsaI")
-        reaction = (
-            "reaction:\n"
-            "7 uL ddH2O\n"
-            "1 uL T4 DNA ligase buffer\n"
-            "1 uL DNA Mix\n"
-            "0.5 uL T4 DNA ligase\n"
-            f"0.5 uL {enzyme}"
-        )
+        proto_key = "goldengate_bsai"
+        reaction = "reaction:\n" + reagent_block(proto_key)
         destination = "thermocycler1A"
         program = "main/GG1"
     else:
-        reaction = (
-            "reaction:\n"
-            "4 uL ddH2O\n"
-            "1 uL DNA Mix\n"
-            "5 uL 2X Gibson Mix"
-        )
+        proto_key = "gibson_neb_2x"
+        reaction = "reaction:\n" + reagent_block(proto_key)
         destination = "thermocycler1B"
         program = "main/GIB2"
 

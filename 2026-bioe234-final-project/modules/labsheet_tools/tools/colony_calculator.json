@@ -79,7 +79,7 @@
 
   "execution_details": {
     "language": "Python",
-    "source": "modules/crispr_tools/tools/colony_calculator.py",
+    "source": "modules/labsheet_tools/tools/colony_calculator.py",
     "initialization": "initiate",
     "execution": "run",
     "disposal": null,

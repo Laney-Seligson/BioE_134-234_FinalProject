@@ -1,0 +1,184 @@
+{
+  "id": "org.bioe234.function.create_construction_file.v2",
+  "name": "Create_Construction_File",
+  "description": "Generate a DNA cloning construction file, structured paper information resource, or paper-derived construction workflow. For sequence_build, supported assembly_strategy values are only: GoldenGate, Gibson, and TypeIISOligoCloning. For Gibson with auto_design_primers=true, do not ask for primer names/sequences or enzyme; require construct_name, backbone_name, backbone_sequence, insert_name, insert_sequence, and insertion_index. For paper_shorthand, provide only paper_id.",
+  "type": "function",
+  "keywords": [
+    "cloning",
+    "construction file",
+    "golden gate",
+    "gibson",
+    "type IIS",
+    "oligo cloning",
+    "dna assembly",
+    "crispr",
+    "workflow",
+    "paper shorthand"
+  ],
+  "inputs": [
+    {
+      "name": "input_mode",
+      "type": "string",
+      "description": "Mode of operation. Must be one of: sequence_build, paper_info, paper_shorthand."
+    },
+    {
+      "name": "construct_name",
+      "type": "string",
+      "description": "Name of the final construct. Required for sequence_build."
+    },
+    {
+      "name": "assembly_strategy",
+      "type": "string",
+      "enum": ["GoldenGate", "Gibson", "TypeIISOligoCloning"],
+      "description": "Cloning strategy for sequence_build. Must be one of: GoldenGate, Gibson, TypeIISOligoCloning. Tool names are not valid assembly strategies."
+    },
+    {
+      "name": "backbone_name",
+      "type": "string",
+      "description": "Backbone plasmid name. Required for sequence_build."
+    },
+    {
+      "name": "backbone_sequence",
+      "type": "string",
+      "description": "Backbone DNA sequence, resource name, resource URI, or local FASTA/GenBank path. Required for sequence_build."
+    },
+    {
+      "name": "insert_name",
+      "type": "string",
+      "description": "Insert name. Required for GoldenGate and Gibson."
+    },
+    {
+      "name": "insert_sequence",
+      "type": "string",
+      "description": "Insert DNA sequence, resource name, resource URI, or local FASTA/GenBank path. Required for GoldenGate and Gibson. Not required for TypeIISOligoCloning."
+    },
+    {
+      "name": "auto_design_primers",
+      "type": "boolean",
+      "description": "For Gibson only. If true, automatically design insert and vector PCR primers. Do not ask the user for primer names or primer sequences when true.",
+      "default": false
+    },
+    {
+      "name": "insertion_index",
+      "type": "integer",
+      "description": "0-indexed insertion position in the backbone. Required for Gibson when auto_design_primers is true."
+    },
+    {
+      "name": "overlap_bp",
+      "type": "integer",
+      "description": "Gibson overlap length in bp. Default 20.",
+      "default": 20
+    },
+    {
+      "name": "primer_anneal_bp",
+      "type": "integer",
+      "description": "Number of insert/vector-specific annealing bases in each primer. Default 20.",
+      "default": 20
+    },
+    {
+      "name": "insert_forward_primer_name",
+      "type": "string",
+      "description": "Insert forward primer name. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "insert_forward_primer_sequence",
+      "type": "string",
+      "description": "Insert forward primer DNA sequence. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "insert_reverse_primer_name",
+      "type": "string",
+      "description": "Insert reverse primer name. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "insert_reverse_primer_sequence",
+      "type": "string",
+      "description": "Insert reverse primer DNA sequence. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "vector_forward_primer_name",
+      "type": "string",
+      "description": "Vector forward primer name. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "vector_forward_primer_sequence",
+      "type": "string",
+      "description": "Vector forward primer DNA sequence. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "vector_reverse_primer_name",
+      "type": "string",
+      "description": "Vector reverse primer name. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "vector_reverse_primer_sequence",
+      "type": "string",
+      "description": "Vector reverse primer DNA sequence. Required for GoldenGate and for Gibson only when auto_design_primers is false."
+    },
+    {
+      "name": "top_oligo_name",
+      "type": "string",
+      "description": "Top oligo name. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "top_oligo_sequence",
+      "type": "string",
+      "description": "Top oligo DNA sequence. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "bottom_oligo_name",
+      "type": "string",
+      "description": "Bottom oligo name. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "bottom_oligo_sequence",
+      "type": "string",
+      "description": "Bottom oligo DNA sequence. Required for TypeIISOligoCloning."
+    },
+    {
+      "name": "enzyme",
+      "type": "string",
+      "description": "Restriction enzyme. Required for GoldenGate and TypeIISOligoCloning. Not required for Gibson."
+    },
+    {
+      "name": "cell_strain",
+      "type": "string",
+      "description": "Optional transformation host strain."
+    },
+    {
+      "name": "selection",
+      "type": "string",
+      "description": "Optional selection marker."
+    },
+    {
+      "name": "temperature_c",
+      "type": "integer",
+      "description": "Optional transformation temperature in Celsius."
+    },
+    {
+      "name": "paper_id",
+      "type": "string",
+      "description": "Required for paper_shorthand. Identifier for a curated paper resource."
+    },
+    {
+      "name": "paper_info_json",
+      "type": "object",
+      "description": "Optional full paper information object returned from get_paper_info."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "object",
+      "description": "Structured construction file, construction file text, or paper-derived construction workflow."
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/construction_file_tools/tools/create_construction_file.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "create_construction_file"
+  }
+}

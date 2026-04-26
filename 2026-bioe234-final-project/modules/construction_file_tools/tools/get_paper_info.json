@@ -30,5 +30,15 @@
       "type": "object",
       "description": "Structured paper information with normalized fields. Always includes core fields (paper_id, title, organism, system, targets, vectors, enzymes, assembly_method, delivery_method, validation_methods, key_constraints, notes). May additionally include oligo_information if available."
     }
-  ]
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/construction_file_tools/tools/get_paper_info.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "get_paper_info"
+  }
+  
 }

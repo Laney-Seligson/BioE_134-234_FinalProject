@@ -2316,14 +2316,10 @@ class CreateConstructionFile:
         auto_design_primers: bool = False,
         insertion_index: int | None = None,
     ) -> None:
-<<<<<<< Updated upstream
-        if assembly_strategy == "GoldenGate":
-=======
         if assembly_strategy == "Gibson" and auto_design_primers and insertion_index is None:
             raise ValueError("insertion_index is required for Gibson when auto_design_primers=True.")
 
         if assembly_strategy in {"GoldenGate", "Gibson"}:
->>>>>>> Stashed changes
             required_pairs = [
                 ("insert_forward_primer", insert_forward_primer_name, insert_forward_primer_sequence),
                 ("insert_reverse_primer", insert_reverse_primer_name, insert_reverse_primer_sequence),

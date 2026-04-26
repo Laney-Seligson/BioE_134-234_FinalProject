@@ -171,5 +171,14 @@
       "type": "object",
       "description": "Structured construction file, construction file text, or paper-derived construction workflow."
     }
-  ]
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/construction_file_tools/tools/create_construction_file.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "create_construction_file"
+  }
 }

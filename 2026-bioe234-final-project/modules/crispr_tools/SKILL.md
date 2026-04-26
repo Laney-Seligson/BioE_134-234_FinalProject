@@ -98,8 +98,11 @@ When preparing to call create_construction_file using the sequence_build mode:
 Use this when:
 - The user provides DNA sequences
 - The user wants a full construction file
-- The workflow is standard cloning (GoldenGate, Gibson, DirectSynthesis)
+- The workflow is standard cloning (GoldenGate, Gibson, TypeIIOligoAssembly)
 
+If all required fields are already present in the user message, call the tool immediately.
+Do not ask for fields already provided.
+For "validate this", call validate_construction_file, not lab_sheet
 #### Required fields:
 
 For all workflows:
@@ -134,6 +137,13 @@ Optional:
 - cell_strain
 - selection
 - temperature_c
+
+For input_mode='sequence_build', gather all required fields for the selected assembly_strategy.
+
+For Gibson:
+- If the user asks to auto-design primers, call the tool once all construct/backbone/insert/insertion_index fields are present.
+- Do not ask for primer names or sequences.
+- Do not ask for enzyme.
 
 ---
 
@@ -293,6 +303,67 @@ Important:
 - When translating a full plasmid, most of the output will be non-coding — only specific
   coordinate ranges will give meaningful protein sequence.
 
+---
+### Tool: Validate Construction File
+## Description
+
+Validates whether a construction workflow is biologically correct. This includes:
+
+PCR primer annealing and orientation
+Whether PCR products can be generated
+Gibson overlap correctness (matching overlaps between insert and vector)
+Golden Gate compatibility (enzyme and overhang logic)
+
+Returns both:
+
+structured validation results (is_valid, errors)
+human-readable summary
+When to use
+
+## Use this tool when the user:
+
+says “validate this”, “check this”, or “is this correct”
+wants to confirm a construction file is biologically valid
+has already generated a construction file and wants verification
+When NOT to use
+Do NOT use for generating protocols → use lab_sheet
+Do NOT use for building constructs → use create_construction_file
+Required inputs
+
+You must provide the same core inputs used to build the construct:
+
+backbone_sequence
+insert_sequence
+primer names and sequences (if used)
+assembly_strategy
+
+When the user says "validate this construction file", "validate this cloning workflow", or "check this Gibson construction file", call validate_construction_file.
+
+Do NOT call crispr_verify_edit unless the user is asking to verify a CRISPR genome edit using a protospacer/reference sequence.
+
+Do NOT call lab_sheet for validation.
+
+IMPORTANT:
+
+Do NOT invent missing fields
+If required fields are missing, ask for ALL missing fields in one message
+Behavior rules
+If the user says “validate this”, ALWAYS call validate_construction_file
+Do NOT call lab_sheet when validation is requested
+Do NOT re-ask for fields already provided by the user
+If a construction file was just generated in the conversation, reuse its inputs directly
+Gibson-specific rules
+Do NOT require enzyme
+If primers were auto-designed, use them directly
+Validation must confirm:
+vector end overlap = insert start overlap
+insert end overlap = vector start overlap
+Golden Gate-specific rules
+Requires enzyme (e.g. BsaI)
+Check:
+overhang compatibility
+correct Type IIS orientation
+no missing overhangs
 ---
 
 ### `crispr_predict_offtargets`

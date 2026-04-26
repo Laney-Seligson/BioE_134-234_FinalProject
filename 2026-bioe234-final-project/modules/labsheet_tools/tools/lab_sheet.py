@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from modules.crispr_tools.tools._protocols import (
+from modules.labsheet_tools.tools._protocols import (
     PROTOCOLS,
     reagent_block,
     protocol_source_record,
 )
+from modules.crispr_tools.tools._citations import cites, format_citations
 
 _RESCUE_ANTIBIOTICS = {"Spec", "spectinomycin", "Spc"}
 
@@ -597,12 +598,50 @@ class LabSheet:
         lab_sheet_text = "\n\n".join(sections)
         lab_sheet_tsv = _build_tsv(operations, thread, notes)
 
+        # Build a list of canonical protocol sources (one entry per step type
+        # that fired). Each entry includes the manufacturer/method paper its
+        # volumes came from, so the output is fully auditable.
+        protocol_keys: list[str] = []
+        if pcr_ops:
+            protocol_keys.append("pcr_q5")
+        for op in assemble_ops:
+            if op.get("step_type") == "GoldenGate":
+                protocol_keys.append("goldengate_bsai")
+            else:
+                protocol_keys.append("gibson_neb_2x")
+        if transform_ops:
+            protocol_keys.extend([
+                "transformation_chemical",
+                "miniprep_zymo",
+                "sanger_sequencing",
+            ])
+        # de-duplicate while preserving order
+        seen: set[str] = set()
+        protocol_keys = [k for k in protocol_keys if not (k in seen or seen.add(k))]
+
+        protocol_sources = [protocol_source_record(k) for k in protocol_keys]
+
+        # Surface every underlying citation as a flat list too, matching the
+        # citations field shape used by the other tools (rank_guides,
+        # predict_offtargets, colony_calculator, etc.).
+        citation_keys: list[str] = []
+        for k in protocol_keys:
+            proto = PROTOCOLS[k]
+            citation_keys.append(proto.source)
+            citation_keys.extend(proto.extra_sources)
+        # de-dupe citations too
+        seen_cit: set[str] = set()
+        citation_keys = [c for c in citation_keys if not (c in seen_cit or seen_cit.add(c))]
+
         return {
             "construct_name": construct_name,
             "assembly_strategy": assembly_strategy,
             "lab_sheet_text": lab_sheet_text,
             "lab_sheet_tsv": lab_sheet_tsv,
             "step_count": len(sections),
+            "protocol_sources": protocol_sources,
+            "citations": format_citations(cites(*citation_keys)) if citation_keys else [],
+            "verify_before_use": _VERIFY_DISCLAIMER,
         }
 
 

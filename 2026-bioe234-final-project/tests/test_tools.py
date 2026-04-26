@@ -16,18 +16,18 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from modules.seq_basics.tools.translate import translate
 from modules.seq_basics.tools.reverse_complement import reverse_complement
-from modules.crispr_tools.tools.create_construction_file import create_construction_file
+from modules.construction_file_tools.tools.create_construction_file import create_construction_file
 from modules.crispr_tools.tools.design_cloning_oligos import design_cloning_oligos
-from modules.crispr_tools.tools.construction_file_validation import (
+from modules.construction_file_tools.tools.validate_construction_file import (
     validate_construction_record,
 )
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.rank_guides import rank_guides
-from modules.crispr_tools.tools.colony_calculator import colony_calculator
-from modules.crispr_tools.tools.interpret_ice_tide import interpret_ice_tide
+from modules.labsheet_tools.tools.colony_calculator import colony_calculator
+from modules.labsheet_tools.tools.interpret_ice_tide import interpret_ice_tide
 from modules.crispr_tools.tools.predict_editing_efficiency import predict_editing_efficiency
-from modules.crispr_tools.tools.verify_edit import verify_edit
-from modules.crispr_tools.tools.lab_sheet import lab_sheet
+from modules.labsheet_tools.tools.verify_edit import verify_edit
+from modules.labsheet_tools.tools.lab_sheet import lab_sheet
 from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
 
 
@@ -333,7 +333,7 @@ def test_verify_edit_cas12a_forward_strand():
 def test_verify_edit_cas12a_reverse_strand():
     # RC protospacer on + strand, TAAA after it (= RC of TTTA = TTTV PAM on minus strand)
     protospacer = "ATGATGATGATGATGATGATGAT"
-    from modules.crispr_tools.tools.verify_edit import _reverse_complement
+    from modules.labsheet_tools.tools.verify_edit import _reverse_complement
     rc = _reverse_complement(protospacer)
     # forward strand: [padding][RC protospacer][TAAA][padding]
     reference = "A" * 20 + rc + "TAAA" + "A" * 200
@@ -490,7 +490,8 @@ def test_lab_sheet_goldengate_assemble_section():
     assert "A: Assemble" in text
     assert "DNA Mix:" in text
     assert "BsaI" in text
-    assert "T4 DNA ligase" in text
+    # NEB product naming: "T4 DNA Ligase" — capital L (case-insensitive check)
+    assert "t4 dna ligase" in text.lower()
     assert "program: main/GG1" in text
 
 
@@ -498,7 +499,8 @@ def test_lab_sheet_gibson_assemble_section():
     result = lab_sheet(_make_record(strategy="Gibson"))
     text = result["lab_sheet_text"]
     assert "A: Assemble" in text
-    assert "2X Gibson Mix" in text
+    # NEB product is "Gibson Assembly Master Mix (2X)" — substring 'Gibson' is enough
+    assert "Gibson" in text and "2X" in text
     assert "program: main/GIB2" in text
 
 
@@ -1140,6 +1142,49 @@ def test_interpret_ice_tide_cites_tide_paper_for_tide():
     _assert_well_formed_citations(result["citations"])
     labels = " ".join(c["label"] for c in result["citations"])
     assert "Brinkman" in labels
+
+
+def test_lab_sheet_emits_protocol_sources_and_disclaimer():
+    """lab_sheet output should include protocol_sources (one entry per
+    canonical recipe used), a flat citations list, and a verify_before_use
+    disclaimer. This is the auditable-recipe contract from _protocols.py."""
+    result = lab_sheet(_make_record(strategy="GoldenGate"))
+
+    # disclaimer present and non-empty
+    assert "verify_before_use" in result
+    assert isinstance(result["verify_before_use"], str)
+    assert "confirm" in result["verify_before_use"].lower()
+
+    # protocol_sources: one entry per step type
+    sources = result["protocol_sources"]
+    assert isinstance(sources, list)
+    assert len(sources) >= 1
+    for entry in sources:
+        assert "step" in entry and "sources" in entry
+        assert isinstance(entry["sources"], list) and len(entry["sources"]) >= 1
+        for s in entry["sources"]:
+            assert set(s.keys()) == {"label", "reference", "claim"}
+
+    # citations: flat list shape consistent with other tools
+    assert isinstance(result["citations"], list)
+    assert len(result["citations"]) >= 1
+    for c in result["citations"]:
+        assert set(c.keys()) == {"label", "reference", "claim"}
+
+
+def test_lab_sheet_goldengate_cites_engler_and_neb():
+    """GoldenGate assembly should cite Engler 2008 + NEB E1601."""
+    result = lab_sheet(_make_record(strategy="GoldenGate"))
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Engler" in labels
+    assert "BsaI" in labels or "E1601" in labels
+
+
+def test_lab_sheet_gibson_cites_gibson_2009():
+    """Gibson assembly should cite Gibson 2009 + NEB E2611."""
+    result = lab_sheet(_make_record(strategy="Gibson"))
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Gibson" in labels
 
 
 def test_verify_edit_emits_citations():

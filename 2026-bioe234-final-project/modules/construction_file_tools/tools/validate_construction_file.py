@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from modules.crispr_tools.tools.create_construction_file import CreateConstructionFile
+from modules.construction_file_tools.tools.create_construction_file import CreateConstructionFile
 
 
 DNA_ALPHABET = {"A", "C", "G", "T", "N"}
@@ -14,15 +14,16 @@ class ConstructionValidationError(ValueError):
 
 
 def normalize_sequence(seq: str) -> str:
+    """
+    Normalize a DNA sequence by uppercasing and removing non-letter characters.
+    Then confirm it only contains A/C/G/T/N.
+    """
     if not isinstance(seq, str) or not seq.strip():
         raise ConstructionValidationError("Sequence must be a non-empty string.")
 
     cleaned = "".join(ch for ch in seq.upper() if ch.isalpha())
     if not cleaned:
         raise ConstructionValidationError("Sequence became empty after normalization.")
-
-    # Auto-convert RNA to DNA
-    cleaned = cleaned.replace("U", "T")
 
     invalid = set(cleaned) - DNA_ALPHABET
     if invalid:
@@ -60,6 +61,10 @@ def find_all_forward_matches(
     template: str,
     min_anneal_len: int = 12,
 ) -> List[dict]:
+    """
+    Find all possible forward-primer annealing matches.
+    A forward primer anneals via a suffix at its 3' end.
+    """
     primer = normalize_sequence(primer)
     template = normalize_sequence(template)
 
@@ -101,6 +106,10 @@ def find_all_reverse_matches(
     template: str,
     min_anneal_len: int = 12,
 ) -> List[dict]:
+    """
+    Find all possible reverse-primer annealing matches on the template.
+    The reverse primer binds via the reverse complement of its 3' suffix.
+    """
     reverse_primer = normalize_sequence(reverse_primer)
     template = normalize_sequence(template)
 
@@ -147,6 +156,18 @@ def choose_best_pcr_product(
     min_anneal_len: int = 12,
     is_circular: bool = False,
 ) -> Dict[str, object]:
+    """
+    Evaluate all forward/reverse binding combinations and choose the best valid PCR product.
+
+    Linear template:
+    - require forward_start < reverse_start
+    - require no overlap
+
+    Circular template:
+    - search on template + template
+    - allow wraparound products
+    - only allow products spanning <= one template length
+    """
     forward_primer = normalize_sequence(forward_primer)
     reverse_primer = normalize_sequence(reverse_primer)
     template = normalize_sequence(template)
@@ -394,6 +415,13 @@ def find_terminal_bsaI_sites(seq: str, recognition_site: str = "GGTCTC") -> dict
 
 
 def extract_goldengate_overhangs(seq: str, enzyme: str) -> dict:
+    """
+    Version 1 simplification:
+    - find a forward BsaI site near one end
+    - find a reverse-oriented BsaI site near the other end
+    - take the 4 nt immediately after the forward site as the left overhang
+    - take the 4 nt immediately before the reverse-oriented site as the right overhang
+    """
     seq = normalize_sequence(seq)
     enzyme_info = get_supported_enzyme(enzyme)
     site = enzyme_info["recognition_site"]
@@ -404,9 +432,14 @@ def extract_goldengate_overhangs(seq: str, enzyme: str) -> dict:
     left_site_start = sites["left_site_start"]
     right_site_start = sites["right_site_start"]
 
+    # BsaI primer designs here use:
+    # clamp + GGTCTC + spacer base + 4 bp overhang + annealing sequence
+    #
+    # So skip the one spacer base after the forward recognition site.
     left_overhang_start = left_site_start + len(site) + 1
     left_overhang = seq[left_overhang_start:left_overhang_start + overhang_len]
 
+    # On the reverse-oriented side, skip the one spacer base before the reverse site.
     right_overhang_end = right_site_start - 1
     right_overhang = seq[right_overhang_end - overhang_len:right_overhang_end]
 
@@ -442,9 +475,13 @@ def validate_goldengate_step(
     insert_name = inputs[1]
 
     if vector_name not in produced_sequences:
-        raise ConstructionValidationError(f"GoldenGate input '{vector_name}' has no available validated sequence.")
+        raise ConstructionValidationError(
+            f"GoldenGate input '{vector_name}' has no available validated sequence."
+        )
     if insert_name not in produced_sequences:
-        raise ConstructionValidationError(f"GoldenGate input '{insert_name}' has no available validated sequence.")
+        raise ConstructionValidationError(
+            f"GoldenGate input '{insert_name}' has no available validated sequence."
+        )
 
     vector_seq = produced_sequences[vector_name]
     insert_seq = produced_sequences[insert_name]
@@ -452,8 +489,10 @@ def validate_goldengate_step(
     vector_ends = extract_goldengate_overhangs(vector_seq, enzyme)
     insert_ends = extract_goldengate_overhangs(insert_seq, enzyme)
 
-    junction_1_ok = vector_ends["right_overhang"] == reverse_complement(insert_ends["left_overhang"])
-    junction_2_ok = insert_ends["right_overhang"] == reverse_complement(vector_ends["left_overhang"])
+    # The extracted overhangs are already in junction-facing form.
+    # Compare them directly instead of reverse-complementing again.
+    junction_1_ok = vector_ends["right_overhang"] == insert_ends["left_overhang"]
+    junction_2_ok = insert_ends["right_overhang"] == vector_ends["left_overhang"]
 
     if not junction_1_ok or not junction_2_ok:
         raise ConstructionValidationError(
@@ -476,6 +515,79 @@ def validate_goldengate_step(
             "vector_right_overhang": vector_ends["right_overhang"],
             "insert_left_overhang": insert_ends["left_overhang"],
             "insert_right_overhang": insert_ends["right_overhang"],
+        },
+    }
+
+
+def validate_gibson_step(
+    step: dict,
+    produced_sequences: Dict[str, str],
+) -> Dict[str, object]:
+    if step.get("step_type") != "Gibson":
+        raise ConstructionValidationError("validate_gibson_step only accepts Gibson steps.")
+
+    inputs = step.get("inputs", [])
+    params = step.get("parameters", {})
+    output_name = step.get("output", "").strip()
+
+    if len(inputs) < 2:
+        raise ConstructionValidationError("Gibson step requires at least 2 inputs.")
+
+    vector_name = inputs[0]
+    insert_name = inputs[1]
+
+    if vector_name not in produced_sequences:
+        raise ConstructionValidationError(
+            f"Gibson input '{vector_name}' has no available validated sequence."
+        )
+    if insert_name not in produced_sequences:
+        raise ConstructionValidationError(
+            f"Gibson input '{insert_name}' has no available validated sequence."
+        )
+
+    vector_seq = normalize_sequence(produced_sequences[vector_name])
+    insert_seq = normalize_sequence(produced_sequences[insert_name])
+
+    overlap_bp = params.get("overlap_bp", 20)
+    if not isinstance(overlap_bp, int) or overlap_bp <= 0:
+        raise ConstructionValidationError("Gibson overlap_bp must be a positive integer.")
+
+    if len(vector_seq) < overlap_bp or len(insert_seq) < overlap_bp:
+        raise ConstructionValidationError(
+            "PCR fragments are shorter than the required Gibson overlap length."
+        )
+
+    vector_end_overlap = vector_seq[-overlap_bp:]
+    insert_start_overlap = insert_seq[:overlap_bp]
+
+    insert_end_overlap = insert_seq[-overlap_bp:]
+    vector_start_overlap = vector_seq[:overlap_bp]
+
+    junction_1_ok = vector_end_overlap == insert_start_overlap
+    junction_2_ok = insert_end_overlap == vector_start_overlap
+
+    if not junction_1_ok or not junction_2_ok:
+        raise ConstructionValidationError(
+            "Gibson overlaps are not compatible for circular assembly. "
+            f"Vector end={vector_end_overlap}, "
+            f"Insert start={insert_start_overlap}, "
+            f"Insert end={insert_end_overlap}, "
+            f"Vector start={vector_start_overlap}."
+        )
+
+    return {
+        "step_number": step.get("step_number"),
+        "step_type": "Gibson",
+        "output_name": output_name,
+        "is_valid": True,
+        "message": "Gibson step validated successfully.",
+        "details": {
+            "overlap_bp": overlap_bp,
+            "reagent": params.get("reagent", "GibsonMix"),
+            "vector_end_overlap": vector_end_overlap,
+            "insert_start_overlap": insert_start_overlap,
+            "insert_end_overlap": insert_end_overlap,
+            "vector_start_overlap": vector_start_overlap,
         },
     }
 
@@ -524,6 +636,13 @@ def validate_construction_record(
 
             elif step_type == "GoldenGate":
                 step_result = validate_goldengate_step(
+                    step=step,
+                    produced_sequences=produced_sequences,
+                )
+                report["step_results"].append(step_result)
+
+            elif step_type == "Gibson":
+                step_result = validate_gibson_step(
                     step=step,
                     produced_sequences=produced_sequences,
                 )
@@ -620,6 +739,14 @@ def format_validation_report(report: dict) -> str:
             lines.append(f"       Insert left overhang: {details.get('insert_left_overhang')}")
             lines.append(f"       Insert right overhang: {details.get('insert_right_overhang')}")
 
+        if isinstance(details, dict) and step_type == "Gibson" and step_valid is True:
+            lines.append(f"       Reagent: {details.get('reagent')}")
+            lines.append(f"       Overlap length: {details.get('overlap_bp')} bp")
+            lines.append(f"       Vector end overlap: {details.get('vector_end_overlap')}")
+            lines.append(f"       Insert start overlap: {details.get('insert_start_overlap')}")
+            lines.append(f"       Insert end overlap: {details.get('insert_end_overlap')}")
+            lines.append(f"       Vector start overlap: {details.get('vector_start_overlap')}")
+
         lines.append("")
 
     errors = report.get("errors", [])
@@ -641,8 +768,10 @@ def format_validation_report(report: dict) -> str:
 
 class ValidateConstructionFile:
     """
-    Validate a construction workflow from the original user inputs rather than
-    requiring a pre-built structured construction record.
+    MCP wrapper for validating construction workflows.
+
+    The helper functions above contain the validation logic. This class only
+    provides the initiate/run interface expected by the MCP loader.
     """
 
     def initiate(self) -> None:
@@ -652,7 +781,6 @@ class ValidateConstructionFile:
     def run(
         self,
         construct_name: str,
-        host_organism: str,
         assembly_strategy: str,
         backbone_name: str,
         backbone_sequence: str,
@@ -688,19 +816,14 @@ class ValidateConstructionFile:
         if not isinstance(strict, bool):
             raise ConstructionValidationError("strict must be a boolean.")
 
-        host_organism = self.builder._normalize_host_organism(host_organism)
         assembly_strategy = self.builder._normalize_assembly_strategy(assembly_strategy)
 
         self.builder._require_nonempty_string(construct_name, "construct_name")
-        self.builder._require_nonempty_string(host_organism, "host_organism")
         self.builder._require_nonempty_string(assembly_strategy, "assembly_strategy")
         self.builder._require_nonempty_string(backbone_name, "backbone_name")
         self.builder._require_nonempty_string(backbone_sequence, "backbone_sequence")
         self.builder._require_nonempty_string(insert_name, "insert_name")
         self.builder._require_nonempty_string(insert_sequence, "insert_sequence")
-
-        if host_organism not in self.builder.supported_organisms:
-            raise ConstructionValidationError("host_organism must be E_coli for version 1.")
 
         if assembly_strategy not in self.builder.allowed_strategies:
             raise ConstructionValidationError(
@@ -749,12 +872,13 @@ class ValidateConstructionFile:
             cell_strain=cell_strain,
             selection=selection,
             temperature_c=temperature_c,
+            top_oligo_name="",
+            bottom_oligo_name="",
         )
         validated_operations = self.builder._validate_operations(operations, validated_parts)
 
         structured_construction_file = {
             "construct_name": construct_name,
-            "host_organism": host_organism,
             "assembly_strategy": assembly_strategy,
             "parts": validated_parts,
             "operations": validated_operations,
@@ -769,7 +893,10 @@ class ValidateConstructionFile:
         )
 
         return {
-            "readable_summary": format_validation_report(report)
+            "is_valid": report.get("is_valid", False),
+            "summary": "PASS" if report.get("is_valid", False) else "FAIL",
+            "details": report.get("step_results", []),
+            "readable_summary": format_validation_report(report),
         }
 
 

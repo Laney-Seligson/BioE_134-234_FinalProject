@@ -107,8 +107,8 @@ def _classify_organism(organism: str) -> str:
         return "mammalian"
     return "mammalian"  # default fallback for unlisted organisms
 
-from modules.crispr_tools.tools.create_construction_file import CreateConstructionFile
-from modules.crispr_tools.tools.construction_file_validation import ValidateConstructionFile
+from modules.construction_file_tools.tools.create_construction_file import CreateConstructionFile
+from modules.construction_file_tools.tools.validate_construction_file import ValidateConstructionFile
 from modules.crispr_tools.tools.design_cas9_grna import DesignCas9Grna
 from modules.crispr_tools.tools.cas_selector import CasSelector
 from modules.crispr_tools.tools.design_cas12a_crrna import DesignCas12aCrrna

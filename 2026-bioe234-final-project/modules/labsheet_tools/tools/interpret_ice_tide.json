@@ -76,7 +76,7 @@
 
   "execution_details": {
     "language": "Python",
-    "source": "modules/crispr_tools/tools/interpret_ice_tide.py",
+    "source": "modules/labsheet_tools/tools/interpret_ice_tide.py",
     "initialization": "initiate",
     "execution": "run",
     "disposal": null,

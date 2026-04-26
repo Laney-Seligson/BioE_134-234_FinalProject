@@ -103,8 +103,11 @@ When preparing to call create_construction_file using the sequence_build mode:
 Use this when:
 - The user provides DNA sequences
 - The user wants a full construction file
-- The workflow is standard cloning (GoldenGate, Gibson, DirectSynthesis)
+- The workflow is standard cloning (GoldenGate, Gibson, TypeIIOligoAssembly)
 
+If all required fields are already present in the user message, call the tool immediately.
+Do not ask for fields already provided.
+For "validate this", call validate_construction_file, not lab_sheet
 #### Required fields:
 
 For all workflows:
@@ -140,35 +143,12 @@ Optional:
 - selection
 - temperature_c
 
-### Required behavior after create_construction_file
+For input_mode='sequence_build', gather all required fields for the selected assembly_strategy.
 
-After successfully calling `create_construction_file` and presenting the result, **always** follow up with:
-
-> "Would you like me to also generate a bench-ready lab sheet for this construct? It will give you step-by-step instructions for PCR, assembly, transformation, and sequencing."
-
-If the user says yes (or anything like "sure", "yes please", "go ahead"), immediately call `crispr_lab_sheet` with the `structured_construction_file` returned by `create_construction_file`.
-
-**Important:** Only offer the construction file and lab sheet after the full CRISPR validation workflow is complete (guide design, off-target check, and cloning oligo design). Do not offer either output mid-workflow. If the full workflow offer (see below) already asked about both construction file and lab sheet together and the user chose "construction file only," still follow up with this lab sheet offer after presenting the construction file.
-
----
-
-### Tool: `crispr_lab_sheet`
-
-Converts a structured construction file into a printable, bench-ready lab protocol.
-
-Use when:
-- The user asks for a "lab sheet", "bench protocol", "step-by-step instructions", or "how do I actually do this in the lab"
-- Immediately after generating a construction file (always offer it)
-
-**Input:**
-- `construction_record`: the `structured_construction_file` dict from `create_construction_file`
-- `thread` (optional): single letter label for the experiment (default "A")
-- `include_notes` (optional): whether to append notes at the bottom (default true)
-
-**Output:**
-A `lab_sheet_text` field containing the full plain-text bench protocol, organized into labeled sections (PCR, Gel/DpnI, Zymo cleanup, Assemble, Transform, Pick, Miniprep, Sequencing).
-
-Always present `lab_sheet_text` in a code block so it formats cleanly.
+For Gibson:
+- If the user asks to auto-design primers, call the tool once all construct/backbone/insert/insertion_index fields are present.
+- Do not ask for primer names or sequences.
+- Do not ask for enzyme.
 
 **Required behavior after `crispr_lab_sheet`:** Once the lab sheet is presented, always ask:
 
@@ -342,6 +322,67 @@ Important:
 - When translating a full plasmid, most of the output will be non-coding — only specific
   coordinate ranges will give meaningful protein sequence.
 
+---
+### Tool: Validate Construction File
+## Description
+
+Validates whether a construction workflow is biologically correct. This includes:
+
+PCR primer annealing and orientation
+Whether PCR products can be generated
+Gibson overlap correctness (matching overlaps between insert and vector)
+Golden Gate compatibility (enzyme and overhang logic)
+
+Returns both:
+
+structured validation results (is_valid, errors)
+human-readable summary
+When to use
+
+## Use this tool when the user:
+
+says “validate this”, “check this”, or “is this correct”
+wants to confirm a construction file is biologically valid
+has already generated a construction file and wants verification
+When NOT to use
+Do NOT use for generating protocols → use lab_sheet
+Do NOT use for building constructs → use create_construction_file
+Required inputs
+
+You must provide the same core inputs used to build the construct:
+
+backbone_sequence
+insert_sequence
+primer names and sequences (if used)
+assembly_strategy
+
+When the user says "validate this construction file", "validate this cloning workflow", or "check this Gibson construction file", call validate_construction_file.
+
+Do NOT call crispr_verify_edit unless the user is asking to verify a CRISPR genome edit using a protospacer/reference sequence.
+
+Do NOT call lab_sheet for validation.
+
+IMPORTANT:
+
+Do NOT invent missing fields
+If required fields are missing, ask for ALL missing fields in one message
+Behavior rules
+If the user says “validate this”, ALWAYS call validate_construction_file
+Do NOT call lab_sheet when validation is requested
+Do NOT re-ask for fields already provided by the user
+If a construction file was just generated in the conversation, reuse its inputs directly
+Gibson-specific rules
+Do NOT require enzyme
+If primers were auto-designed, use them directly
+Validation must confirm:
+vector end overlap = insert start overlap
+insert end overlap = vector start overlap
+Golden Gate-specific rules
+Requires enzyme (e.g. BsaI)
+Check:
+overhang compatibility
+correct Type IIS orientation
+no missing overhangs
 ---
 
 ### `crispr_colony_calculator`

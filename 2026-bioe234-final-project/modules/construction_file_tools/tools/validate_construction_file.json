@@ -1,0 +1,170 @@
+{
+  "id": "org.bioe134-234.function.cloning.validate_construction_file.v2",
+  "name": "validate_construction_file",
+  "description": "Validate whether a DNA cloning construction workflow is biologically correct. Supports GoldenGate and Gibson assembly. Checks PCR primer annealing, primer orientation, amplicon validity, and assembly compatibility (overhangs for GoldenGate, overlaps for Gibson).",
+  "type": "function",
+  "seq_params": [
+    "backbone_sequence",
+    "insert_sequence"
+  ],
+  "keywords": [
+    "construction file",
+    "validation",
+    "PCR",
+    "cloning",
+    "primer annealing",
+    "GoldenGate",
+    "Gibson",
+    "assembly verification",
+    "overlap",
+    "overhang"
+  ],
+  "inputs": [
+    {
+      "name": "construct_name",
+      "type": "string",
+      "description": "Name of the final construct."
+    },
+    {
+      "name": "assembly_strategy",
+      "type": "string",
+      "enum": ["GoldenGate", "Gibson"],
+      "description": "Assembly strategy used. Must be either GoldenGate or Gibson."
+    },
+    {
+      "name": "backbone_name",
+      "type": "string",
+      "description": "Name of the backbone plasmid."
+    },
+    {
+      "name": "backbone_sequence",
+      "type": "string",
+      "description": "DNA sequence or resource name for the backbone plasmid."
+    },
+    {
+      "name": "insert_name",
+      "type": "string",
+      "description": "Name of the insert."
+    },
+    {
+      "name": "insert_sequence",
+      "type": "string",
+      "description": "DNA sequence or resource name for the insert."
+    },
+
+    {
+      "name": "insert_forward_primer_name",
+      "type": "string",
+      "description": "Insert forward primer name. Required unless primers were auto-designed."
+    },
+    {
+      "name": "insert_forward_primer_sequence",
+      "type": "string",
+      "description": "Insert forward primer sequence. Required unless primers were auto-designed."
+    },
+    {
+      "name": "insert_reverse_primer_name",
+      "type": "string",
+      "description": "Insert reverse primer name. Required unless primers were auto-designed."
+    },
+    {
+      "name": "insert_reverse_primer_sequence",
+      "type": "string",
+      "description": "Insert reverse primer sequence. Required unless primers were auto-designed."
+    },
+    {
+      "name": "vector_forward_primer_name",
+      "type": "string",
+      "description": "Vector forward primer name. Required unless primers were auto-designed."
+    },
+    {
+      "name": "vector_forward_primer_sequence",
+      "type": "string",
+      "description": "Vector forward primer sequence. Required unless primers were auto-designed."
+    },
+    {
+      "name": "vector_reverse_primer_name",
+      "type": "string",
+      "description": "Vector reverse primer name. Required unless primers were auto-designed."
+    },
+    {
+      "name": "vector_reverse_primer_sequence",
+      "type": "string",
+      "description": "Vector reverse primer sequence. Required unless primers were auto-designed."
+    },
+
+    {
+      "name": "enzyme",
+      "type": "string",
+      "description": "Restriction enzyme used. Required for GoldenGate only (e.g., BsaI). Not required for Gibson."
+    },
+
+    {
+      "name": "min_anneal_len",
+      "type": "integer",
+      "description": "Minimum required primer annealing length for PCR validation. Default is 12.",
+      "default": 12
+    },
+    {
+      "name": "strict",
+      "type": "boolean",
+      "description": "If true, stop at first failure. If false, return full report.",
+      "default": false
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "Validation results for the construction workflow.",
+      "properties": {
+        "is_valid": {
+          "type": "boolean",
+          "description": "Overall validation result."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Short summary (PASS/FAIL)."
+        },
+        "details": {
+          "type": "object",
+          "description": "Step-by-step validation results (PCR insert, PCR vector, assembly)."
+        },
+        "readable_summary": {
+          "type": "string",
+          "description": "Full human-readable validation report."
+        }
+      }
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "construct_name": "pET28a_REP24",
+        "assembly_strategy": "Gibson",
+        "backbone_name": "pET28a",
+        "backbone_sequence": "pET28a",
+        "insert_name": "REP24",
+        "insert_sequence": "ATGAAA...",
+        "min_anneal_len": 12,
+        "strict": false
+      },
+      "output": {
+        "result": {
+          "is_valid": true,
+          "summary": "PASS"
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/validate_construction_file.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "validate_construction_file"
+  }
+}

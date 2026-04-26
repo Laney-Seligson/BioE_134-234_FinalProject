@@ -62,7 +62,7 @@
 
   "execution_details": {
     "language": "Python",
-    "source": "modules/crispr_tools/tools/verify_edit.py",
+    "source": "modules/labsheet_tools/tools/verify_edit.py",
     "initialization": "initiate",
     "execution": "run",
     "disposal": null,

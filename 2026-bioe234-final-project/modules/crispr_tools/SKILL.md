@@ -517,11 +517,11 @@ Use when the user asks:
 3. Upload the .ab1 trace to ICE (Synthego) or TIDE (Brinkman et al. 2014) with the amplicon sequence and cut offset
 4. Once the user has their ICE/TIDE results, use `interpret_ice_tide` to interpret them (see below)
 
-**Required follow-up:** After presenting the verify_edit output (and only after — never during the design workflow), always close with:
+**Required follow-up:** After presenting the verify_edit output, always close with:
 
 > "Once you have your ICE or TIDE results, come back and I can interpret the editing efficiency for you — just share the KO score (ICE) or indel percentage (TIDE) and the R² fit value."
 
-`crispr_verify_edit` is a **post-experiment** tool. Never call it as part of the design workflow. It is only relevant after the user has physically run the CRISPR experiment and obtained sequencing data.
+Note: `crispr_verify_edit` designs the **sequencing primers** — this is prep work done before the experiment so the primers are ready to order. The actual interpretation of results is done later with `interpret_ice_tide` after sequencing data is in hand. Do NOT call `crispr_verify_edit` during the automated design workflow (steps 1–7 above) — it is offered as a standalone step when the user asks to set up their verification protocol.
 
 ---
 

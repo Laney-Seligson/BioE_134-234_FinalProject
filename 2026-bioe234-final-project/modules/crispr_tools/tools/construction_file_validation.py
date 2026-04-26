@@ -884,6 +884,8 @@ class ValidateConstructionFile:
             cell_strain=cell_strain,
             selection=selection,
             temperature_c=temperature_c,
+            top_oligo_name="",
+            bottom_oligo_name="",
         )
         validated_operations = self.builder._validate_operations(operations, validated_parts)
 

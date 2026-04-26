@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 
@@ -184,6 +183,9 @@ class RankGuides:
             raise ValueError("guides must not be empty.")
         if not reference or not reference.strip():
             raise ValueError("reference must not be empty.")
+
+        # Accept either a list of dicts (from design tools) or a list of plain strings
+        guides = [{"protospacer": g} if isinstance(g, str) else g for g in guides]
 
         scored = []
         for guide in guides:

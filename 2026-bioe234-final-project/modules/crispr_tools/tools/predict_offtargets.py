@@ -197,6 +197,13 @@ class PredictOfftargets:
         reference = reference.upper().strip()
         nuclease = nuclease.lower().strip()
 
+        # Normalize IUPAC ambiguity codes in the reference to N so scanning
+        # still works on sequences from GenBank or genomic databases.
+        _IUPAC_AMBIGUOUS = set("RYWSKMBDHV")
+        reference = "".join(
+            "N" if b in _IUPAC_AMBIGUOUS else b for b in reference
+        )
+
         if nuclease not in _SUPPORTED_NUCLEASES:
             raise ValueError(
                 f"Unsupported nuclease '{nuclease}'. Choose 'cas9' or 'cas12a'."

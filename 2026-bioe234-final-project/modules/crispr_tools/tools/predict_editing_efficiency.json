@@ -1,0 +1,82 @@
+{
+  "id": "org.bioe234.function.crispr.predict_editing_efficiency.v1",
+  "name": "CRISPR Editing Efficiency Predictor",
+  "description": "Predicts on-target editing efficiency BEFORE the experiment is run. Uses a simplified linear approximation of Doench 2016 Rule Set 2: position-specific nucleotide weights along the protospacer, PAM context (NGG > NAG, NGGT > NGGA), GC content optimum, and poly-T penalty (Pol III termination). Then adjusts for delivery method (RNP, plasmid, lentivirus, AAV, electroporation) and editing outcome (NHEJ knockout, HDR knockin, base/prime editing). Returns a predicted % efficiency with a +/-15% confidence range, a feature breakdown, and human-readable warnings.",
+  "type": "function",
+  "keywords": ["CRISPR", "editing efficiency", "Doench", "Rule Set 2", "on-target", "prediction", "Cas9", "Cas12a", "HDR", "NHEJ"],
+  "date_created": "2026-04-26",
+  "date_last_modified": "2026-04-26",
+
+  "inputs": [
+    {
+      "name": "protospacer",
+      "type": "string",
+      "description": "20bp DNA (Cas9) or 23bp DNA (Cas12a) protospacer, no PAM."
+    },
+    {
+      "name": "pam",
+      "type": "string",
+      "description": "PAM sequence adjacent to the protospacer. 3bp NGG for Cas9 (3' of protospacer), 4bp TTTV for Cas12a (5' of protospacer)."
+    },
+    {
+      "name": "nuclease",
+      "type": "string",
+      "optional": true,
+      "description": "'cas9' (default) or 'cas12a'."
+    },
+    {
+      "name": "downstream_3nt",
+      "type": "string",
+      "optional": true,
+      "description": "Cas9 only. 3 nucleotides immediately 3' of the PAM. Used for NGGT vs NGGA preference."
+    },
+    {
+      "name": "delivery",
+      "type": "string",
+      "optional": true,
+      "description": "Delivery method: 'rnp' (default 1.0x), 'plasmid' (0.55x), 'lentivirus' (0.75x), 'aav' (0.65x), 'electroporation' (0.85x). Default 'plasmid'."
+    },
+    {
+      "name": "outcome",
+      "type": "string",
+      "optional": true,
+      "description": "Editing outcome: 'nhej' (knockout, default 1.0x), 'hdr' (knockin, 0.10x), 'base_edit' (0.40x), 'prime_edit' (0.20x)."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "Dict with on_target_efficiency_pct, confidence_range, feature_contributions breakdown, warnings, and a plain-English interpretation."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "protospacer": "ATGCATGCATGCATGCATGG",
+        "pam": "AGG",
+        "nuclease": "cas9",
+        "delivery": "rnp",
+        "outcome": "nhej"
+      },
+      "output": {
+        "result": {
+          "on_target_efficiency_pct": 70.0,
+          "confidence_range": [55.0, 85.0]
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/predict_editing_efficiency.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_predict_editing_efficiency",
+    "seq_params": []
+  }
+}

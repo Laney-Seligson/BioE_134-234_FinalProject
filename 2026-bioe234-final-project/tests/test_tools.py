@@ -25,6 +25,7 @@ from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.rank_guides import rank_guides
 from modules.crispr_tools.tools.colony_calculator import colony_calculator
 from modules.crispr_tools.tools.interpret_ice_tide import interpret_ice_tide
+from modules.crispr_tools.tools.predict_editing_efficiency import predict_editing_efficiency
 from modules.crispr_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.lab_sheet import lab_sheet
 from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
@@ -939,4 +940,138 @@ def test_interpret_ice_tide_unedited_dominant_warns():
     )
     assert result["dominant_indel"] == "0"
     assert any("unedited" in w.lower() for w in result["warnings"])
+
+
+# ---------------------------------------------------------------------------
+# predict_editing_efficiency tests
+# ---------------------------------------------------------------------------
+
+def test_predict_editing_efficiency_good_guide_high_score():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG",  # GC=50%, ends in G
+        pam="AGG",
+        nuclease="cas9",
+        delivery="rnp",
+        outcome="nhej",
+    )
+    # Good guide + RNP + NHEJ should predict moderate-to-high efficiency
+    assert result["on_target_efficiency_pct"] > 50
+    assert result["warnings"] == []
+    assert "feature_contributions" in result
+    assert len(result["confidence_range"]) == 2
+
+
+def test_predict_editing_efficiency_polyt_guide_dies():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATTTTTGCATGCATGG",  # contains TTTT
+        pam="AGG",
+        nuclease="cas9",
+    )
+    # Poly-T should kill the score and produce a warning
+    assert result["on_target_efficiency_pct"] < 25
+    assert any("TTTT" in w or "Pol III" in w for w in result["warnings"])
+
+
+def test_predict_editing_efficiency_weak_pam_warns():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG",
+        pam="AAG",  # NAG is weak
+        nuclease="cas9",
+    )
+    assert any("PAM" in w for w in result["warnings"])
+
+
+def test_predict_editing_efficiency_hdr_lower_than_nhej():
+    nhej = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", outcome="nhej"
+    )
+    hdr = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", outcome="hdr"
+    )
+    # HDR is ~10% of NHEJ
+    assert hdr["on_target_efficiency_pct"] < nhej["on_target_efficiency_pct"] / 5
+
+
+def test_predict_editing_efficiency_rnp_better_than_plasmid():
+    rnp = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", delivery="rnp"
+    )
+    plasmid = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", delivery="plasmid"
+    )
+    assert rnp["on_target_efficiency_pct"] > plasmid["on_target_efficiency_pct"]
+
+
+def test_predict_editing_efficiency_empty_protospacer_raises():
+    with pytest.raises(ValueError):
+        predict_editing_efficiency(protospacer="", pam="AGG")
+
+
+def test_predict_editing_efficiency_wrong_length_raises():
+    with pytest.raises(ValueError):
+        # 19bp instead of 20
+        predict_editing_efficiency(protospacer="ATGCATGCATGCATGCATG", pam="AGG", nuclease="cas9")
+
+
+def test_predict_editing_efficiency_invalid_delivery_raises():
+    with pytest.raises(ValueError):
+        predict_editing_efficiency(
+            protospacer="ATGCATGCATGCATGCATGG", pam="AGG", delivery="magic_beans"
+        )
+
+
+# ---------------------------------------------------------------------------
+# CFD score tests for predict_offtargets
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_cfd_perfect_match_is_one():
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = protospacer + "AGG" + "C" * 50
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # First site should be the on-target with CFD = 1.0
+    on = result["offtarget_sites"][0]
+    assert on["mismatches"] == 0
+    assert on["cfd_score"] == 1.0
+
+
+def test_predict_offtargets_aggregate_cfd_excludes_on_target():
+    protospacer = "ATGATGATGATGATGATGAT"
+    # only on-target in reference
+    reference = protospacer + "AGG" + "C" * 50
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # aggregate CFD excludes the on-target -> 0 if no other matches
+    assert result["aggregate_offtarget_cfd"] == 0.0
+
+
+def test_predict_offtargets_pam_distal_mismatch_higher_cfd_than_seed_mismatch():
+    # seed mismatch (PAM-proximal) penalizes harder than PAM-distal mismatch
+    # protospacer ATGATGATGATGATGATGAT
+    # PAM-distal mismatch (position 20 from PAM-proximal end = position 1 in seq):
+    #   change first base
+    seed_mismatch_off = "ATGATGATGATGATGATGAA"  # last base differs (PAM-proximal pos 1)
+    distal_mismatch_off = "TTGATGATGATGATGATGAT"  # first base differs (PAM-distal pos 20)
+    # Both with PAM
+    reference = seed_mismatch_off + "AGG" + "C" * 30 + distal_mismatch_off + "AGG" + "C" * 30
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference=reference,
+        nuclease="cas9",
+        max_mismatches=1,
+    )
+    # find the two off-target entries
+    seed_site = next(s for s in result["offtarget_sites"] if s["sequence"] == seed_mismatch_off)
+    distal_site = next(s for s in result["offtarget_sites"] if s["sequence"] == distal_mismatch_off)
+    # Distal mismatch should have HIGHER CFD (less harmful) than seed mismatch
+    assert distal_site["cfd_score"] > seed_site["cfd_score"]
+
+
+def test_predict_offtargets_no_pam_cfd_is_zero():
+    protospacer = "ATGATGATGATGATGATGAT"
+    # no NGG after the protospacer
+    reference = protospacer + "ACC" + "C" * 50
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas9")
+    for s in result["offtarget_sites"]:
+        if not s["has_pam"]:
+            assert s["cfd_score"] == 0.0
+
 

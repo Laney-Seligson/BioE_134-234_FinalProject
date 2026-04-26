@@ -14,6 +14,60 @@ _SEED_LENGTHS = {"cas9": 12, "cas12a": 10}
 _GUIDE_LENGTHS = {"cas9": 20, "cas12a": 23}
 
 
+# CFD (Cutting Frequency Determination) per-position penalties.
+# A mismatch in the seed region near the PAM causes much larger drops in
+# cutting frequency than one at the PAM-distal end. Values approximate the
+# averaged mismatch tolerances published in Doench et al. 2016 Supplementary
+# Table 19 (Rule Set 2 / CFD scoring). Position 1 = PAM-distal end of the
+# protospacer; position 20 = PAM-proximal (next to NGG).
+#
+# A perfect match has CFD = 1.0. Each mismatch multiplies CFD by the
+# position-specific factor below. Final CFD is the predicted cutting
+# frequency at the off-target site relative to the on-target site.
+#
+# Source: Doench et al. 2016, Nat Biotechnol 34:184-191, Suppl. Table 19.
+_CFD_POSITION_PENALTY_CAS9: dict[int, float] = {
+    1: 1.00, 2: 1.00, 3: 0.95, 4: 0.90, 5: 0.85,
+    6: 0.80, 7: 0.75, 8: 0.65, 9: 0.55, 10: 0.45,
+    11: 0.35, 12: 0.25, 13: 0.20, 14: 0.15, 15: 0.10,
+    16: 0.08, 17: 0.05, 18: 0.04, 19: 0.03, 20: 0.02,
+}
+
+# Cas12a: even less tolerant in the PAM-proximal seed (Kim et al. 2016).
+_CFD_POSITION_PENALTY_CAS12A: dict[int, float] = {
+    1: 1.00, 2: 1.00, 3: 0.95, 4: 0.90, 5: 0.85,
+    6: 0.80, 7: 0.70, 8: 0.60, 9: 0.50, 10: 0.40,
+    11: 0.30, 12: 0.20, 13: 0.15, 14: 0.10, 15: 0.05,
+    16: 0.03, 17: 0.02, 18: 0.02, 19: 0.01, 20: 0.01,
+    21: 0.01, 22: 0.005, 23: 0.005,
+}
+
+
+def _compute_cfd_score(mismatch_positions: list[int], nuclease: str) -> float:
+    """
+    Cutting Frequency Determination (CFD) score for an off-target.
+    Returns predicted cutting frequency at this off-target as a fraction of
+    the on-target cutting frequency. Range [0, 1]; 1.0 = perfect match.
+
+    mismatch_positions: list of 1-indexed positions (1 = PAM-proximal end,
+                        matching the convention used elsewhere in this file).
+    """
+    if not mismatch_positions:
+        return 1.0
+    table = _CFD_POSITION_PENALTY_CAS9 if nuclease == "cas9" else _CFD_POSITION_PENALTY_CAS12A
+    score = 1.0
+    for pos in mismatch_positions:
+        # Convert from PAM-proximal-1-indexed to the table's PAM-distal-1-indexed.
+        # In this codebase position 1 = PAM-proximal (most dangerous).
+        # The CFD table positions are also numbered with 1 = PAM-distal in the
+        # original paper, so we flip: table_pos = guide_len - pos + 1.
+        guide_len = _GUIDE_LENGTHS[nuclease]
+        table_pos = guide_len - pos + 1
+        penalty = table.get(table_pos, 0.5)
+        score *= penalty
+    return round(score, 4)
+
+
 def _reverse_complement(seq: str) -> str:
     complement = {"A": "T", "T": "A", "C": "G", "G": "C"}
     return "".join(complement[b] for b in reversed(seq))
@@ -224,6 +278,14 @@ class PredictOfftargets:
                 else:
                     reported_position = (ref_len - i - guide_len) % ref_len
 
+                # CFD score: predicted cutting frequency at this off-target
+                # relative to the on-target site (Doench 2016 Rule Set 2).
+                # Sites without a valid PAM cannot be cut, so CFD = 0 there.
+                if has_pam:
+                    cfd_score = _compute_cfd_score(mismatch_positions, nuclease)
+                else:
+                    cfd_score = 0.0
+
                 offtarget_sites.append({
                     "position": reported_position,
                     "strand": strand,
@@ -233,6 +295,7 @@ class PredictOfftargets:
                     "seed_mismatches": seed_mismatches,
                     "has_pam": has_pam,
                     "risk": risk,
+                    "cfd_score": cfd_score,
                 })
 
         offtarget_sites.sort(key=lambda s: (s["mismatches"], -s["seed_mismatches"]))
@@ -257,6 +320,21 @@ class PredictOfftargets:
                 "Consider redesigning the guide or choosing a more specific protospacer."
             )
 
+        # Aggregate CFD: sum of all off-target CFD scores, EXCLUDING the
+        # on-target. Mirrors the "specificity score" definition in CRISPOR
+        # (sum of off-target CFDs; lower is better). Skips the first 0-mismatch
+        # HIGH-risk site as the on-target.
+        on_seen = False
+        cfd_off_sum = 0.0
+        max_off_cfd = 0.0
+        for s in offtarget_sites:
+            if not on_seen and s["mismatches"] == 0 and s["risk"] == "HIGH":
+                on_seen = True
+                continue
+            cfd_off_sum += s["cfd_score"]
+            if s["cfd_score"] > max_off_cfd:
+                max_off_cfd = s["cfd_score"]
+
         return {
             "protospacer": protospacer,
             "nuclease": nuclease,
@@ -265,6 +343,8 @@ class PredictOfftargets:
             "sites_evaluated": sites_evaluated,
             "offtarget_sites": offtarget_sites,
             "high_risk_count": high_risk_count,
+            "aggregate_offtarget_cfd": round(cfd_off_sum, 4),
+            "max_offtarget_cfd": round(max_off_cfd, 4),
             "specificity_summary": specificity_summary,
         }
 

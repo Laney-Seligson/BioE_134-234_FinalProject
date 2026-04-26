@@ -1,0 +1,90 @@
+{
+  "id": "org.bioe234.function.crispr.colony_calculator.v1",
+  "name": "CRISPR Colony Picking Calculator",
+  "description": "Given an expected editing efficiency, calculates how many colonies/clones to screen to be confident of recovering a desired number of successfully edited clones. Uses the binomial distribution to compute the smallest n such that P(>=k edits in n trials) >= confidence. Includes published efficiency presets for common contexts (Cas9 RNP/plasmid in mammalian cells, Cas9/Cas12a in E. coli, HDR) and a 1.5x safety bump for real-world losses (failed PCR, contamination, sequencing dropouts).",
+  "type": "function",
+  "keywords": ["CRISPR", "colony picking", "screening", "binomial", "editing efficiency", "HDR", "clone selection", "experimental design"],
+  "date_created": "2026-04-25",
+  "date_last_modified": "2026-04-25",
+
+  "inputs": [
+    {
+      "name": "editing_efficiency",
+      "type": "number",
+      "optional": true,
+      "description": "Expected fraction of colonies that will be successfully edited, in (0, 1]. Required unless preset is provided."
+    },
+    {
+      "name": "desired_clones",
+      "type": "integer",
+      "optional": true,
+      "description": "How many edited clones you want to recover. Default 1."
+    },
+    {
+      "name": "confidence",
+      "type": "number",
+      "optional": true,
+      "description": "Target probability of recovering at least desired_clones. Default 0.95."
+    },
+    {
+      "name": "preset",
+      "type": "string",
+      "optional": true,
+      "description": "Optional published-efficiency preset to use instead of supplying editing_efficiency. One of: 'cas9_rnp_mammalian', 'cas9_plasmid_mammalian', 'cas9_ecoli', 'cas12a_ecoli', 'hdr_mammalian', 'hdr_ecoli'."
+    },
+    {
+      "name": "max_colonies",
+      "type": "integer",
+      "optional": true,
+      "description": "Safety cap on the binomial search. Default 10000."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dict with editing_efficiency used, desired_clones, confidence, colonies_to_pick (the answer), expected_edits, probability_at_chosen_n, safety_margin_recommendation (1.5x bump), and a plain-English recommendation paragraph."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "editing_efficiency": 0.5,
+        "desired_clones": 1,
+        "confidence": 0.95
+      },
+      "output": {
+        "result": {
+          "colonies_to_pick": 5,
+          "probability_at_chosen_n": 0.9688,
+          "safety_margin_recommendation": 8
+        }
+      }
+    },
+    {
+      "input": {
+        "preset": "hdr_mammalian",
+        "desired_clones": 1,
+        "confidence": 0.95
+      },
+      "output": {
+        "result": {
+          "editing_efficiency": 0.05,
+          "colonies_to_pick": 59
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/colony_calculator.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_colony_calculator",
+    "seq_params": []
+  }
+}

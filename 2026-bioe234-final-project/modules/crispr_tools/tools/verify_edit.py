@@ -52,6 +52,72 @@ def _design_sequencing_primer(
         return primer, start
 
 
+def _calculate_tm_wallace(primer: str) -> float:
+    """
+    Estimate primer melting temperature using the Wallace rule:
+        Tm = 2*(A+T) + 4*(G+C)  [degrees Celsius]
+
+    Source: Wallace et al. 1979, Nucleic Acids Res 6(11):3543-3557.
+
+    Valid for short oligos (~14-20 bp) at standard salt conditions. For longer
+    primers this tends to overestimate Tm, but it's the standard quick-check
+    used in undergraduate molecular biology labs and is good enough to flag
+    mismatched primer pairs.
+    """
+    at = sum(1 for b in primer if b in "AT")
+    gc = sum(1 for b in primer if b in "GC")
+    return 2 * at + 4 * gc
+
+
+def _evaluate_primers(fwd_primer: str, rev_primer: str) -> tuple[float, float, list[str]]:
+    """
+    Calculate Tm for each primer and return warnings for common PCR failure modes:
+      - Tm outside 50-65 degC range (too unstable or too sticky)
+      - |Tm_fwd - Tm_rev| > 5 degC (one primer will dominate; asymmetric amplification)
+      - GC content outside 40-60% (hard to get clean amplification)
+      - Poly-N runs of 4+ (slippage, secondary structure)
+    Sources: Dieffenbach et al. 1993, PCR Methods Appl 3(3):S30-37;
+             Rychlik 1995, Mol Biotechnol 3(2):129-134.
+    """
+    tm_fwd = _calculate_tm_wallace(fwd_primer)
+    tm_rev = _calculate_tm_wallace(rev_primer)
+    warnings: list[str] = []
+
+    for label, primer, tm in [("forward", fwd_primer, tm_fwd), ("reverse", rev_primer, tm_rev)]:
+        if tm < 50:
+            warnings.append(
+                f"{label} primer Tm is {tm:.1f}degC (< 50degC): may not anneal reliably. "
+                "Consider a longer primer or a more GC-rich region."
+            )
+        elif tm > 65:
+            warnings.append(
+                f"{label} primer Tm is {tm:.1f}degC (> 65degC): may cause non-specific binding. "
+                "Consider a shorter primer or a less GC-rich region."
+            )
+
+        gc_frac = sum(1 for b in primer if b in "GC") / len(primer) if primer else 0
+        if gc_frac < 0.40:
+            warnings.append(f"{label} primer GC content {gc_frac:.0%} is below 40% — weak binding.")
+        elif gc_frac > 0.60:
+            warnings.append(f"{label} primer GC content {gc_frac:.0%} is above 60% — risk of secondary structure.")
+
+        for base in "ATGC":
+            if base * 4 in primer:
+                warnings.append(
+                    f"{label} primer contains a poly-{base} run of 4+: risk of slippage/mispriming."
+                )
+                break
+
+    if abs(tm_fwd - tm_rev) > 5:
+        warnings.append(
+            f"Primer Tm mismatch: forward {tm_fwd:.1f}degC vs reverse {tm_rev:.1f}degC "
+            f"(delta {abs(tm_fwd - tm_rev):.1f}degC > 5degC). One primer will dominate at "
+            "the annealing step, leading to asymmetric PCR. Redesign so Tms are within 5degC."
+        )
+
+    return tm_fwd, tm_rev, warnings
+
+
 def _validate_pam(
     reference: str, ps_position: int, strand: str, protospacer_len: int, nuclease: str
 ) -> str:
@@ -195,8 +261,13 @@ class VerifyEdit:
             - cut_position: where the nuclease cuts (0-indexed, non-template strand for Cas12a)
             - forward_primer: sequence of the upstream sequencing primer
             - forward_primer_position: where that primer starts
+            - forward_primer_tm: estimated Tm in degC (Wallace rule)
             - reverse_primer: sequence of the downstream sequencing primer
             - reverse_primer_position: where that primer starts
+            - reverse_primer_tm: estimated Tm in degC (Wallace rule)
+            - tm_difference: |Tm_fwd - Tm_rev| in degC (good primer pairs have <5)
+            - primer_warnings: list of QC warnings (Tm out of range, Tm mismatch,
+                               GC content, poly-N runs). Empty list = primers are clean.
             - amplicon_sequence: the reference sequence between the two primers
             - amplicon_length: how long that amplicon is in bp
             - cut_offset_in_amplicon: where the cut falls within the amplicon
@@ -290,6 +361,8 @@ class VerifyEdit:
             reference, cut_position, "reverse", primer_len=primer_len, offset=primer_offset
         )
 
+        tm_fwd, tm_rev, primer_warnings = _evaluate_primers(fwd_primer, rev_primer)
+
         amplicon_start = fwd_primer_pos
         amplicon_end = min(rev_primer_pos + primer_len, ref_len)
         amplicon_sequence = reference[amplicon_start:amplicon_end]
@@ -350,8 +423,12 @@ class VerifyEdit:
             "cut_position": cut_position,
             "forward_primer": fwd_primer,
             "forward_primer_position": fwd_primer_pos,
+            "forward_primer_tm": round(tm_fwd, 1),
             "reverse_primer": rev_primer,
             "reverse_primer_position": rev_primer_pos,
+            "reverse_primer_tm": round(tm_rev, 1),
+            "tm_difference": round(abs(tm_fwd - tm_rev), 1),
+            "primer_warnings": primer_warnings,
             "amplicon_sequence": amplicon_sequence,
             "amplicon_length": amplicon_length,
             "cut_offset_in_amplicon": cut_offset_in_amplicon,

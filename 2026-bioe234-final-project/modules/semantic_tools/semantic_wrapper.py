@@ -1,12 +1,15 @@
 """
 semantic_wrapper.py
 
-Semantic wrapper for gene discovery using:
-- OLS4 for GO term search
-- NCBI Gene API for metadata enrichment
+Semantic wrapper for biology concept discovery using:
+- OLS4 for GO / ontology term search
 
 Pipeline:
-Natural language -> OLS4 GO term search -> NCBI metadata
+Natural language query -> parsed query -> OLS4 GO / ontology terms
+
+This tool is intentionally separated from gene retrieval.
+Gene retrieval should be handled by the annotation tool:
+go_term_gene_lookup
 """
 
 from __future__ import annotations
@@ -20,7 +23,6 @@ import requests
 
 
 OLS4_SEARCH_URL = "https://www.ebi.ac.uk/ols4/api/search"
-NCBI_EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
 
 @dataclass
@@ -39,37 +41,14 @@ class GOTerm:
 
 
 @dataclass
-class GeneAnnotation:
-    gene_id: str
-    symbol: str
-    taxon: Optional[str]
-    evidence: Optional[str]
-    source: Optional[str]
-    go_id: str
-    go_label: Optional[str]
-
-
-@dataclass
-class NCBIGene:
-    gene_id: str
-    symbol: Optional[str]
-    description: Optional[str]
-    organism: Optional[str]
-
-
-@dataclass
 class Result:
     parsed_query: ParsedQuery
     go_terms: List[GOTerm]
-    genes: List[GeneAnnotation]
-    ncbi_records: List[NCBIGene]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "parsed_query": asdict(self.parsed_query),
             "go_terms": [asdict(x) for x in self.go_terms],
-            "genes": [asdict(x) for x in self.genes],
-            "ncbi_records": [asdict(x) for x in self.ncbi_records],
         }
 
 
@@ -105,10 +84,15 @@ def get_json(
 
 ORGANISMS = {
     "yeast": "Saccharomyces cerevisiae",
+    "saccharomyces cerevisiae": "Saccharomyces cerevisiae",
     "human": "Homo sapiens",
+    "homo sapiens": "Homo sapiens",
     "mouse": "Mus musculus",
+    "mus musculus": "Mus musculus",
     "ecoli": "Escherichia coli",
+    "e coli": "Escherichia coli",
     "e. coli": "Escherichia coli",
+    "escherichia coli": "Escherichia coli",
 }
 
 
@@ -122,10 +106,31 @@ def parse_query(q: str) -> ParsedQuery:
             break
 
     tokens = re.findall(r"[a-zA-Z]+", q_lower)
+
     stop = {
-        "find", "genes", "gene", "related", "to", "in", "of", "and",
-        "for", "associated", "involved", "with", "show", "me", "the"
+        "find",
+        "genes",
+        "gene",
+        "related",
+        "to",
+        "in",
+        "of",
+        "and",
+        "for",
+        "associated",
+        "involved",
+        "with",
+        "show",
+        "me",
+        "the",
+        "return",
+        "most",
+        "relevant",
+        "matches",
+        "biological",
+        "functions",
     }
+
     keywords = [t for t in tokens if t not in stop]
 
     ontology_terms: List[str] = []
@@ -149,13 +154,13 @@ def parse_query(q: str) -> ParsedQuery:
     )
 
 
-def search_go(term: str) -> List[GOTerm]:
+def search_go(term: str, rows: int = 5) -> List[GOTerm]:
     data = get_json(
         OLS4_SEARCH_URL,
         params={
             "q": term,
             "ontology": "go",
-            "rows": 5,
+            "rows": rows,
         },
     )
 
@@ -186,47 +191,6 @@ def search_go(term: str) -> List[GOTerm]:
     return results
 
 
-def ncbi_lookup(symbol: str, organism: Optional[str]) -> List[NCBIGene]:
-    term = symbol
-    if organism:
-        term += f' AND "{organism}"[Organism]'
-
-    search_data = get_json(
-        f"{NCBI_EUTILS_BASE}/esearch.fcgi",
-        {"db": "gene", "term": term, "retmode": "json", "retmax": 3},
-    )
-
-    ids = search_data.get("esearchresult", {}).get("idlist", [])
-    if not ids:
-        return []
-
-    summary_data = get_json(
-        f"{NCBI_EUTILS_BASE}/esummary.fcgi",
-        {"db": "gene", "id": ",".join(ids), "retmode": "json"},
-    )
-
-    results: List[NCBIGene] = []
-    result_block = summary_data.get("result", {})
-
-    for gene_id in ids:
-        record = result_block.get(gene_id, {})
-        organism_name = None
-        org_obj = record.get("organism")
-        if isinstance(org_obj, dict):
-            organism_name = org_obj.get("scientificname")
-
-        results.append(
-            NCBIGene(
-                gene_id=gene_id,
-                symbol=record.get("name"),
-                description=record.get("description"),
-                organism=organism_name,
-            )
-        )
-
-    return results
-
-
 class SemanticGeneWrapper:
     def run(self, query: str) -> Result:
         parsed = parse_query(query)
@@ -236,19 +200,7 @@ class SemanticGeneWrapper:
             go_terms.extend(search_go(term))
             time.sleep(0.2)
 
-        # No direct gene retrieval yet in this fallback version.
-        # It gets ontology terms reliably first, which is the part that is failing now.
-        genes: List[GeneAnnotation] = []
-
-        ncbi_records: List[NCBIGene] = []
-        # Optional weak enrichment: search NCBI using the ontology phrase itself
-        for phrase in parsed.ontology_terms[:1]:
-            ncbi_records.extend(ncbi_lookup(phrase, parsed.organism))
-            time.sleep(0.2)
-
         return Result(
             parsed_query=parsed,
             go_terms=go_terms,
-            genes=genes,
-            ncbi_records=ncbi_records,
         )

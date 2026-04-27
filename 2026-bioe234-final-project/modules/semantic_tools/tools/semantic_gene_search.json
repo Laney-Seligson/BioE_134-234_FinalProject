@@ -1,17 +1,16 @@
 {
   "id": "org.bioe234.function.semantic.semantic_gene_search.v1",
   "name": "Semantic Gene Search",
-  "description": "Search for genes from a natural-language biology query by mapping the query to Gene Ontology terms and retrieving associated genes, with optional NCBI Gene enrichment.",
+  "description": "Map a natural-language biology query to relevant Gene Ontology or ontology terms using OLS4.",
   "type": "function",
   "keywords": [
     "semantic search",
     "gene ontology",
     "GO",
-    "genes",
     "biology",
     "natural language",
-    "NCBI Gene",
-    "ontology"
+    "ontology",
+    "OLS4"
   ],
   "date_created": null,
   "date_last_modified": null,
@@ -19,58 +18,34 @@
     {
       "name": "query",
       "type": "string",
-      "description": "Natural-language biology query, such as 'genes related to oxidative stress in yeast'."
-    },
-    {
-      "name": "max_go_terms",
-      "type": "integer",
-      "optional": true,
-      "description": "Maximum number of matched GO terms to return. Default: 5."
-    },
-    {
-      "name": "max_gene_annotations",
-      "type": "integer",
-      "optional": true,
-      "description": "Maximum number of gene annotations to return. Default: 15."
-    },
-    {
-      "name": "enrich_ncbi",
-      "type": "boolean",
-      "optional": true,
-      "description": "Whether to retrieve NCBI Gene summaries for top returned genes. Default: true."
+      "description": "Natural-language biology query, such as 'oxidative stress in yeast'."
     }
   ],
   "outputs": [
     {
       "type": "object",
-      "description": "Structured result with parsed query, matched GO terms, gene annotations, NCBI gene records, and notes."
+      "description": "Structured result with parsed query and matched ontology terms."
     }
   ],
   "examples": [
     {
       "input": {
-        "query": "genes related to oxidative stress in yeast"
+        "query": "oxidative stress in yeast"
       },
       "output": {
         "result": {
           "parsed_query": {
-            "organism_label": "Saccharomyces cerevisiae"
-          }
-        }
-      }
-    },
-    {
-      "input": {
-        "query": "human genes involved in DNA repair",
-        "max_go_terms": 3,
-        "max_gene_annotations": 10,
-        "enrich_ncbi": true
-      },
-      "output": {
-        "result": {
-          "parsed_query": {
-            "organism_label": "Homo sapiens"
-          }
+            "organism": "Saccharomyces cerevisiae",
+            "ontology_terms": [
+              "response to oxidative stress"
+            ]
+          },
+          "go_terms": [
+            {
+              "go_id": "GO:0006979",
+              "label": "response to oxidative stress"
+            }
+          ]
         }
       }
     }

@@ -61,9 +61,9 @@ def _score_specificity(
     Rules:
       - No HIGH risk off-target sites (on-target counts as HIGH but
         is excluded from this tally)                                 +1
-      - ≤1 MEDIUM risk off-target site                                +1
-      - Total off-target sites ≤5                                     +1
-    Max score: 3.
+      - MEDIUM-risk and total off-target counts are reported and used
+        as tie-breakers, but are not scored with arbitrary cutoffs.
+    Max score: 1.
     """
     report = predict_offtargets(
         protospacer=protospacer,
@@ -88,10 +88,6 @@ def _score_specificity(
 
     score = 0
     if high == 0:
-        score += 1
-    if medium <= 1:
-        score += 1
-    if total <= 5:
         score += 1
 
     details = {
@@ -124,14 +120,15 @@ class RankGuides:
 
         2. Specificity (off-target safety) — uses predict_offtargets
            - No HIGH risk off-target sites                +1
-           - ≤1 MEDIUM risk off-target site               +1
-           - Total off-target sites ≤5                    +1
+           - MEDIUM-risk and total off-target counts are reported and
+             used as tie-breakers, not scored with arbitrary cutoffs.
            Sources: Hsu et al. 2013 (Nat Biotechnol);
                     Fu et al. 2013 (Nat Biotechnol).
 
-        Total score = efficiency + specificity. Max 6 for Cas9, 5 for Cas12a.
+        Total score = efficiency + specificity. Max 4 for Cas9, 3 for Cas12a.
         Guides are returned sorted by total score (desc), then by
-        efficiency (desc), then by total off-targets (asc).
+        efficiency (desc), then by HIGH-risk, MEDIUM-risk, and total
+        off-target counts (asc).
 
     Input:
         guides (list[dict]): list of guide dicts as returned by
@@ -208,11 +205,14 @@ class RankGuides:
                 "total_score": eff_score + spec_score,
             })
 
-        # primary: total score desc; secondary: efficiency desc; tertiary: total off-targets asc
+        # primary: total score desc; secondary: efficiency desc; then fewer
+        # predicted off-targets by severity as tie-breakers.
         scored.sort(
             key=lambda g: (
                 -g["total_score"],
                 -g["efficiency_score"],
+                g["specificity_details"]["high_risk_offtargets"],
+                g["specificity_details"]["medium_risk_offtargets"],
                 g["specificity_details"]["total_offtargets"],
             )
         )

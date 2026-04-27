@@ -229,7 +229,7 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
     ),
 
     "pcrispr": VectorSpec(
-        name="pCRISPR::rpsL",
+        name="pCRISPR",
         cloning_method="TypeIISOligoCloning",
         dna_source="annealed_oligos",
         enzyme="BsaI",
@@ -245,18 +245,17 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         cell_strain="HME63 or MG1655 carrying pCas9",
         selection="Kan",
         notes=(
-            "Two-plasmid E. coli system: pCRISPR::rpsL carries the spacer array; "
-            "pCas9 provides Cas9 and tracrRNA.  BsaI flanks an rpsL counter-"
-            "selection cassette.  The AAAAC bottom overhang (5 nt) is specific to "
-            "this architecture and wider than the mammalian 4-nt AAAC."
+            "Two-plasmid E. coli system: pCRISPR carries the spacer array under "
+            "J23119; pCas9 provides Cas9 and tracrRNA.  BsaI TypeIIS cloning.  "
+            "The AAAAC bottom overhang (5 nt) is wider than the mammalian 4-nt AAAC."
         ),
         citations=(
             Citation("Jiang et al. Nat Biotechnol 2013",
                      "https://doi.org/10.1038/nbt.2508",
-                     "pCas9/pCRISPR two-plasmid system; BsaI AAAC/AAAAC guide insertion"),
+                     "pCas9/pCRISPR two-plasmid E. coli system; BsaI guide insertion"),
             Citation("Addgene #44505",
                      "https://www.addgene.org/44505/",
-                     "pCRISPR::rpsL plasmid repository record"),
+                     "pCRISPR plasmid repository record"),
         ),
     ),
 "prc11_lbcpf1": VectorSpec(
@@ -455,6 +454,117 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         ),
     ),
 
+    # ── Yeast (Saccharomyces cerevisiae) ─────────────────────────────────────
+    # pML104: all-in-one S. cerevisiae vector.  SpCas9 under TEF1 promoter;
+    # sgRNA under SNR52 RNA Pol III promoter.  BsaI TypeIIS cloning.
+    # Overhangs must be verified from the plasmid map before ordering oligos.
+
+    "pml104": VectorSpec(
+        name="pML104",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
+        enzyme="BsaI",
+        promoter="SNR52",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="GGTCTC",
+        top_overhang="",    # verify from Addgene #67639 plasmid map / protocol
+        bottom_overhang="", # verify from Addgene #67639 plasmid map / protocol
+        u6_prefers_5prime_g=False,  # SNR52 does not require a 5′G
+        cell_strain="Saccharomyces cerevisiae",
+        selection="URA3",
+        notes=(
+            "All-in-one S. cerevisiae CRISPR vector.  SpCas9 under TEF1 promoter; "
+            "sgRNA under SNR52 RNA Pol III promoter.  Episomal 2μ origin; URA3 "
+            "selection.  BsaI TypeIIS cloning — verify exact 4-nt overhangs from "
+            "the plasmid map/protocol before ordering oligos."
+        ),
+        citations=(
+            Citation("Laughery et al. Yeast 2015",
+                     "https://doi.org/10.1002/yea.3080",
+                     "pML104 all-in-one S. cerevisiae CRISPR vector; BsaI guide cloning"),
+            Citation("Addgene #67639",
+                     "https://www.addgene.org/67639/",
+                     "pML104 plasmid repository record"),
+        ),
+    ),
+
+    # ── Caenorhabditis elegans ────────────────────────────────────────────────
+    # pDD162: Peft-3::Cas9 drives Cas9 in soma and germline; U6 promoter drives
+    # sgRNA.  Guide inserted by Gibson assembly (Ligation Independent Cloning).
+    # Vector linearisation primers must be supplied separately — see Addgene
+    # #47549 protocol and the Goldstein Lab CRISPR collection notes.
+
+    "pdd162": VectorSpec(
+        name="pDD162",
+        cloning_method="GibsonAssembly",
+        dna_source="overlap_fragment",
+        enzyme="Gibson",
+        promoter="U6",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recommended_overlap_bp=20,
+        u6_prefers_5prime_g=False,
+        cell_strain="Caenorhabditis elegans (germline microinjection)",
+        selection="Amp",
+        notes=(
+            "C. elegans all-in-one vector.  Peft-3 drives Cas9 in soma and "
+            "germline; U6 promoter drives the sgRNA.  Guide is inserted by Gibson "
+            "assembly (Ligation Independent Cloning) into a pre-built sgRNA "
+            "scaffold that is missing its 19-nt targeting sequence.  Provide "
+            "left_overlap_context and right_overlap_context from the plasmid map "
+            "flanking the empty targeting slot.  Vector linearisation primers are "
+            "NOT designed by this tool — add them manually before calling "
+            "create_construction_file with assembly_strategy='Gibson'."
+        ),
+        citations=(
+            Citation("Dickinson et al. Nat Methods 2013",
+                     "https://doi.org/10.1038/nmeth.2641",
+                     "pDD162 C. elegans Cas9+sgRNA vector; Gibson LIC guide insertion"),
+            Citation("Addgene #47549",
+                     "https://www.addgene.org/47549/",
+                     "pDD162 plasmid repository record; cloning method: Gibson LIC"),
+        ),
+    ),
+
+    # ── Drosophila melanogaster ───────────────────────────────────────────────
+    # pCFD3: dU6:3-driven single-guide vector.  SpCas9 is supplied in trans
+    # from a stable nos-cas9 or act5c-cas9 transgenic line.  BbsI TypeIIS
+    # cloning.  Overhangs must be verified from the plasmid map.
+
+    "pcfd3": VectorSpec(
+        name="pCFD3",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
+        enzyme="BbsI",
+        promoter="U6:3",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="GAAGAC",
+        top_overhang="",    # verify from Addgene #49410 plasmid map / protocol
+        bottom_overhang="", # verify from Addgene #49410 plasmid map / protocol
+        u6_prefers_5prime_g=False,  # dU6:3 does not enforce a 5′G requirement
+        cell_strain="Drosophila melanogaster (embryo injection)",
+        selection="Amp",
+        notes=(
+            "Single-guide Drosophila CRISPR vector.  dU6:3 RNA Pol III promoter "
+            "drives the sgRNA; SpCas9 is provided in trans by a nos-cas9 or "
+            "act5c-cas9 transgenic line.  BbsI TypeIIS cloning — verify exact "
+            "4-nt overhangs from the plasmid map/protocol before ordering oligos."
+        ),
+        citations=(
+            Citation("Port et al. PNAS 2014",
+                     "https://doi.org/10.1073/pnas.1405500111",
+                     "pCFD3 single-guide Drosophila vector; BbsI cloning; Cas9 in trans"),
+            Citation("Addgene #49410",
+                     "https://www.addgene.org/49410/",
+                     "pCFD3 plasmid repository record"),
+        ),
+    ),
+
     # ── Educational / backbone-only presets ─────────────────────────────────
     "pet28a": VectorSpec(
         name="pET28a",
@@ -543,6 +653,54 @@ GOLDEN_GATE_ENZYME_SPECS: dict[str, dict] = {
     "BsmBI": {"recognition": "CGTCTC", "spacer_len": 1},
     "Esp3I": {"recognition": "CGTCTC", "spacer_len": 1},  # BsmBI isoschizomer
     "BbsI":  {"recognition": "GAAGAC", "spacer_len": 2},
+}
+
+# ---------------------------------------------------------------------------
+# Known promoter and scaffold sequences for auto-cassette assembly
+# Used by RestrictionLigation when scaffold_in_vector=False and the promoter
+# and nuclease are both known — avoids asking the user for the full cassette.
+# Sequences sourced from published protocols; verify before ordering.
+# ---------------------------------------------------------------------------
+
+PROMOTER_SEQUENCES: dict[str, str] = {
+    # Anderson J23119 constitutive promoter (iGEM standard part BBa_J23119)
+    "J23119": "TTGACAGCTAGCTCAGTCCTAGGTATAATGCTAGC",
+}
+
+SCAFFOLD_SEQUENCES: dict[str, str] = {
+    # Standard SpCas9 sgRNA scaffold (Jinek et al. 2012 / Cong et al. 2013)
+    "SpCas9": "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGT"
+              "GGCACCGAGTCGGTGC",
+}
+
+
+# ---------------------------------------------------------------------------
+# Organism compatibility map
+# Maps lowercase target-organism keywords to substrings expected in
+# VectorSpec.cell_strain when the vector is compatible with that organism.
+# ---------------------------------------------------------------------------
+
+_ORGANISM_COMPAT: dict[str, list[str]] = {
+    "escherichia coli":          ["e. coli", "mg1655", "hme63", "mach1", "dh5"],
+    "e. coli":                   ["e. coli", "mg1655", "hme63", "mach1", "dh5"],
+    "bacteria":                  ["e. coli", "mg1655", "hme63", "mach1", "dh5"],
+    "mammalian":                 ["mammalian"],
+    "human":                     ["mammalian"],
+    "homo sapiens":              ["mammalian"],
+    "mouse":                     ["mammalian"],
+    "mus musculus":              ["mammalian"],
+    "zebrafish":                 ["zebrafish"],
+    "danio rerio":               ["zebrafish"],
+    "arabidopsis":               ["arabidopsis"],
+    "arabidopsis thaliana":      ["arabidopsis"],
+    "plant":                     ["arabidopsis", "agrobacterium"],
+    "saccharomyces cerevisiae":  ["saccharomyces"],
+    "s. cerevisiae":             ["saccharomyces"],
+    "yeast":                     ["saccharomyces"],
+    "caenorhabditis elegans":    ["caenorhabditis"],
+    "c. elegans":                ["caenorhabditis"],
+    "drosophila":                ["drosophila"],
+    "drosophila melanogaster":   ["drosophila"],
 }
 
 
@@ -663,6 +821,61 @@ class CRISPRCloningDesigner:
                 "Pass vector='custom' to design with a vector not in this list."
             )
         return VECTOR_SPECS[key]
+
+    # ── Organism compatibility check ─────────────────────────────────────────
+
+    def _check_organism_compatibility(
+        self, spec: VectorSpec, target_organism: str
+    ) -> Optional[dict]:
+        """
+        Return a needs_user_input dict if the vector's cell_strain is incompatible
+        with target_organism, or None if compatible or organism is unrecognised.
+        """
+        org_lower = target_organism.lower().strip()
+        strain_lower = spec.cell_strain.lower()
+
+        compatible_substrings: Optional[list[str]] = None
+        for key, substrings in _ORGANISM_COMPAT.items():
+            if key in org_lower or org_lower in key:
+                compatible_substrings = substrings
+                break
+
+        if compatible_substrings is None:
+            return None  # Unrecognised organism — don't block
+
+        if any(s in strain_lower for s in compatible_substrings):
+            return None  # Compatible
+
+        suggestions = [
+            k for k, v in VECTOR_SPECS.items()
+            if v.nuclease_system not in ("N/A",)
+            and any(s in v.cell_strain.lower() for s in compatible_substrings)
+        ]
+
+        suggestion_str = (
+            f"Compatible preset vectors for {target_organism}: "
+            + ", ".join(suggestions) + "."
+            if suggestions else
+            "No preset vectors are configured for this organism — "
+            "pass vector='custom' and supply cloning parameters manually."
+        )
+
+        return {
+            "status": "needs_user_input",
+            "cloning_method": spec.cloning_method,
+            "vector": spec.name,
+            "missing_fields": ["vector"],
+            "questions": [
+                f"Vector '{spec.name}' is designed for '{spec.cell_strain}', "
+                f"but the target organism is '{target_organism}'. "
+                + suggestion_str
+            ],
+            "notes": (
+                f"Organism mismatch: vector cell_strain='{spec.cell_strain}' "
+                f"vs target_organism='{target_organism}'. "
+                "To skip this check, pass vector='custom'."
+            ),
+        }
 
     # ── Requirements assessment ──────────────────────────────────────────────
 
@@ -1496,6 +1709,7 @@ class CRISPRCloningDesigner:
         vector: Optional[str] = None,
         cloning_method: Optional[str] = None,
         construct_name: Optional[str] = None,
+        target_organism: Optional[str] = None,
         # ── TypeIIS branch ────────────────────────────────────────────────
         protospacer: Optional[str] = None,
         top_overhang: Optional[str] = None,
@@ -1535,8 +1749,28 @@ class CRISPRCloningDesigner:
         # Resolve vector spec (None for custom)
         spec = self.resolve_vector(vector)
 
+        # Organism compatibility guard
+        if spec is not None and target_organism:
+            compat_check = self._check_organism_compatibility(spec, target_organism)
+            if compat_check:
+                return compat_check
+
         # Determine effective cloning method
         method = cloning_method or (spec.cloning_method if spec else None)
+
+        # Auto-assemble guide cassette for RestrictionLigation vectors where
+        # scaffold_in_vector=False and promoter/nuclease sequences are known.
+        if (
+            method == "RestrictionLigation"
+            and not guide_cassette_sequence
+            and protospacer
+            and spec is not None
+            and not spec.scaffold_in_vector
+        ):
+            promoter_seq  = PROMOTER_SEQUENCES.get(spec.promoter, "")
+            scaffold_seq  = SCAFFOLD_SEQUENCES.get(spec.nuclease_system, "")
+            if promoter_seq and scaffold_seq:
+                guide_cassette_sequence = promoter_seq + protospacer + scaffold_seq
 
         # Requirements check — may return early with needs_user_input
         check = self.assess_requirements(

@@ -114,7 +114,7 @@ from modules.crispr_tools.tools.cas_selector import CasSelector
 from modules.crispr_tools.tools.design_cas12a_crrna import DesignCas12aCrrna
 from modules.crispr_tools.tools.design_cloning_oligos import CRISPRCloningDesigner
 from modules.crispr_tools.tools.fetch_target_sequence import FetchTargetSequence
-from modules.crispr_tools.tools._utils import rank_guides
+from modules.crispr_tools.tools.rank_guides import rank_guides
 
 
 _CONSTRUCTION_INPUT_FIELDS = {
@@ -247,14 +247,17 @@ class RunFullCrisprWorkflow:
             guides = self.cas12a_designer.run(seq)
         else:
             raise ValueError(f"Unsupported nuclease system: {spec.nuclease_system}")
-        ranked = rank_guides(guides)
+        nuclease_key = "cas12a" if spec.nuclease_system == "Cas12a" else "cas9"
+        ranking = rank_guides(guides=guides, reference=seq, nuclease=nuclease_key)
+        ranked_guides    = ranking["ranked_guides"]
+        scoring_rationale = ranking["scoring_rationale"]
 
-        if guide_index >= len(ranked):
+        if guide_index >= len(ranked_guides):
             raise ValueError(
-                f"guide_index {guide_index} is out of range for {len(ranked)} designed guides."
+                f"guide_index {guide_index} is out of range for {len(ranked_guides)} designed guides."
             )
 
-        selected_guide = ranked[guide_index]
+        selected_guide = ranked_guides[guide_index]
         protospacer = selected_guide["protospacer"]
 
         cloning = self.oligo_designer.run(
@@ -266,8 +269,9 @@ class RunFullCrisprWorkflow:
             return {
                 "status": cloning.get("status", "needs_user_input"),
                 "sequence_info": sequence_info,
-                "guides": guides,
+                "guides": ranked_guides,
                 "selected_guide": selected_guide,
+                "scoring_rationale": scoring_rationale,
                 "protospacer": protospacer,
                 "cloning": cloning,
             }
@@ -290,8 +294,9 @@ class RunFullCrisprWorkflow:
         return {
             "status": "ready",
             "sequence_info": sequence_info,
-            "guides": guides,
+            "guides": ranked_guides,
             "selected_guide": selected_guide,
+            "scoring_rationale": scoring_rationale,
             "protospacer": protospacer,
             "cloning": cloning,
             "construction_file_inputs": construction_inputs,

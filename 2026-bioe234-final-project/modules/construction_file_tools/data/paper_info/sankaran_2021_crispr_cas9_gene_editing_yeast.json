@@ -1,0 +1,98 @@
+{
+    "resource_type": "paper_important_info_v2",
+    "paper_id": "sankaran_2021_crispr_cas9_gene_editing_yeast",
+    "title": "CRISPR-Cas9 Gene Editing in Yeast: A Molecular Biology and Bioinformatics Laboratory Module for Undergraduate and High School Students",
+    "source_pdf": "jmbe.00106-21.pdf",
+    "citation": {
+      "authors": [
+        "Saumya M. Sankaran",
+        "Justin D. Smith",
+        "Kevin R. Roy"
+      ],
+      "journal": "Journal of Microbiology & Biology Education",
+      "year": 2021,
+      "doi": "10.1128/jmbe.00106-21"
+    },
+    "organism": "Saccharomyces cerevisiae",
+    "system": "CRISPR-Cas9",
+    "application": [
+      "ADE2 gene inactivation",
+      "comparison of gRNA editing efficiencies",
+      "NHEJ-mediated indel generation",
+      "HDR-mediated ADE2 ORF deletion using donor DNA",
+      "educational laboratory module"
+    ],
+    "targets": [
+      "ADE2"
+    ],
+    "vectors": [
+      "Cas9-only control plasmid",
+      "Cas9+gRNA plasmid",
+      "single-plasmid system containing constitutively active Cas9 and gRNA",
+      "Addgene course kit plasmids"
+    ],
+    "enzymes": [
+      "Cas9"
+    ],
+    "assembly_method": "Pre-cloned gRNA plasmids are used in the module; students design/analyze gRNAs, but the main paper does not describe a full plasmid cloning assembly workflow.",
+    "delivery_method": [
+      "yeast transformation",
+      "cotransformation of Cas9/gRNA plasmid and linear donor DNA"
+    ],
+    "validation_methods": [
+      "colony color phenotype",
+      "red/white colony counting",
+      "editing efficiency calculation",
+      "PCR amplification of edited ADE2 locus",
+      "amplicon length analysis",
+      "DNA sequencing"
+    ],
+    "oligo_information": {
+      "explicit_sequences": [],
+      "design_rules": [
+        {
+          "name": "ADE2_target_selection",
+          "rule_type": "target_selection",
+          "description": "Students identify SpCas9 PAMs and associated gRNA sequences in the ADE2 gene, first manually and then using Benchling CRISPR analysis."
+        },
+        {
+          "name": "Cas9_PAM_rule",
+          "rule_type": "guide_design",
+          "description": "Use Streptococcus pyogenes Cas9 targeting logic to identify PAM sequences, matching gRNA sequences, and corresponding Cas9 cut sites."
+        },
+        {
+          "name": "Guide_score_comparison",
+          "rule_type": "guide_selection",
+          "description": "Compare candidate gRNA target locations and predicted on-target/off-target scores before choosing a guide."
+        },
+        {
+          "name": "Multiple_guide_efficiency_rule",
+          "rule_type": "experimental_design",
+          "description": "Test different gRNAs targeting the same ADE2 gene because predicted scores may not match empirical editing efficiency."
+        },
+        {
+          "name": "Donor_template_rule",
+          "rule_type": "HDR_design",
+          "description": "For precise ADE2 ORF deletion, cotransform a linear donor template with the Cas9+gRNA plasmid."
+        }
+      ],
+      "interpretation_notes": [
+        "The main paper does not provide full construction-ready oligo sequences.",
+        "The paper references supplemental appendices for detailed student protocols, plasmids, and materials.",
+        "Best suited for shorthand construction workflow generation rather than direct sequence-level reconstruction."
+      ]
+    },
+    "key_constraints": [
+      "Full plasmid sequences are not provided in the main paper.",
+      "The four ADE2 gRNA plasmids are described as previously cloned and ready to use.",
+      "Exact gRNA sequences and cloning oligos are not fully listed in the main text.",
+      "Detailed materials and methods are located in supplemental appendices.",
+      "Best suited for paper_shorthand mode rather than sequence_build mode."
+    ],
+    "notes": [
+      "Students perform a dry lab using Saccharomyces Genome Database and Benchling to design and evaluate ADE2 gRNAs.",
+      "The experimental setup includes three transformations: Cas9-only control, Cas9+gRNA without donor, and Cas9+gRNA with donor.",
+      "Loss of ADE2 function produces a red colony phenotype, allowing visual scoring of editing outcomes.",
+      "Follow-up analysis can distinguish NHEJ and HDR outcomes by PCR and sequencing."
+    ]
+  }

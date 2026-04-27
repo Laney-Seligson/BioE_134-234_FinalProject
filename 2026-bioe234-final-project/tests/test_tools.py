@@ -761,6 +761,8 @@ def test_rank_guides_scores_single_guide_cas9():
     )
     top = result["ranked_guides"][0]
     assert top["efficiency_score"] == 3
+    assert top["specificity_score"] == 1
+    assert top["total_score"] == 4
     assert top["efficiency_details"]["gc_content_ok"] is True
     assert top["efficiency_details"]["no_polyt_run"] is True
     assert top["efficiency_details"]["g_at_pam_proximal"] is True
@@ -820,6 +822,8 @@ def test_rank_guides_cas12a_max_efficiency_is_two():
     )
     top = result["ranked_guides"][0]
     assert top["efficiency_score"] <= 2
+    assert top["specificity_score"] == 1
+    assert top["total_score"] == 3
     assert "g_at_pam_proximal" not in top["efficiency_details"]
 
 
@@ -1202,5 +1206,3 @@ def test_verify_edit_emits_citations():
     # Cas9 mechanism + primer Tm + ICE/TIDE protocol papers should all appear
     assert "Jinek" in labels
     assert "Wallace" in labels
-
-

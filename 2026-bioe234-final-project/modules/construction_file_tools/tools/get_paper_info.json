@@ -1,7 +1,7 @@
 {
   "id": "org.bioe234.function.get_paper_info.v2",
   "name": "get_paper_info",
-  "description": "Load a curated paper information JSON record from the crispr_tools data directory. Supports both v1 and v2 schemas. Returns normalized fields (targets, vectors, enzymes, assembly_method, delivery_method, validation_methods, key_constraints, notes) so downstream tools can operate consistently. v2 records may additionally include structured oligo_information (explicit_sequences and design_rules).",
+  "description": "Load a curated paper information JSON record from the construction_file_tools data directory. Supports both v1 and v2 schemas. Returns normalized fields (targets, vectors, enzymes, assembly_method, delivery_method, validation_methods, key_constraints, notes) so downstream tools can operate consistently. v2 records may additionally include structured oligo_information (explicit_sequences and design_rules).",
   "type": "function",
   "keywords": [
     "paper",

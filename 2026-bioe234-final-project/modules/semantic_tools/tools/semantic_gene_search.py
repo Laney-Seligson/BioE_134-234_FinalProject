@@ -1,7 +1,10 @@
 """
 Semantic Gene Search MCP tool.
 
-Natural language biology query -> GO terms -> optional NCBI metadata
+Natural language biology query -> GO / ontology terms
+
+This tool only performs semantic concept discovery.
+Gene lookup should be handled by go_term_gene_lookup.
 """
 
 from modules.semantic_tools.semantic_wrapper import SemanticGeneWrapper
@@ -11,18 +14,16 @@ class SemanticGeneSearch:
     """
     Description:
         Search for biology concepts using a natural-language query by mapping
-        the query to Gene Ontology terms, with optional exploratory NCBI metadata.
+        the query to Gene Ontology / ontology terms.
 
     Input:
         query (str): Natural-language biology query, e.g.
-                     "genes related to oxidative stress in yeast"
+                     "oxidative stress in yeast"
 
     Output:
         dict: Structured result containing:
               - parsed_query
               - go_terms
-              - genes
-              - ncbi_records
     """
 
     def initiate(self) -> None:

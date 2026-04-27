@@ -43,20 +43,6 @@
       "description": "Structured gene lookup result."
     }
   ],
-  "examples": [
-    {
-      "input": {
-        "go_id": "GO:0006979",
-        "go_label": "response to oxidative stress",
-        "organism": "Saccharomyces cerevisiae"
-      },
-      "output": {
-        "result": {
-          "go_id": "GO:0006979"
-        }
-      }
-    }
-  ],
   "execution_details": {
     "language": "Python",
     "source": "modules/annotation_tools/tools/go_term_gene_lookup.py",

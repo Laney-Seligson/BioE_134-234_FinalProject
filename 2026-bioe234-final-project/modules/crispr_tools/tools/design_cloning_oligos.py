@@ -655,6 +655,24 @@ GOLDEN_GATE_ENZYME_SPECS: dict[str, dict] = {
     "BbsI":  {"recognition": "GAAGAC", "spacer_len": 2},
 }
 
+# ---------------------------------------------------------------------------
+# Known promoter and scaffold sequences for auto-cassette assembly
+# Used by RestrictionLigation when scaffold_in_vector=False and the promoter
+# and nuclease are both known — avoids asking the user for the full cassette.
+# Sequences sourced from published protocols; verify before ordering.
+# ---------------------------------------------------------------------------
+
+PROMOTER_SEQUENCES: dict[str, str] = {
+    # Anderson J23119 constitutive promoter (iGEM standard part BBa_J23119)
+    "J23119": "TTGACAGCTAGCTCAGTCCTAGGTATAATGCTAGC",
+}
+
+SCAFFOLD_SEQUENCES: dict[str, str] = {
+    # Standard SpCas9 sgRNA scaffold (Jinek et al. 2012 / Cong et al. 2013)
+    "SpCas9": "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGT"
+              "GGCACCGAGTCGGTGC",
+}
+
 
 # ---------------------------------------------------------------------------
 # Organism compatibility map
@@ -1739,6 +1757,20 @@ class CRISPRCloningDesigner:
 
         # Determine effective cloning method
         method = cloning_method or (spec.cloning_method if spec else None)
+
+        # Auto-assemble guide cassette for RestrictionLigation vectors where
+        # scaffold_in_vector=False and promoter/nuclease sequences are known.
+        if (
+            method == "RestrictionLigation"
+            and not guide_cassette_sequence
+            and protospacer
+            and spec is not None
+            and not spec.scaffold_in_vector
+        ):
+            promoter_seq  = PROMOTER_SEQUENCES.get(spec.promoter, "")
+            scaffold_seq  = SCAFFOLD_SEQUENCES.get(spec.nuclease_system, "")
+            if promoter_seq and scaffold_seq:
+                guide_cassette_sequence = promoter_seq + protospacer + scaffold_seq
 
         # Requirements check — may return early with needs_user_input
         check = self.assess_requirements(

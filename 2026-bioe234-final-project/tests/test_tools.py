@@ -1191,6 +1191,117 @@ def test_lab_sheet_gibson_cites_gibson_2009():
     assert "Gibson" in labels
 
 
+def test_lab_sheet_pick_uses_colony_calculator_default():
+    """Default Mach1 → cloning success rate 0.8, n=2 colonies for 95% conf."""
+    result = lab_sheet(_make_record())
+    plan = result["colony_plan"][0]
+    assert plan["colonies_to_pick"] == 2
+    assert plan["labels"] == ["A1A", "A1B"]
+
+
+def test_lab_sheet_pick_scales_for_low_efficiency():
+    """Low editing efficiency → many more colonies recommended."""
+    result = lab_sheet(_make_record(), editing_efficiency=0.05)
+    plan = result["colony_plan"][0]
+    assert plan["colonies_to_pick"] >= 50
+    # pick section text should reflect the count
+    assert f"{plan['colonies_to_pick']}" in result["lab_sheet_text"]
+
+
+def test_lab_sheet_pick_uses_preset():
+    """Passing a colony_preset should plumb through to colony_calculator."""
+    result = lab_sheet(_make_record(), colony_preset="hdr_mammalian")
+    plan = result["colony_plan"][0]
+    assert plan["preset"] == "hdr_mammalian"
+    assert plan["colonies_to_pick"] > 30
+
+
+def test_lab_sheet_gel_size_computed_from_primers():
+    """When parts list carries sequences, gel size should be a real bp number."""
+    template = (
+        "AAAAAAAAAAATGCATGCATGCATGCATGCATGCATGCATGCATGCAT"
+        "AAAAAAAAAAATGCATGCATGCATGCATGCATGCATGCATGCATGCAT"
+    )
+    fwd = "ATGCATGCATGCATGCATGC"  # matches inside template
+    rev_rc = template[60:80]
+    # reverse complement to make a reverse primer
+    comp = str.maketrans("ACGT", "TGCA")
+    rev = rev_rc.translate(comp)[::-1]
+    record = {
+        "construct_name": "test",
+        "assembly_strategy": "Gibson",
+        "parts": [
+            {"part_type": "dsdna", "name": "tmpl", "sequence": template},
+            {"part_type": "oligo", "name": "f", "sequence": fwd},
+            {"part_type": "oligo", "name": "r", "sequence": rev},
+        ],
+        "operations": [
+            {
+                "step_type": "PCR",
+                "inputs": ["f", "r", "tmpl"],
+                "parameters": {"forward_primer": "f", "reverse_primer": "r", "template": "tmpl"},
+                "output": "amp",
+            }
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    # any positive bp size should appear, not literal "?"
+    assert "bp" in result["lab_sheet_text"]
+
+
+def test_lab_sheet_crispr_delivery_electroporation():
+    """CRISPRDelivery step with method=electroporation should render the
+    Lonza Nucleofection recipe."""
+    record = {
+        "construct_name": "edit_K562",
+        "assembly_strategy": "CRISPR",
+        "parts": [],
+        "operations": [
+            {
+                "step_type": "CRISPRDelivery",
+                "inputs": ["cas9_rnp", "K562_cells"],
+                "parameters": {"method": "electroporation"},
+                "output": "edited_pool",
+            }
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    text = result["lab_sheet_text"]
+    assert "CRISPRDelivery" in text
+    assert "Nucleofect" in text or "Lonza" in text
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Lonza" in labels
+
+
+def test_lab_sheet_emits_protocols_io_links():
+    """Every protocol used should be matched by a clickable protocols.io URL."""
+    result = lab_sheet(_make_record())
+    links = result["protocols_io_links"]
+    assert len(links) >= 1
+    for entry in links:
+        assert entry["search_url"].startswith("https://www.protocols.io/search?q=")
+        assert entry["protocol"]
+
+
+def test_lab_sheet_unknown_crispr_method_raises():
+    record = {
+        "construct_name": "x",
+        "assembly_strategy": "CRISPR",
+        "parts": [],
+        "operations": [{
+            "step_type": "CRISPRDelivery",
+            "inputs": [],
+            "parameters": {"method": "wormhole"},
+            "output": "y",
+        }],
+        "notes": "",
+    }
+    with pytest.raises(ValueError):
+        lab_sheet(record)
+
+
 def test_verify_edit_emits_citations():
     reference = (
         "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTT"

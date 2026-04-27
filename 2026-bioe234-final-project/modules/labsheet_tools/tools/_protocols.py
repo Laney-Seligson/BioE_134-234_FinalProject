@@ -123,6 +123,80 @@ PROTOCOLS: dict[str, Protocol] = {
               "and a midiprep kit instead.",
     ),
 
+    # CRISPR RNP assembly (IDT Alt-R)
+    "crispr_rnp_assembly": Protocol(
+        name="Cas9 RNP Assembly (IDT Alt-R, 5 uL)",
+        reagents=(
+            ("Alt-R crRNA (100 uM)", "1 uL"),
+            ("Alt-R tracrRNA (100 uM)", "1 uL"),
+            ("Nuclease-Free Duplex Buffer", "1 uL"),
+            ("Alt-R S.p. Cas9 Nuclease V3 (10 ug/uL = ~62 uM)", "1 uL"),
+            ("PBS or Opti-MEM (delivery buffer)", "1 uL"),
+        ),
+        program="Anneal crRNA+tracrRNA: 95C 5 min, slow cool to RT (-1C/sec). "
+                "Complex with Cas9 at 1:1.2 (RNA:protein) molar ratio: "
+                "incubate at room temperature 20 min. Use within 1 hr.",
+        source="idt_altr_rnp",
+        notes="Final RNP concentration ~10 uM. Scale up linearly for "
+              "multiple electroporations or larger lipofection volumes.",
+    ),
+
+    # CRISPR delivery — electroporation (Lonza Nucleofector)
+    "crispr_electroporation": Protocol(
+        name="RNP Electroporation (Lonza 4D Nucleofector, 20 uL cuvette)",
+        reagents=(
+            ("Pre-formed Cas9 RNP (10 uM, from crispr_rnp_assembly)", "5 uL"),
+            ("Cells in P3/SF/SE Nucleofection Solution", "15 uL"),
+            ("(target: 1e5 - 5e5 cells per cuvette)", ""),
+        ),
+        program="Resuspend cells in Lonza solution; add RNP; transfer to "
+                "Nucleocuvette; run cell-line-specific program (e.g. CA-137 "
+                "for K562, CM-138 for HEK293, EH-100 for primary T cells); "
+                "transfer to pre-warmed media within 10 min.",
+        source="lonza_nucleofection",
+        notes="Always check Lonza's published optimization tables for the "
+              "exact program for your cell line. RNP > plasmid for editing "
+              "efficiency and lower off-target rate.",
+    ),
+
+    # CRISPR delivery — lipofection (Lipofectamine CRISPRMAX)
+    "crispr_lipofection": Protocol(
+        name="RNP Lipofection (Lipofectamine CRISPRMAX, 24-well)",
+        reagents=(
+            ("Cas9 RNP (7.5 pmol)", "1.5 uL of 5 uM RNP"),
+            ("Cas9 Plus Reagent", "1 uL"),
+            ("Opti-MEM (mix 1)", "25 uL"),
+            ("Lipofectamine CRISPRMAX", "1.5 uL"),
+            ("Opti-MEM (mix 2)", "25 uL"),
+        ),
+        program="Combine RNP + Plus Reagent + Opti-MEM (mix 1). In parallel, "
+                "combine CRISPRMAX + Opti-MEM (mix 2). Incubate each 5 min RT. "
+                "Combine 1:1; incubate 5 min RT. Add 50 uL complex to cells "
+                "in 500 uL antibiotic-free media. Refresh media at 24 hr.",
+        source="thermo_crisprmax",
+        notes="Use for adherent cell lines that tolerate lipofection. For "
+              "primary cells or hard-to-transfect lines, prefer "
+              "crispr_electroporation instead.",
+    ),
+
+    # In-vitro transcription of sgRNA (NEB EnGen E3322)
+    "crispr_ivt_sgrna": Protocol(
+        name="sgRNA In Vitro Transcription (NEB EnGen E3322, 20 uL)",
+        reagents=(
+            ("Target-specific DNA oligo (1 uM, with T7 promoter + spacer)", "1 uL"),
+            ("sgRNA Scaffold DNA Mix", "2 uL"),
+            ("NTP Buffer Mix", "10 uL"),
+            ("EnGen sgRNA Enzyme Mix (T7 RNAP + others)", "2 uL"),
+            ("Nuclease-free water", "5 uL"),
+        ),
+        program="37C 30 min; add 1 uL DNase I, 37C 15 min; LiCl precipitate "
+                "or column purify (Monarch RNA Cleanup). Quantify; store -80C.",
+        source="neb_e3322_ivt",
+        notes="Use IVT sgRNA when you need many guides cheaply (e.g. screening). "
+              "Synthetic Alt-R guides (used in crispr_rnp_assembly) give higher "
+              "and more reproducible editing in mammalian cells.",
+    ),
+
     # Sanger sequencing premix (UC Berkeley standard)
     "sanger_sequencing": Protocol(
         name="Sanger Sequencing Premix Submission",

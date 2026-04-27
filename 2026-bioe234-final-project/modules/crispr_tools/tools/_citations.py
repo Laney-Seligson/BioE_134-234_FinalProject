@@ -271,6 +271,46 @@ CITATIONS: dict[str, Citation] = {
               "containing 200-500 ng plasmid DNA and 3.2 pmol primer "
               "(typical: 4 uL miniprep DNA + 3 uL of 2.66 uM primer + ddH2O).",
     ),
+
+    # IDT Alt-R Cas9 RNP assembly (vendor protocol; widely used for
+    # mammalian electroporation/lipofection experiments).
+    "idt_altr_rnp": Citation(
+        label="IDT Alt-R CRISPR-Cas9 System: RNP assembly protocol",
+        url_or_reference="https://www.idtdna.com/pages/products/crispr-genome-editing/alt-r-crispr-cas9-system",
+        claim="Anneal Alt-R crRNA + tracrRNA at equimolar (1 uL each, 100 uM "
+              "stock) in 1 uL Duplex Buffer; complex with Cas9 protein at 1:1.2 "
+              "molar ratio (RNA:protein) at room temp 20 min before delivery.",
+    ),
+
+    # Lonza/Neon electroporation (foundational Lonza Nucleofector protocol).
+    "lonza_nucleofection": Citation(
+        label="Lonza Nucleofector (4D) CRISPR/Cas9 RNP delivery protocol",
+        url_or_reference="https://bioscience.lonza.com/lonza_bs/CH/en/Cell-and-Transfection",
+        claim="20 uL Nucleocuvette: 100,000-500,000 cells in P3/SF/SE solution, "
+              "add 5 uL pre-formed RNP complex, run program (e.g. CA-137 for "
+              "K562, CM-138 for HEK293, EH-100 for primary T cells); transfer "
+              "to pre-warmed media within 10 min.",
+    ),
+
+    # Lipofection of CRISPRMAX (ThermoFisher) for plasmid/RNP transfection.
+    "thermo_crisprmax": Citation(
+        label="ThermoFisher Lipofectamine CRISPRMAX user guide",
+        url_or_reference="https://www.thermofisher.com/order/catalog/product/CMAX00001",
+        claim="24-well lipofection: dilute 7.5 pmol Cas9 RNP + 1 uL Cas9 Plus "
+              "Reagent in 25 uL Opti-MEM; in parallel dilute 1.5 uL CRISPRMAX "
+              "in 25 uL Opti-MEM; combine 1:1, incubate 5 min RT, add 50 uL "
+              "complex to cells in 500 uL antibiotic-free media.",
+    ),
+
+    # NEB EnGen sgRNA Synthesis Kit / IVT (E3322).
+    "neb_e3322_ivt": Citation(
+        label="NEB EnGen sgRNA Synthesis Kit (E3322)",
+        url_or_reference="https://www.neb.com/en-us/products/e3322-engen-sgrna-synthesis-kit-s-pyogenes",
+        claim="One-pot in vitro transcription of sgRNA from a target-specific "
+              "DNA oligo: 1 uL target oligo (1 uM) + 2 uL sgRNA scaffold mix + "
+              "10 uL NTP buffer mix + 2 uL T7 RNA polymerase mix + 5 uL ddH2O; "
+              "incubate 37C 30 min; DNase I treat 15 min; column or LiCl purify.",
+    ),
 }
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
-from modules.crispr_tools.tools._citations import cites, format_citations
+from modules.crispr_tools.tools.citations import cites, format_citations
 
 _SUPPORTED_NUCLEASES = {"cas9", "cas12a"}
 

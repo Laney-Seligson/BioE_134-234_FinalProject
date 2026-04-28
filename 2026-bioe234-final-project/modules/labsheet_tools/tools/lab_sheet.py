@@ -6,7 +6,7 @@ from modules.labsheet_tools.tools._protocols import (
     protocol_source_record,
 )
 from modules.labsheet_tools.tools.colony_calculator import colony_calculator
-from modules.crispr_tools.tools._citations import cites, format_citations
+from modules.crispr_tools.tools.citations import cites, format_citations
 
 _RESCUE_ANTIBIOTICS = {"Spec", "spectinomycin", "Spc"}
 

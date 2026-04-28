@@ -4,7 +4,7 @@ Canonical wet-lab protocol registry.
 Every recipe rendered into a lab sheet should resolve to one of these
 entries. Volumes and conditions are transcribed from manufacturer manuals
 or the original primary literature, never invented. Each entry carries a
-`source` key that resolves into _citations.CITATIONS, so the lab_sheet
+`source` key that resolves into citations.CITATIONS, so the lab_sheet
 output can ship a `protocol_sources` field that is auditable end-to-end.
 
 If you need to update a recipe (e.g. NEB revises a kit insert), edit the
@@ -15,7 +15,7 @@ Schema:
     Protocol.reagents    — ordered list of (reagent, volume) tuples; the
                            sum of volumes is the total reaction volume
     Protocol.program     — thermocycler program / incubation conditions
-    Protocol.source      — citation key (must exist in _citations.CITATIONS)
+    Protocol.source      — citation key (must exist in citations.CITATIONS)
     Protocol.notes       — optional protocol-specific notes
 """
 
@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from modules.crispr_tools.tools._citations import CITATIONS
+from modules.crispr_tools.tools.citations import CITATIONS
 
 
 @dataclass(frozen=True)

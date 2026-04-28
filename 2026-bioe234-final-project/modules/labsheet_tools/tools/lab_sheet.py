@@ -9,6 +9,11 @@ from modules.labsheet_tools.tools.colony_calculator import colony_calculator
 from modules.labsheet_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.citations import cites, format_citations
 
+# predict_editing_efficiency is imported lazily inside run() — keeps
+# lab_sheet usable in lightweight envs that don't ship the crispr scoring
+# tool, and lets us fail soft (skip the prediction, render the sheet).
+_PREDICT_EFFICIENCY_KNOWN = {"cas9", "cas12a"}
+
 _RESCUE_ANTIBIOTICS = {"Spec", "spectinomycin", "Spc"}
 
 # Map of CRISPRDelivery method name → registry protocol key. Lets the
@@ -714,6 +719,57 @@ def _format_crispr_delivery_section(op: dict, thread: str) -> str:
     ]).rstrip()
 
 
+def _format_unknown_step_section(op: dict, thread: str) -> str:
+    """Last-resort renderer for a step_type lab_sheet doesn't recognize.
+    Better than silently dropping it — the user sees the inputs/outputs
+    and a flag that no canonical recipe is on file."""
+    step_type = op.get("step_type", "Unknown")
+    inputs = op.get("inputs", [])
+    output = op.get("output", "")
+    params = op.get("parameters", {})
+    return "\n".join([
+        f"{thread}: {step_type}",
+        "",
+        "WARNING: lab_sheet does not have a canonical recipe for this step.",
+        "The construction file specified the following — fill in volumes and",
+        "thermocycler settings against the manufacturer's protocol manually.",
+        "",
+        f"inputs: {', '.join(inputs) if inputs else '(none)'}",
+        f"output: {output}",
+        f"parameters: {params}",
+    ])
+
+
+def _maybe_predict_efficiency(
+    protospacer: str | None,
+    pam: str | None,
+    nuclease: str,
+    delivery: str,
+    outcome: str,
+) -> dict | None:
+    """Best-effort call into predict_editing_efficiency. Returns the
+    full prediction dict on success, or None if the inputs are
+    insufficient or the tool errors out (we don't want lab_sheet to
+    crash because the predictor was strict about a PAM)."""
+    if not protospacer or not pam:
+        return None
+    if nuclease.lower() not in _PREDICT_EFFICIENCY_KNOWN:
+        return None
+    try:
+        from modules.crispr_tools.tools.predict_editing_efficiency import (
+            predict_editing_efficiency,
+        )
+        return predict_editing_efficiency(
+            protospacer=protospacer,
+            pam=pam,
+            nuclease=nuclease.lower(),
+            delivery=delivery,
+            outcome=outcome,
+        )
+    except Exception:
+        return None
+
+
 def _format_direct_synthesis_section(op: dict, thread: str) -> str:
     inputs = op.get("inputs", [])
     output = op.get("output", "")
@@ -1051,6 +1107,9 @@ class LabSheet:
         protospacer: str | None = None,
         verification_reference: str | None = None,
         nuclease: str = "cas9",
+        pam: str | None = None,
+        delivery: str = "plasmid",
+        outcome: str = "nhej",
     ) -> dict:
         if not construction_record:
             raise ValueError("construction_record must not be empty.")
@@ -1060,6 +1119,18 @@ class LabSheet:
         operations = construction_record.get("operations", [])
         notes = construction_record.get("notes", "")
         parts_map = _build_parts_map(construction_record.get("parts", []))
+
+        # Best-effort pre-experiment editing efficiency prediction.
+        # Surfaced in the output so the user knows what to expect at the
+        # bench BEFORE running ICE/TIDE on real data.
+        predicted_eff = _maybe_predict_efficiency(
+            protospacer, pam, nuclease, delivery, outcome,
+        )
+        # If we got a prediction, also feed it into the colony plan so
+        # colony counts are guide-specific instead of preset-generic
+        # (only when caller didn't already pin editing_efficiency).
+        if predicted_eff and editing_efficiency is None and colony_preset is None:
+            editing_efficiency = predicted_eff["on_target_efficiency_pct"] / 100.0
 
         # If the caller passes a protospacer + reference, auto-call
         # verify_edit to design guide-specific Sanger primers that span
@@ -1109,6 +1180,16 @@ class LabSheet:
         typeiis_ops = [op for op in operations if op.get("step_type") == "TypeIISOligoCloning"]
         rxn_lig_ops = [op for op in operations if op.get("step_type") == "RestrictionLigation"]
 
+        # Safety net: any step_type not in a known bucket gets explicit
+        # placeholder rendering instead of being silently dropped (the
+        # bug that made TypeIIS / RestrictionLigation lab sheets read
+        # like 1-line summaries).
+        _known = {
+            "PCR", "GoldenGate", "Gibson", "Transform", "DirectSynthesis",
+            "TypeIISOligoCloning", "RestrictionLigation", "CRISPRDelivery",
+        }
+        unknown_ops = [op for op in operations if op.get("step_type") not in _known]
+
         # Decide colony-screening burden once per Transform op via the
         # colony_calculator tool, instead of hardcoding "pick 2 colonies".
         transform_plans = [
@@ -1150,6 +1231,9 @@ class LabSheet:
 
         for op in direct_ops:
             sections.append(_format_direct_synthesis_section(op, thread))
+
+        for op in unknown_ops:
+            sections.append(_format_unknown_step_section(op, thread))
 
         if include_notes and notes:
             sections.append(f"note:\n{notes}")
@@ -1249,6 +1333,18 @@ class LabSheet:
             "verify_before_use": _VERIFY_DISCLAIMER,
             "colony_plan": colony_plan_summary,
             "protocols_io_links": protocols_io_links,
+            "predicted_editing_efficiency": (
+                {
+                    "on_target_efficiency_pct": predicted_eff["on_target_efficiency_pct"],
+                    "confidence_range": predicted_eff["confidence_range"],
+                    "interpretation": predicted_eff["interpretation"],
+                    "warnings": predicted_eff.get("warnings", []),
+                    "delivery": predicted_eff.get("delivery"),
+                    "outcome": predicted_eff.get("outcome"),
+                }
+                if predicted_eff
+                else None
+            ),
             "verify_edit_summary": (
                 {
                     "protospacer": verify_edit_result["protospacer"],

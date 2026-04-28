@@ -421,6 +421,56 @@ def _format_assemble_section(op: dict, thread: str) -> str:
     ])
 
 
+def _format_restriction_ligation_section(op: dict, thread: str) -> str:
+    """Render a RestrictionLigation step (vector + insert, one or two
+    restriction enzymes, then T4 ligation). Without this section the
+    workflow would jump straight from PCR to Transform — the same
+    biological-completeness gap that TypeIISOligoCloning had."""
+    proto_key = "restriction_ligation"
+    proto = PROTOCOLS[proto_key]
+    params = op.get("parameters", {})
+    inputs = op.get("inputs", [])
+    output = op.get("output", "")
+    enzyme = params.get("enzyme", "EcoRI-HF + BamHI-HF")
+
+    backbone = inputs[0] if len(inputs) > 0 else "vector"
+    insert = inputs[1] if len(inputs) > 1 else "insert"
+
+    src_rows = [
+        [backbone, f"box{thread}/A1"],
+        [insert, f"box{thread}/B1"],
+    ]
+    source_table = _col_table(["dna", "location"], src_rows)
+    samples_table = _col_table(
+        ["label", "fragments", "product"],
+        [[thread, f"{backbone} / {insert}", output]],
+    )
+
+    return "\n".join([
+        f"{thread}: RestrictionLigation",
+        "",
+        f"protocol: {proto.name}",
+        f"enzyme(s): {enzyme}",
+        "",
+        "reaction:",
+        reagent_block(proto_key),
+        "",
+        f"program: {proto.program}",
+        "",
+        "source:",
+        source_table,
+        "",
+        "samples:",
+        samples_table,
+        "",
+        "destination: thermocycler1A (digest) -> bench (ligate)",
+        "",
+        f"notes:\n{proto.notes}",
+        "",
+        _ENZYME_NOTE,
+    ])
+
+
 def _format_typeiis_oligo_section(op: dict, thread: str) -> str:
     """Render a TypeIISOligoCloning step. The construction record's
     inputs are [top_oligo, bottom_oligo, vector] and parameters carry
@@ -699,6 +749,7 @@ def _build_tsv(
     transform_ops = [op for op in operations if op.get("step_type") == "Transform"]
     direct_ops = [op for op in operations if op.get("step_type") == "DirectSynthesis"]
     typeiis_ops = [op for op in operations if op.get("step_type") == "TypeIISOligoCloning"]
+    rxn_lig_ops = [op for op in operations if op.get("step_type") == "RestrictionLigation"]
 
     source_map: dict[str, str] = {}
 
@@ -784,6 +835,26 @@ def _build_tsv(
             "destination": dest,
             "program": prog,
             "notes": note,
+        }))
+
+    # RestrictionLigation rows
+    for op in rxn_lig_ops:
+        params = op.get("parameters", {})
+        inputs = op.get("inputs", [])
+        enzyme = params.get("enzyme", "EcoRI-HF + BamHI-HF")
+        rows.append(_tsv_row({
+            "section": f"{thread}: RestrictionLigation",
+            "label": thread,
+            "fragments": ", ".join(inputs),
+            "product": op.get("output", ""),
+            "destination": "thermocycler1A -> bench",
+            "program": f"digest 37C 1hr ({enzyme}); gel-purify; T4 ligate 16C O/N",
+            "notes": (
+                f"Digest vector + insert in parallel with {enzyme} (NEB rCutSmart, "
+                f"20 uL each); heat-inactivate 65C 20min; gel-purify both; ligate "
+                f"3:1 insert:vector with T4 ligase 16C overnight. Optionally rSAP-"
+                f"treat vector to reduce self-ligation. Never let enzymes warm up!"
+            ),
         }))
 
     # TypeIIS oligo cloning rows
@@ -1036,6 +1107,7 @@ class LabSheet:
         direct_ops = [op for op in operations if op.get("step_type") == "DirectSynthesis"]
         crispr_ops = [op for op in operations if op.get("step_type") == "CRISPRDelivery"]
         typeiis_ops = [op for op in operations if op.get("step_type") == "TypeIISOligoCloning"]
+        rxn_lig_ops = [op for op in operations if op.get("step_type") == "RestrictionLigation"]
 
         # Decide colony-screening burden once per Transform op via the
         # colony_calculator tool, instead of hardcoding "pick 2 colonies".
@@ -1063,6 +1135,9 @@ class LabSheet:
         # no annealed-and-ligated insert in hand — biologically invalid.
         for op in typeiis_ops:
             sections.append(_format_typeiis_oligo_section(op, thread))
+
+        for op in rxn_lig_ops:
+            sections.append(_format_restriction_ligation_section(op, thread))
 
         for op, plan in zip(transform_ops, transform_plans):
             sections.append(_format_transform_section(op, thread))
@@ -1097,6 +1172,8 @@ class LabSheet:
                 protocol_keys.append("gibson_neb_2x")
         if typeiis_ops:
             protocol_keys.append("typeiis_oligo_cloning")
+        if rxn_lig_ops:
+            protocol_keys.append("restriction_ligation")
         if transform_ops:
             protocol_keys.extend([
                 "transformation_chemical",

@@ -1286,6 +1286,50 @@ def test_lab_sheet_emits_protocols_io_links():
         assert entry["protocol"]
 
 
+def test_lab_sheet_restriction_ligation_renders():
+    """RestrictionLigation steps used to be silently dropped — lab sheet
+    would jump straight from PCR to Transform. Make sure they now render
+    in full (digest, gel-purify, ligate)."""
+    record = {
+        "construct_name": "pTargetF_lacZ",
+        "assembly_strategy": "RestrictionLigation",
+        "parts": [],
+        "operations": [
+            {
+                "step_type": "PCR",
+                "inputs": ["f", "r", "lacZ_template"],
+                "parameters": {"forward_primer": "f", "reverse_primer": "r", "template": "lacZ_template"},
+                "output": "lacZ_pcr",
+            },
+            {
+                "step_type": "RestrictionLigation",
+                "inputs": ["pTargetF", "lacZ_pcr"],
+                "parameters": {"enzyme": "EcoRI-HF + BamHI-HF"},
+                "output": "pTargetF_lacZ",
+            },
+            {
+                "step_type": "Transform",
+                "inputs": ["pTargetF_lacZ"],
+                "parameters": {"cells": "Mach1", "selection": "Spec", "temperature_c": 37},
+                "output": "pTargetF_lacZ_e",
+            },
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    text = result["lab_sheet_text"]
+    # RestrictionLigation must appear AFTER PCR but BEFORE Transform
+    assert "RestrictionLigation" in text
+    assert text.find("RestrictionLigation") > text.find("PCR")
+    assert text.find("RestrictionLigation") < text.find("Transform")
+    # Recipe content
+    assert "EcoRI" in text or "BamHI" in text
+    assert "T4 DNA Ligase" in text or "T4 ligase" in text.lower() or "ligate" in text.lower()
+    # cited
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Sambrook" in labels or "Inoue" in labels
+
+
 def test_lab_sheet_typeiis_oligo_cloning_renders():
     """TypeIISOligoCloning step should render anneal+digest-ligate
     instructions BEFORE Transform — without this the workflow is

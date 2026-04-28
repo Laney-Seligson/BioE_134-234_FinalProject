@@ -123,6 +123,48 @@ PROTOCOLS: dict[str, Protocol] = {
               "and a midiprep kit instead.",
     ),
 
+    # Classical restriction-ligation cloning (one or two restriction enzymes,
+    # then T4 ligation). Used by pTargetF / lambda Red recombineering and
+    # most legacy cloning workflows. Sambrook 2001 + NEB ligation guide.
+    "restriction_ligation": Protocol(
+        name="Restriction Digestion + T4 Ligation (20 uL digest, 10 uL ligation)",
+        reagents=(
+            ("--- Vector digest (20 uL) ---", ""),
+            ("Vector DNA (1 ug)", "1-5 uL"),
+            ("10X NEB rCutSmart Buffer", "2 uL"),
+            ("Restriction enzyme(s) (e.g. EcoRI-HF, BamHI-HF)", "0.5 uL each"),
+            ("ddH2O", "to 20 uL"),
+            ("--- Insert digest (20 uL, parallel) ---", ""),
+            ("Insert PCR product (gel-purified, 100-500 ng)", "5-10 uL"),
+            ("10X NEB rCutSmart Buffer", "2 uL"),
+            ("Same restriction enzyme(s)", "0.5 uL each"),
+            ("ddH2O", "to 20 uL"),
+            ("--- Ligation (10 uL) ---", ""),
+            ("Digested + gel-purified vector (~50 ng)", "1 uL"),
+            ("Digested + gel-purified insert (3:1 molar excess)", "1-3 uL"),
+            ("10X T4 DNA Ligase Buffer", "1 uL"),
+            ("T4 DNA Ligase", "0.5 uL"),
+            ("ddH2O", "to 10 uL"),
+        ),
+        program=(
+            "Digest: 37C 1 hr (or 16C overnight for star activity-prone enzymes); "
+            "65C 20 min heat-inactivate. "
+            "Gel-purify both digests on 1% agarose. "
+            "Ligate: 16C overnight (or RT 1 hr for sticky ends, RT 10 min "
+            "for compatible cohesive ends with NEB Quick Ligase)."
+        ),
+        source="sambrook_2001",
+        extra_sources=("inoue_1990",),
+        notes=(
+            "Always gel-purify digests before ligation — uncut vector is the "
+            "#1 source of background. For dephosphorylation of vector ends "
+            "(cuts background further) add 1 uL rSAP, 30 min 37C, before "
+            "heat-inactivation. For pTargetF-style guide cloning, use the "
+            "vendor's recommended Type IIS enzyme (BsaI / BbsI) and switch "
+            "to the typeiis_oligo_cloning protocol instead."
+        ),
+    ),
+
     # Type IIS oligo cloning (single-pot digestion-ligation of annealed
     # oligo duplex into a Type IIS-cut vector, e.g. pX330/pSpCas9 with BbsI
     # or pCRISPR/Lenti-Guide with BsmBI). Engler 2008 + NEB E1601 recipe.

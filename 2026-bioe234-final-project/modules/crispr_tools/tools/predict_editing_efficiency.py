@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from modules.crispr_tools.tools._citations import cites, format_citations
+from modules.crispr_tools.tools.citations import cites, format_citations
 
 
 # ---------------------------------------------------------------------------

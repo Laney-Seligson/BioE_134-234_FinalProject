@@ -6,7 +6,7 @@ from modules.labsheet_tools.tools._protocols import (
     protocol_source_record,
 )
 from modules.labsheet_tools.tools.colony_calculator import colony_calculator
-from modules.crispr_tools.tools._citations import cites, format_citations
+from modules.crispr_tools.tools.citations import cites, format_citations
 
 _RESCUE_ANTIBIOTICS = {"Spec", "spectinomycin", "Spc"}
 
@@ -170,6 +170,7 @@ def _build_colony_plan(
     colony_preset: str | None,
     desired_clones: int,
     confidence: float,
+    is_crispr: bool = False,
 ) -> dict:
     """Call colony_calculator to decide how many colonies to pick for a
     Transform step. Returns a dict with n, labels, the efficiency that
@@ -202,6 +203,15 @@ def _build_colony_plan(
                 confidence=confidence,
             )
             used_preset = guess
+        elif is_crispr:
+            # E. coli CRISPR editing: use the published benchmark preset
+            # rather than the generic cloning success rate.
+            result = colony_calculator(
+                preset="cas9_ecoli",
+                desired_clones=desired_clones,
+                confidence=confidence,
+            )
+            used_preset = "cas9_ecoli"
         else:
             result = colony_calculator(
                 editing_efficiency=_DEFAULT_CLONING_SUCCESS,
@@ -987,7 +997,8 @@ class LabSheet:
         # colony_calculator tool, instead of hardcoding "pick 2 colonies".
         transform_plans = [
             _build_colony_plan(
-                op, editing_efficiency, colony_preset, desired_clones, confidence
+                op, editing_efficiency, colony_preset, desired_clones, confidence,
+                is_crispr=bool(crispr_ops),
             )
             for op in transform_ops
         ]

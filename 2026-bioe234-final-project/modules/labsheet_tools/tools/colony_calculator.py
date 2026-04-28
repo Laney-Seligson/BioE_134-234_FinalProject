@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from modules.crispr_tools.tools._citations import cites, format_citations
+from modules.crispr_tools.tools.citations import cites, format_citations
 
 
 def _binomial_at_least_k(n: int, p: float, k: int) -> float:

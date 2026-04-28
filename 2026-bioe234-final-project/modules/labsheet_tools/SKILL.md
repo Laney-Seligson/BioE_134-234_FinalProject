@@ -128,9 +128,20 @@ Use when the user asks:
 3. Upload the .ab1 trace to ICE (Synthego) or TIDE (Brinkman et al. 2014) with the amplicon sequence and cut offset
 4. Once the user has their ICE/TIDE results, use `interpret_ice_tide` to interpret them (see below)
 
-**Required follow-up:** After presenting the verify_edit output, always close with:
+**Required follow-up:** After presenting the verify_edit output, before telling the user to go to the bench:
 
-> "Once you have your ICE or TIDE results, come back and I can interpret the editing efficiency for you — just share the KO score (ICE) or indel percentage (TIDE) and the R² fit value."
+1. **Offer a predicted editing efficiency** — call `crispr_predict_editing_efficiency` with the same protospacer (already known from the verify_edit call) and its PAM (infer from context; if unclear, ask "are you using NGG PAM with Cas9, or a different nuclease?"). Use `delivery` and `outcome` from context if available, otherwise default to `delivery="plasmid"`, `outcome="nhej"`. If `crispr_predict_editing_efficiency` was already called earlier in this session for the same guide, reference that result instead of calling again.
+
+   Present the result as:
+   > "Before you head to the bench — based on your guide sequence, I'm predicting roughly **X%** editing efficiency (range Y–Z%). [interpretation from tool]. This is what you'd expect to see when you get your ICE/TIDE results back."
+
+   If the prediction is LOW or VERY LOW, add:
+   > "Your predicted efficiency is on the lower end — you may want to reconsider the guide or delivery method before running the experiment."
+
+2. **Then** present the PCR/Sanger workflow (amplicon, primers, cut offset).
+
+3. **Close with:**
+   > "Once you have your ICE or TIDE results, come back and I can interpret the editing efficiency for you — just share the KO score (ICE) or indel percentage (TIDE) and the R² fit value."
 
 Note: `crispr_verify_edit` designs the **sequencing primers** — this is prep work done before the experiment so the primers are ready to order. The actual interpretation of results is done later with `interpret_ice_tide` after sequencing data is in hand. Do NOT call `crispr_verify_edit` during the automated design workflow — offer it separately so the user can order sequencing primers alongside cloning oligos.
 

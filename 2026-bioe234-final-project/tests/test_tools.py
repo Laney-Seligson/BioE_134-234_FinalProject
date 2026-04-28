@@ -1384,12 +1384,10 @@ def test_lab_sheet_uses_guide_specific_sequencing_primers():
 
 def test_lab_sheet_auto_calls_verify_edit():
     """When protospacer + verification_reference are passed, lab_sheet
-    should call verify_edit internally, derive guide-specific primers,
-    and surface the verify_edit_summary in the output."""
-    reference = (
-        "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTT"
-        "TAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC"
-    )
+    should call verify_edit internally and emit a dedicated post-edit
+    EditVerification section (separate from plasmid Sequencing). The
+    plasmid Sequencing section keeps L4440 — different target."""
+    reference = "A" * 100 + "TCAGAAACCTGCCAGTTTGC" + "TGG" + "A" * 200
     result = lab_sheet(
         _make_record(),
         protospacer="TCAGAAACCTGCCAGTTTGC",
@@ -1399,11 +1397,13 @@ def test_lab_sheet_auto_calls_verify_edit():
     assert result["verify_edit_summary"] is not None
     summary = result["verify_edit_summary"]
     assert summary["protospacer"] == "TCAGAAACCTGCCAGTTTGC"
-    # at least one primer should be designed for a usable reference
+    # at least one genomic primer should be designed for a usable reference
     assert summary["forward_primer"] or summary["reverse_primer"]
-    # Generic L4440 should NOT appear when guide-specific primers were derived
-    assert "L4440" not in result["lab_sheet_text"]
-    assert "verify_F" in result["lab_sheet_text"]
+    # Distinct EditVerification section now appears
+    assert "EditVerification" in result["lab_sheet_text"]
+    assert "ICE" in result["lab_sheet_text"] or "TIDE" in result["lab_sheet_text"]
+    # Plasmid Sequencing still uses L4440 (different target)
+    assert "L4440" in result["lab_sheet_text"]
 
 
 def test_lab_sheet_explicit_primers_win_over_auto():

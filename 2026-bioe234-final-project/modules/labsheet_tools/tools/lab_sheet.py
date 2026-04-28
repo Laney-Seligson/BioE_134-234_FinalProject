@@ -666,7 +666,7 @@ def _format_sequencing_section(
     source_table = _col_table(["label", "location", "product"], src_rows)
 
     return "\n".join([
-        f"{thread}: Sequencing",
+        f"{thread}: Sequencing (plasmid — confirms vector clone, NOT the genomic edit)",
         "",
         "sources:",
         source_table,
@@ -719,6 +719,130 @@ def _format_crispr_delivery_section(op: dict, thread: str) -> str:
     ]).rstrip()
 
 
+def _format_edit_verification_section(
+    thread: str,
+    ve: dict,
+    nuclease: str,
+    delivery: str,
+) -> str:
+    """Render the post-edit GENOMIC verification protocol from a
+    verify_edit result. This is distinct from the plasmid Sequencing
+    step — those Sanger reads confirm the vector was cloned correctly,
+    while this section confirms the actual genomic edit (e.g. mouse
+    Tyr locus) AFTER transfection / nucleofection / electroporation.
+
+    Workflow rendered:
+      1. Extract genomic DNA from edited cells (post-recovery).
+      2. PCR-amplify the locus using verify_edit's flanking primers.
+      3. Run a confirmation gel for amplicon size.
+      4. Sanger-sequence the amplicon (3 uL of one of the same primers).
+      5. Upload the .ab1 trace + amplicon sequence + cut offset to
+         Synthego ICE or run TIDE locally.
+    """
+    fwd = ve.get("forward_primer", "")
+    rev = ve.get("reverse_primer", "")
+    fwd_tm = ve.get("forward_primer_tm", "?")
+    rev_tm = ve.get("reverse_primer_tm", "?")
+    cut_pos = ve.get("cut_position", "?")
+    amp_len = ve.get("amplicon_length", "?")
+    cut_off = ve.get("cut_offset_in_amplicon", "?")
+    primer_warnings = ve.get("primer_warnings", []) or []
+
+    primer_table = _col_table(
+        ["primer", "sequence", "Tm (C)", "location"],
+        [
+            ["verify_F (genomic)", fwd or "(verify_edit could not design)", str(fwd_tm), "oligos1/M1"],
+            ["verify_R (genomic)", rev or "(verify_edit could not design)", str(rev_tm), "oligos1/M2"],
+        ],
+    )
+
+    gdna_step = (
+        "Day 0 (post-edit): harvest edited cells (or genomic-DNA template) "
+        f"~{2 if delivery in ('rnp','electroporation','lipofection') else 3} "
+        "days after delivery to allow time for indel formation."
+    )
+    if delivery in ("rnp", "electroporation"):
+        gdna_step += " For RNP/electroporation, 48 hr is typical."
+    elif delivery in ("plasmid", "lentivirus", "aav"):
+        gdna_step += (
+            " For plasmid transfection/lentivirus/AAV, wait 72 hr or longer "
+            "for full Cas9 expression and editing."
+        )
+    gdna_step += (
+        " Extract genomic DNA via column kit (e.g. Qiagen DNeasy, Zymo "
+        "Quick-DNA Miniprep), elute in 50 uL ddH2O, normalize to ~50 ng/uL."
+    )
+
+    ice_url = "https://ice.synthego.com/"
+    interpretation = ve.get("interpretation_guide", "")
+
+    pcr_step = (
+        f"PCR (50 uL Q5 reaction): 25 uL Q5 2X master mix + 1.25 uL each "
+        f"primer (10 uM stock) + 1 uL gDNA (~50 ng) + 21.5 uL ddH2O. "
+        f"Program: 98C 30s; [98C 10s, 65C 30s, 72C 30s/kb] x 35; 72C 2 min; "
+        f"4C hold. Expected amplicon: ~{amp_len} bp."
+    )
+    gel_step = (
+        f"Run 5 uL of PCR product on 1.5% agarose to confirm a single "
+        f"~{amp_len} bp band before Sanger submission."
+    )
+    sanger_step = (
+        "Sanger premix (1 reaction per primer, 10 uL total): 4 uL PCR "
+        "product (100-300 ng) + 3 uL primer (2.66 uM) + 3 uL ddH2O. "
+        "Submit to your sequencing facility."
+    )
+    ice_step = (
+        f"Once .ab1 traces are back: upload the EDITED trace + the UNEDITED "
+        f"reference trace (or paste the amplicon sequence) to {ice_url} along "
+        f"with the protospacer ({ve.get('protospacer','?')}). ICE reports KO "
+        f"score + indel distribution. The cut should fall at offset {cut_off} "
+        f"in the amplicon (position {cut_pos} in the reference). Run TIDE "
+        f"(Brinkman 2014) for a second-opinion deconvolution."
+    )
+
+    warning_block = ""
+    if primer_warnings:
+        warning_block = "\nprimer_warnings:\n" + "\n".join(f"- {w}" for w in primer_warnings)
+
+    handoff = (
+        "After running ICE/TIDE, call interpret_ice_tide with the KO score "
+        "(or total indel %) and R^2 fit value to get a plain-English "
+        "verdict and concrete next steps."
+    )
+
+    return "\n".join([
+        f"{thread}: EditVerification (post-edit genomic Sanger)",
+        "",
+        f"target nuclease: {nuclease}",
+        f"protospacer: {ve.get('protospacer','?')}",
+        f"cut position (reference): {cut_pos}",
+        f"amplicon length: {amp_len} bp",
+        f"cut offset within amplicon: {cut_off}",
+        "",
+        "primers (order separately from cloning oligos):",
+        primer_table,
+        warning_block,
+        "",
+        "step 1 — gDNA prep:",
+        gdna_step,
+        "",
+        "step 2 — locus PCR:",
+        pcr_step,
+        "",
+        "step 3 — confirmation gel:",
+        gel_step,
+        "",
+        "step 4 — Sanger:",
+        sanger_step,
+        "",
+        "step 5 — ICE/TIDE upload:",
+        ice_step,
+        "",
+        "handoff:",
+        handoff,
+    ]).rstrip() + ("\n\n" + interpretation if interpretation else "")
+
+
 def _format_unknown_step_section(op: dict, thread: str) -> str:
     """Last-resort renderer for a step_type lab_sheet doesn't recognize.
     Better than silently dropping it — the user sees the inputs/outputs
@@ -755,6 +879,16 @@ def _maybe_predict_efficiency(
         return None
     if nuclease.lower() not in _PREDICT_EFFICIENCY_KNOWN:
         return None
+    # Normalize delivery — predict_editing_efficiency only knows the
+    # 5 categories below, but users (and the CRISPRDelivery step type)
+    # may pass synonyms like "lipofection" or "nucleofection".
+    _DELIVERY_ALIAS = {
+        "lipofection": "plasmid",       # lipofected plasmid
+        "transfection": "plasmid",
+        "nucleofection": "electroporation",
+        "rnp_assembly": "rnp",
+    }
+    delivery_norm = _DELIVERY_ALIAS.get(delivery.lower(), delivery.lower())
     try:
         from modules.crispr_tools.tools.predict_editing_efficiency import (
             predict_editing_efficiency,
@@ -763,7 +897,7 @@ def _maybe_predict_efficiency(
             protospacer=protospacer,
             pam=pam,
             nuclease=nuclease.lower(),
-            delivery=delivery,
+            delivery=delivery_norm,
             outcome=outcome,
         )
     except Exception:
@@ -794,6 +928,7 @@ def _build_tsv(
     transform_plans: list[dict] | None = None,
     parts_map: dict[str, dict] | None = None,
     sequencing_primers: list[dict] | None = None,
+    verify_edit_result: dict | None = None,
 ) -> str:
     transform_plans = transform_plans or []
     parts_map = parts_map or {}
@@ -1006,19 +1141,37 @@ def _build_tsv(
         product_str = " / ".join(f"{product}-{ch}" for ch in labels)
         primer_names = " / ".join(sp["name"] for sp in seq_primers)
         primer_locs = " / ".join(sp["location"] for sp in seq_primers)
-        primer_note = (
-            "(guide-specific verification primers from verify_edit) "
-            if not any(sp["name"] == "L4440" for sp in seq_primers) else ""
-        )
         rows.append(_tsv_row({
-            "section": f"{thread}: Sequencing",
+            "section": f"{thread}: Sequencing (plasmid)",
             "label": label_str,
             "product": product_str,
             "primer1": primer_names,
             "primer1_location": primer_locs,
             "notes": (
                 f"6 uL ddH2O / 4 uL miniprep DNA / 3 uL primer (2.66 uM). "
-                f"{primer_note}Submit to 237 Stanley Hall."
+                f"Submit to sequencing facility. (Confirms plasmid; does NOT "
+                f"confirm the genomic edit — see EditVerification section.)"
+            ),
+        }))
+
+    # EditVerification row (genomic Sanger after the experiment)
+    if verify_edit_result:
+        ve = verify_edit_result
+        rows.append(_tsv_row({
+            "section": f"{thread}: EditVerification (genomic)",
+            "label": f"{thread}_genomic",
+            "primer1": "verify_F (genomic)",
+            "primer1_location": "oligos1/M1",
+            "primer2": "verify_R (genomic)",
+            "primer2_location": "oligos1/M2",
+            "template": "edited gDNA",
+            "product": f"{ve.get('amplicon_length','?')} bp amplicon",
+            "program": "Q5 35 cycles, 65C anneal",
+            "notes": (
+                f"PCR genomic locus, gel-confirm ~{ve.get('amplicon_length','?')} bp band, "
+                f"Sanger sequence, upload .ab1 + amplicon to Synthego ICE "
+                f"(cut at offset {ve.get('cut_offset_in_amplicon','?')} in amplicon). "
+                f"Run interpret_ice_tide on the result."
             ),
         }))
 
@@ -1132,44 +1285,20 @@ class LabSheet:
         if predicted_eff and editing_efficiency is None and colony_preset is None:
             editing_efficiency = predicted_eff["on_target_efficiency_pct"] / 100.0
 
-        # If the caller passes a protospacer + reference, auto-call
-        # verify_edit to design guide-specific Sanger primers that span
-        # the cut site. Explicit `sequencing_primers` still wins (explicit
-        # > auto > L4440 fallback). This closes the loop the SKILL.md
-        # workflow describes: rank_guides -> verify_edit -> lab_sheet.
+        # If the caller passes a genomic reference + protospacer, run
+        # verify_edit. The result is rendered as a dedicated post-edit
+        # GENOMIC verification section — distinct from the plasmid
+        # Sequencing step (which sequences the assembled vector with
+        # L4440 or a user-supplied vector primer).
         verify_edit_result: dict | None = None
-        if sequencing_primers is None and protospacer and verification_reference:
+        if protospacer and verification_reference:
             try:
                 verify_edit_result = verify_edit(
                     protospacer=protospacer,
                     reference=verification_reference,
                     nuclease=nuclease,
                 )
-                sequencing_primers = [
-                    {
-                        "name": "verify_F",
-                        "sequence": verify_edit_result["forward_primer"],
-                        "location": "oligos1/M1",
-                        "note": (
-                            f"verify_edit forward primer; "
-                            f"Tm={verify_edit_result['forward_primer_tm']}C"
-                        ),
-                    },
-                    {
-                        "name": "verify_R",
-                        "sequence": verify_edit_result["reverse_primer"],
-                        "location": "oligos1/M2",
-                        "note": (
-                            f"verify_edit reverse primer; "
-                            f"Tm={verify_edit_result['reverse_primer_tm']}C"
-                        ),
-                    },
-                ]
             except Exception:
-                # If verify_edit can't design primers (e.g. protospacer
-                # not found in reference), fall through to L4440 so the
-                # lab sheet still renders. The user gets a generic primer
-                # and can re-run with a corrected reference.
                 verify_edit_result = None
 
         pcr_ops = [op for op in operations if op.get("step_type") == "PCR"]
@@ -1235,12 +1364,23 @@ class LabSheet:
         for op in unknown_ops:
             sections.append(_format_unknown_step_section(op, thread))
 
+        # Post-edit GENOMIC verification — appended after all cloning
+        # steps because it happens after the experiment, on harvested
+        # cells, not on the assembled plasmid.
+        if verify_edit_result:
+            sections.append(
+                _format_edit_verification_section(
+                    thread, verify_edit_result, nuclease, delivery,
+                )
+            )
+
         if include_notes and notes:
             sections.append(f"note:\n{notes}")
 
         lab_sheet_text = "\n\n".join(sections)
         lab_sheet_tsv = _build_tsv(
-            operations, thread, notes, transform_plans, parts_map, sequencing_primers
+            operations, thread, notes, transform_plans, parts_map,
+            sequencing_primers, verify_edit_result,
         )
 
         # Build a list of canonical protocol sources (one entry per step type

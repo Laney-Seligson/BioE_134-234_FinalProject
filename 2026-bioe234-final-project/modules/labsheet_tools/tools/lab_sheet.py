@@ -410,6 +410,62 @@ def _format_assemble_section(op: dict, thread: str) -> str:
     ])
 
 
+def _format_typeiis_oligo_section(op: dict, thread: str) -> str:
+    """Render a TypeIISOligoCloning step. The construction record's
+    inputs are [top_oligo, bottom_oligo, vector] and parameters carry
+    the Type IIS enzyme name (BbsI / BsmBI). Without this section, the
+    workflow is biologically incomplete — the lab sheet would jump
+    straight to Transform with no annealed-and-ligated insert in hand.
+    """
+    proto_key = "typeiis_oligo_cloning"
+    proto = PROTOCOLS[proto_key]
+    params = op.get("parameters", {})
+    inputs = op.get("inputs", [])
+    output = op.get("output", "")
+    enzyme = params.get("enzyme", "BbsI-HF")
+    overhangs = params.get("overhangs", "vector-specific (e.g. CACC/AAAC)")
+
+    top = inputs[0] if len(inputs) > 0 else "top_oligo"
+    bot = inputs[1] if len(inputs) > 1 else "bottom_oligo"
+    vec = inputs[2] if len(inputs) > 2 else "vector"
+
+    src_rows = [
+        [top, "oligos1/A1"],
+        [bot, "oligos1/B1"],
+        [vec, f"box{thread}/A1"],
+    ]
+    source_table = _col_table(["dna", "location"], src_rows)
+    samples_table = _col_table(
+        ["label", "fragments", "product"],
+        [[thread, f"{top}+{bot} duplex / {vec}", output]],
+    )
+
+    return "\n".join([
+        f"{thread}: TypeIISOligoCloning",
+        "",
+        f"protocol: {proto.name}",
+        f"enzyme: {enzyme}",
+        f"overhangs: {overhangs}",
+        "",
+        "reaction:",
+        reagent_block(proto_key),
+        "",
+        f"program: {proto.program}",
+        "",
+        "source:",
+        source_table,
+        "",
+        "samples:",
+        samples_table,
+        "",
+        "destination: thermocycler1A",
+        "",
+        f"notes:\n{proto.notes}",
+        "",
+        _ENZYME_NOTE,
+    ])
+
+
 def _format_transform_section(op: dict, thread: str) -> str:
     params = op.get("parameters", {})
     inputs = op.get("inputs", [])
@@ -508,16 +564,39 @@ def _format_miniprep_section(op: dict, thread: str, plan: dict) -> str:
     ])
 
 
-def _format_sequencing_section(op: dict, thread: str, plan: dict) -> str:
+def _normalize_seq_primers(seq_primers: list[dict] | None) -> list[dict]:
+    """Default to L4440 if no guide-specific primers are provided. When
+    the caller passes verify_edit's output, those primers replace L4440
+    so the lab sheet sequences across the actual edit site instead of a
+    generic plasmid backbone landmark."""
+    if not seq_primers:
+        return [{"name": "L4440", "location": "oligos1/J1",
+                 "note": "generic plasmid sequencing primer"}]
+    out = []
+    for i, p in enumerate(seq_primers):
+        out.append({
+            "name": p.get("name", f"verify_primer_{i+1}"),
+            "location": p.get("location", f"oligos1/J{i+1}"),
+            "sequence": p.get("sequence", ""),
+            "note": p.get("note", "guide-specific verification primer (verify_edit)"),
+        })
+    return out
+
+
+def _format_sequencing_section(
+    op: dict, thread: str, plan: dict, seq_primers: list[dict] | None = None,
+) -> str:
     params = op.get("parameters", {})
     inputs = op.get("inputs", [])
     product = inputs[0] if inputs else op.get("output", "")
+    seq_primers = _normalize_seq_primers(seq_primers)
 
     src_rows = []
     for i, ch in enumerate(plan["labels"]):
         loc = f"box{thread}/{chr(67 + i)}1" if i < 24 else f"box{thread}/overflow{i}"
         src_rows.append([f"{thread}1{ch}", loc, f"{product}-{ch}"])
-    src_rows.append(["L4440", "oligos1/J1", "sequencing primer"])
+    for sp in seq_primers:
+        src_rows.append([sp["name"], sp["location"], sp["note"]])
     source_table = _col_table(["label", "location", "product"], src_rows)
 
     return "\n".join([
@@ -527,17 +606,18 @@ def _format_sequencing_section(op: dict, thread: str, plan: dict) -> str:
         source_table,
         "",
         "Instructions:",
-        "Resuspend the oligo L4440 to the appropriate volume for a 100 uM stock.",
-        "In an eppendorf, prepare a 2.66 uM dilute stock of L4440 as:",
-        "  487 uL ddH2O",
-        "  13.3 uL of 100 uM oligo",
-        "For each plasmid listed, mix the following sequencing reactions in an eppendorf tube:",
+    ] + [
+        f"For each plasmid + primer combination, mix the following in an eppendorf tube:"
+    ] + [
+        f"Primers in this run: {', '.join(sp['name'] for sp in seq_primers)}.",
+        "Resuspend each primer to a 100 uM stock; dilute 1:37.6 in ddH2O for a 2.66 uM working stock.",
         "  6 uL ddH2O",
         "  4 uL miniprep DNA (undiluted)",
-        "  3 uL oligo (2.66 uM)",
-        f'Label the tops of the tubes with the label (e.g. "{thread}1A").',
-        "When done, save the L4440 stock at: oligos1/A5",
-        "Take the sequencing reactions and order form to: 237 Stanley Hall (second floor cold room)",
+        "  3 uL primer (2.66 uM)",
+        f'Label the tops of the tubes with the label (e.g. "{thread}1{plan["labels"][0]}").',
+        "Take the sequencing reactions and order form to: 237 Stanley Hall (second floor cold room).",
+        "" if any(sp["name"] == "L4440" for sp in seq_primers) else
+        "Note: using guide-specific verification primers (verify_edit) — sequence WILL span the edit site.",
     ])
 
 
@@ -596,15 +676,18 @@ def _build_tsv(
     notes_str: str,
     transform_plans: list[dict] | None = None,
     parts_map: dict[str, dict] | None = None,
+    sequencing_primers: list[dict] | None = None,
 ) -> str:
     transform_plans = transform_plans or []
     parts_map = parts_map or {}
+    seq_primers = _normalize_seq_primers(sequencing_primers)
     rows = ["\t".join(_TSV_HEADERS)]
 
     pcr_ops = [op for op in operations if op.get("step_type") == "PCR"]
     assemble_ops = [op for op in operations if op.get("step_type") in ("GoldenGate", "Gibson")]
     transform_ops = [op for op in operations if op.get("step_type") == "Transform"]
     direct_ops = [op for op in operations if op.get("step_type") == "DirectSynthesis"]
+    typeiis_ops = [op for op in operations if op.get("step_type") == "TypeIISOligoCloning"]
 
     source_map: dict[str, str] = {}
 
@@ -692,6 +775,25 @@ def _build_tsv(
             "notes": note,
         }))
 
+    # TypeIIS oligo cloning rows
+    for op in typeiis_ops:
+        params = op.get("parameters", {})
+        inputs = op.get("inputs", [])
+        enzyme = params.get("enzyme", "BbsI-HF")
+        rows.append(_tsv_row({
+            "section": f"{thread}: TypeIISOligoCloning",
+            "label": thread,
+            "fragments": ", ".join(inputs),
+            "product": op.get("output", ""),
+            "destination": "thermocycler1A",
+            "program": "anneal -> [37C/16C]x30 -> 60C 5min -> 80C 5min",
+            "notes": (
+                f"Phase 1: anneal top+bottom oligos (95C 5min, slow cool). "
+                f"Phase 2: 1 uL diluted duplex + vector + {enzyme} + T4 ligase "
+                f"in 10 uL. Never let enzymes warm up!"
+            ),
+        }))
+
     # Transform rows
     for op in transform_ops:
         params = op.get("parameters", {})
@@ -764,15 +866,21 @@ def _build_tsv(
         labels = plan["labels"]
         label_str = " / ".join(f"{thread}1{ch}" for ch in labels)
         product_str = " / ".join(f"{product}-{ch}" for ch in labels)
+        primer_names = " / ".join(sp["name"] for sp in seq_primers)
+        primer_locs = " / ".join(sp["location"] for sp in seq_primers)
+        primer_note = (
+            "(guide-specific verification primers from verify_edit) "
+            if not any(sp["name"] == "L4440" for sp in seq_primers) else ""
+        )
         rows.append(_tsv_row({
             "section": f"{thread}: Sequencing",
             "label": label_str,
             "product": product_str,
-            "primer1": "L4440",
-            "primer1_location": "oligos1/J1",
+            "primer1": primer_names,
+            "primer1_location": primer_locs,
             "notes": (
-                "6 uL ddH2O / 4 uL miniprep DNA / 3 uL L4440 2.66 uM. "
-                "Submit to 237 Stanley Hall."
+                f"6 uL ddH2O / 4 uL miniprep DNA / 3 uL primer (2.66 uM). "
+                f"{primer_note}Submit to 237 Stanley Hall."
             ),
         }))
 
@@ -857,6 +965,7 @@ class LabSheet:
         colony_preset: str | None = None,
         desired_clones: int = 1,
         confidence: float = 0.95,
+        sequencing_primers: list[dict] | None = None,
     ) -> dict:
         if not construction_record:
             raise ValueError("construction_record must not be empty.")
@@ -872,6 +981,7 @@ class LabSheet:
         transform_ops = [op for op in operations if op.get("step_type") == "Transform"]
         direct_ops = [op for op in operations if op.get("step_type") == "DirectSynthesis"]
         crispr_ops = [op for op in operations if op.get("step_type") == "CRISPRDelivery"]
+        typeiis_ops = [op for op in operations if op.get("step_type") == "TypeIISOligoCloning"]
 
         # Decide colony-screening burden once per Transform op via the
         # colony_calculator tool, instead of hardcoding "pick 2 colonies".
@@ -892,11 +1002,18 @@ class LabSheet:
         for op in assemble_ops:
             sections.append(_format_assemble_section(op, thread))
 
+        # TypeIISOligoCloning is the assembly step for sgRNA cloning into
+        # BbsI/BsmBI-cut vectors (pX330, Lenti-Guide, etc.). Without
+        # rendering it the workflow would jump straight to Transform with
+        # no annealed-and-ligated insert in hand — biologically invalid.
+        for op in typeiis_ops:
+            sections.append(_format_typeiis_oligo_section(op, thread))
+
         for op, plan in zip(transform_ops, transform_plans):
             sections.append(_format_transform_section(op, thread))
             sections.append(_format_pick_section(op, thread, plan))
             sections.append(_format_miniprep_section(op, thread, plan))
-            sections.append(_format_sequencing_section(op, thread, plan))
+            sections.append(_format_sequencing_section(op, thread, plan, sequencing_primers))
 
         for op in crispr_ops:
             sections.append(_format_crispr_delivery_section(op, thread))
@@ -908,7 +1025,9 @@ class LabSheet:
             sections.append(f"note:\n{notes}")
 
         lab_sheet_text = "\n\n".join(sections)
-        lab_sheet_tsv = _build_tsv(operations, thread, notes, transform_plans, parts_map)
+        lab_sheet_tsv = _build_tsv(
+            operations, thread, notes, transform_plans, parts_map, sequencing_primers
+        )
 
         # Build a list of canonical protocol sources (one entry per step type
         # that fired). Each entry includes the manufacturer/method paper its
@@ -921,6 +1040,8 @@ class LabSheet:
                 protocol_keys.append("goldengate_bsai")
             else:
                 protocol_keys.append("gibson_neb_2x")
+        if typeiis_ops:
+            protocol_keys.append("typeiis_oligo_cloning")
         if transform_ops:
             protocol_keys.extend([
                 "transformation_chemical",

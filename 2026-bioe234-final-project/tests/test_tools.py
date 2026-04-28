@@ -1286,6 +1286,64 @@ def test_lab_sheet_emits_protocols_io_links():
         assert entry["protocol"]
 
 
+def test_lab_sheet_typeiis_oligo_cloning_renders():
+    """TypeIISOligoCloning step should render anneal+digest-ligate
+    instructions BEFORE Transform — without this the workflow is
+    biologically incomplete (transforms an empty vector)."""
+    record = {
+        "construct_name": "pX330_guide",
+        "assembly_strategy": "TypeIISOligoCloning",
+        "parts": [],
+        "operations": [
+            {
+                "step_type": "TypeIISOligoCloning",
+                "inputs": ["top_oligo", "bottom_oligo", "pX330"],
+                "parameters": {"enzyme": "BbsI-HF", "overhangs": "CACC/AAAC"},
+                "output": "pX330_guide",
+            },
+            {
+                "step_type": "Transform",
+                "inputs": ["pX330_guide"],
+                "parameters": {"cells": "Mach1", "selection": "Amp", "temperature_c": 37},
+                "output": "pX330_guide_e",
+            },
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    text = result["lab_sheet_text"]
+    # TypeIIS section must precede Transform
+    assert "TypeIISOligoCloning" in text
+    assert text.find("TypeIISOligoCloning") < text.find("Transform")
+    # Recipe content
+    assert "BbsI" in text
+    assert "anneal" in text.lower() or "Anneal" in text
+    assert "T4 DNA Ligase" in text or "ligase" in text.lower()
+    # Cited
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Engler" in labels
+
+
+def test_lab_sheet_uses_guide_specific_sequencing_primers():
+    """When the caller passes verify_edit-style primers, sequencing
+    section should drop L4440 and use the guide-specific primers."""
+    primers = [
+        {"name": "verify_F", "sequence": "ATGCATGCATGCATGCATGC", "location": "oligos1/M1"},
+        {"name": "verify_R", "sequence": "GCATGCATGCATGCATGCAT", "location": "oligos1/M2"},
+    ]
+    result = lab_sheet(_make_record(), sequencing_primers=primers)
+    text = result["lab_sheet_text"]
+    assert "verify_F" in text
+    assert "verify_R" in text
+    assert "L4440" not in text
+
+
+def test_lab_sheet_defaults_to_l4440_when_no_primers_given():
+    """Backward-compat: with no sequencing_primers passed, fall back to L4440."""
+    result = lab_sheet(_make_record())
+    assert "L4440" in result["lab_sheet_text"]
+
+
 def test_lab_sheet_unknown_crispr_method_raises():
     record = {
         "construct_name": "x",

@@ -123,6 +123,41 @@ PROTOCOLS: dict[str, Protocol] = {
               "and a midiprep kit instead.",
     ),
 
+    # Type IIS oligo cloning (single-pot digestion-ligation of annealed
+    # oligo duplex into a Type IIS-cut vector, e.g. pX330/pSpCas9 with BbsI
+    # or pCRISPR/Lenti-Guide with BsmBI). Engler 2008 + NEB E1601 recipe.
+    "typeiis_oligo_cloning": Protocol(
+        name="Type IIS Oligo Cloning (anneal + digest-ligate, 10 uL)",
+        reagents=(
+            ("100 uM top oligo", "1 uL"),
+            ("100 uM bottom oligo", "1 uL"),
+            ("T4 DNA Ligase Buffer (10X) — also serves as anneal buffer", "1 uL"),
+            ("Vector (50 ng, undigested)", "1 uL"),
+            ("Type IIS enzyme (BbsI-HF / BsmBI-v2)", "0.5 uL"),
+            ("T4 DNA Ligase", "0.5 uL"),
+            ("ddH2O", "5 uL"),
+        ),
+        program=(
+            "Phase 1 - Anneal oligos: combine 1 uL top + 1 uL bottom + 1 uL "
+            "T4 ligase buffer + 7 uL ddH2O in a PCR tube. Heat 95C 5 min, "
+            "ramp -0.1C/sec to 25C (or boil and slow-cool in a beaker). "
+            "Dilute 1:200 in ddH2O before use.\n"
+            "Phase 2 - Digest-ligate: in a fresh tube combine the recipe "
+            "above using 1 uL of the diluted oligo duplex in place of the "
+            "anneal mix. Run [37C 5 min, 16C 5 min] x 30; 60C 5 min; "
+            "80C 5 min; 4C hold."
+        ),
+        source="engler_2008_goldengate",
+        extra_sources=("neb_e1601",),
+        notes=(
+            "Use BbsI-HF (NEB R3539) for pX330/pSpCas9-style Cas9 vectors "
+            "and BsmBI-v2 (NEB R0739) for Lenti-Guide-Puro / pCRISPR. "
+            "Vector overhangs (e.g. CACC/AAAC) come from "
+            "design_cloning_oligos. Resulting plasmid carries the protospacer "
+            "in-frame with the sgRNA scaffold."
+        ),
+    ),
+
     # CRISPR RNP assembly (IDT Alt-R)
     "crispr_rnp_assembly": Protocol(
         name="Cas9 RNP Assembly (IDT Alt-R, 5 uL)",

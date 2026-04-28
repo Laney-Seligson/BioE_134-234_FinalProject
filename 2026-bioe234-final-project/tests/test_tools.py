@@ -1338,6 +1338,44 @@ def test_lab_sheet_uses_guide_specific_sequencing_primers():
     assert "L4440" not in text
 
 
+def test_lab_sheet_auto_calls_verify_edit():
+    """When protospacer + verification_reference are passed, lab_sheet
+    should call verify_edit internally, derive guide-specific primers,
+    and surface the verify_edit_summary in the output."""
+    reference = (
+        "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTT"
+        "TAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC"
+    )
+    result = lab_sheet(
+        _make_record(),
+        protospacer="TCAGAAACCTGCCAGTTTGC",
+        verification_reference=reference,
+        nuclease="cas9",
+    )
+    assert result["verify_edit_summary"] is not None
+    summary = result["verify_edit_summary"]
+    assert summary["protospacer"] == "TCAGAAACCTGCCAGTTTGC"
+    # at least one primer should be designed for a usable reference
+    assert summary["forward_primer"] or summary["reverse_primer"]
+    # Generic L4440 should NOT appear when guide-specific primers were derived
+    assert "L4440" not in result["lab_sheet_text"]
+    assert "verify_F" in result["lab_sheet_text"]
+
+
+def test_lab_sheet_explicit_primers_win_over_auto():
+    """If both auto-call inputs and explicit sequencing_primers are
+    provided, explicit primers should win (verify_edit not invoked)."""
+    primers = [{"name": "my_primer", "location": "oligos1/Z9"}]
+    result = lab_sheet(
+        _make_record(),
+        protospacer="TCAGAAACCTGCCAGTTTGC",
+        verification_reference="ACGTACGTACGT",  # too short, would otherwise fail
+        sequencing_primers=primers,
+    )
+    assert "my_primer" in result["lab_sheet_text"]
+    assert result["verify_edit_summary"] is None
+
+
 def test_lab_sheet_defaults_to_l4440_when_no_primers_given():
     """Backward-compat: with no sequencing_primers passed, fall back to L4440."""
     result = lab_sheet(_make_record())

@@ -6,6 +6,7 @@ from modules.labsheet_tools.tools._protocols import (
     protocol_source_record,
 )
 from modules.labsheet_tools.tools.colony_calculator import colony_calculator
+from modules.labsheet_tools.tools.verify_edit import verify_edit
 from modules.crispr_tools.tools.citations import cites, format_citations
 
 _RESCUE_ANTIBIOTICS = {"Spec", "spectinomycin", "Spc"}
@@ -976,6 +977,9 @@ class LabSheet:
         desired_clones: int = 1,
         confidence: float = 0.95,
         sequencing_primers: list[dict] | None = None,
+        protospacer: str | None = None,
+        verification_reference: str | None = None,
+        nuclease: str = "cas9",
     ) -> dict:
         if not construction_record:
             raise ValueError("construction_record must not be empty.")
@@ -985,6 +989,46 @@ class LabSheet:
         operations = construction_record.get("operations", [])
         notes = construction_record.get("notes", "")
         parts_map = _build_parts_map(construction_record.get("parts", []))
+
+        # If the caller passes a protospacer + reference, auto-call
+        # verify_edit to design guide-specific Sanger primers that span
+        # the cut site. Explicit `sequencing_primers` still wins (explicit
+        # > auto > L4440 fallback). This closes the loop the SKILL.md
+        # workflow describes: rank_guides -> verify_edit -> lab_sheet.
+        verify_edit_result: dict | None = None
+        if sequencing_primers is None and protospacer and verification_reference:
+            try:
+                verify_edit_result = verify_edit(
+                    protospacer=protospacer,
+                    reference=verification_reference,
+                    nuclease=nuclease,
+                )
+                sequencing_primers = [
+                    {
+                        "name": "verify_F",
+                        "sequence": verify_edit_result["forward_primer"],
+                        "location": "oligos1/M1",
+                        "note": (
+                            f"verify_edit forward primer; "
+                            f"Tm={verify_edit_result['forward_primer_tm']}C"
+                        ),
+                    },
+                    {
+                        "name": "verify_R",
+                        "sequence": verify_edit_result["reverse_primer"],
+                        "location": "oligos1/M2",
+                        "note": (
+                            f"verify_edit reverse primer; "
+                            f"Tm={verify_edit_result['reverse_primer_tm']}C"
+                        ),
+                    },
+                ]
+            except Exception:
+                # If verify_edit can't design primers (e.g. protospacer
+                # not found in reference), fall through to L4440 so the
+                # lab sheet still renders. The user gets a generic primer
+                # and can re-run with a corrected reference.
+                verify_edit_result = None
 
         pcr_ops = [op for op in operations if op.get("step_type") == "PCR"]
         assemble_ops = [op for op in operations if op.get("step_type") in ("GoldenGate", "Gibson")]
@@ -1128,6 +1172,19 @@ class LabSheet:
             "verify_before_use": _VERIFY_DISCLAIMER,
             "colony_plan": colony_plan_summary,
             "protocols_io_links": protocols_io_links,
+            "verify_edit_summary": (
+                {
+                    "protospacer": verify_edit_result["protospacer"],
+                    "cut_position": verify_edit_result["cut_position"],
+                    "amplicon_length": verify_edit_result["amplicon_length"],
+                    "forward_primer": verify_edit_result["forward_primer"],
+                    "reverse_primer": verify_edit_result["reverse_primer"],
+                    "forward_primer_tm": verify_edit_result["forward_primer_tm"],
+                    "reverse_primer_tm": verify_edit_result["reverse_primer_tm"],
+                }
+                if verify_edit_result
+                else None
+            ),
         }
 
 

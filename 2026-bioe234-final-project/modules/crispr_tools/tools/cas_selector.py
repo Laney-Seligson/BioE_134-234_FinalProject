@@ -28,10 +28,9 @@ class CasSelector:
                  avoiding a separate transcription unit per guide.
                  (Zetsche et al., 2017, Nat Biotechnol 35(1):31-34)
               b. High specificity required -> Cas12a.
-                 Cas12a is more mismatch-intolerant than SpCas9, with
-                 off-target burden comparable to engineered high-fidelity
-                 Cas9 variants.
-                 (Kleinstiver et al., 2016, Nat Biotechnol 34:869-874)
+                 Cas12a (Cpf1) generally had fewer off-target cuts than wild-type SpCas9
+                 Cas12a is often more sensitive to mismatches in certain guide positions
+                 (Kim et al. 2016 Nature Biotechnology paper, DOI: 10.1038/nbt.3609)
               c. Otherwise -> Cas9 (well-established default).
 
         AT-richness note: when gc_content < 0.45, AT-richness is reported
@@ -293,16 +292,16 @@ class CasSelector:
         elif num_targets >= 2:
             recommendation = "Cas12a"
             rationale = (
-                guide_rationale + f" Multiplexing ({num_targets} targets): Cas12a processes "
-                "a crRNA array from a single transcript without a separate transcription "
+                guide_rationale + f" Multiplexing ({num_targets} targets): favors Cas12a "
+                "crRNA array from a single transcript without a separate transcription "
                 "unit per guide (Zetsche et al., 2017, Nat Biotechnol)."
             )
         elif high_specificity:
-            recommendation = "Cas12a"
+            recommendation = "Cas12a" if cas12a_valid_guides >= cas9_valid_guides else "Cas9"
             rationale = (
                 guide_rationale + " High specificity required: Cas12a is more mismatch-"
                 "intolerant than SpCas9, with off-target burden comparable to engineered "
-                "high-fidelity Cas9 variants (Kleinstiver et al., 2016, Nat Biotechnol)."
+                "high-fidelity Cas9 variants ((Kim et al. 2016 Nature Biotechnology paper, DOI: 10.1038/nbt.3609))."
             )
         else:
             recommendation = "Cas9"
@@ -311,8 +310,8 @@ class CasSelector:
         # --- AT-richness: supporting context only ---
         if at_rich and recommendation == "Cas12a":
             rationale += (
-                f" AT-rich sequence (GC {gc_content:.0%}) further supports Cas12a: "
-                "its TTTV PAM is more prevalent in AT-rich regions "
+                f"AT-rich sequence further supports Cas12a because TTTV PAMs are often easier "
+"to identify in AT-rich targets."
                 "(Zetsche et al., 2015, Cell 163(3):759-771)."
             )
 

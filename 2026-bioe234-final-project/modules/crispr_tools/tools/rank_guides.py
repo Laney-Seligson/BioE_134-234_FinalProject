@@ -7,16 +7,14 @@ from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 _SUPPORTED_NUCLEASES = {"cas9", "cas12a"}
 
 
-def _score_efficiency(protospacer: str, nuclease: str) -> tuple[int, dict]:
+def _score_efficiency(protospacer: str) -> tuple[int, dict]:
     """
     Score a protospacer on predicted on-target cutting efficiency.
 
     Cas9 rules (Doench et al. 2016, Nat Biotechnol 34:184-191):
       - GC content 40-70% (binding energy sweet spot)               +1
       - No TTTT run (Pol III terminator would truncate the sgRNA)   +1
-      - G at PAM-proximal end (position 20; the base adjacent       +1
-        to the NGG PAM correlates with higher cleavage activity)
-      Max score: 3.
+      Max score: 2.
 
     Cas12a rules (Kim et al. 2018; Zetsche et al. 2015):
       - GC content 40-70%                                           +1
@@ -41,13 +39,6 @@ def _score_efficiency(protospacer: str, nuclease: str) -> tuple[int, dict]:
         score += 1
     if no_polyt:
         score += 1
-
-    if nuclease == "cas9":
-        # position 20 (PAM-proximal) = last base of the protospacer
-        g_at_pam_proximal = len(protospacer) > 0 and protospacer[-1] == "G"
-        details["g_at_pam_proximal"] = g_at_pam_proximal
-        if g_at_pam_proximal:
-            score += 1
 
     return score, details
 
@@ -113,9 +104,7 @@ class RankGuides:
         1. Efficiency (on-target cutting likelihood)
            - GC content 40-70%                           +1
            - No TTTT run (Pol III terminator)            +1
-           - G at PAM-proximal end (Cas9 only)           +1
            Sources: Doench et al. 2016 (Nat Biotechnol);
-                    Briner et al. 2014 (Mol Cell);
                     Zetsche et al. 2015 (Cell).
 
         2. Specificity (off-target safety) — uses predict_offtargets
@@ -125,7 +114,7 @@ class RankGuides:
            Sources: Hsu et al. 2013 (Nat Biotechnol);
                     Fu et al. 2013 (Nat Biotechnol).
 
-        Total score = efficiency + specificity. Max 4 for Cas9, 3 for Cas12a.
+        Total score = efficiency + specificity. Max 3 for both Cas9 and Cas12a.
         Guides are returned sorted by total score (desc), then by
         efficiency (desc), then by HIGH-risk, MEDIUM-risk, and total
         off-target counts (asc).
@@ -153,8 +142,8 @@ class RankGuides:
         - Case:
             Input: guides=[{"protospacer": "ATGATGATGATGATGATGAG"}],
                    reference="ATGATGATGATGATGATGAGAGG"+"C"*50, nuclease="cas9"
-            Expected Output: ranked_guides[0]["efficiency_score"] == 3
-            Description: GC=50%, no TTTT, G at pos 20 → max efficiency.
+            Expected Output: ranked_guides[0]["efficiency_score"] == 2
+            Description: GC=50%, no TTTT → max efficiency.
         - Case:
             Input: guides=[], reference="AAA", nuclease="cas9"
             Expected Exception: ValueError
@@ -188,7 +177,7 @@ class RankGuides:
             if not protospacer:
                 raise ValueError("Each guide must have a 'protospacer' key.")
 
-            eff_score, eff_details = _score_efficiency(protospacer, nuclease)
+            eff_score, eff_details = _score_efficiency(protospacer)
             spec_score, spec_details = _score_specificity(
                 protospacer, reference, nuclease, max_mismatches
             )

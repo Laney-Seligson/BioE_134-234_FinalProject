@@ -8,6 +8,10 @@ class DesignCas9Grna:
         scaffold, and converts T -> U to produce the gRNA. Returns up to 10
         candidates in order of appearance.
 
+    Citations: 
+        - Claim:SpCas9 uses a NGG PAM - Jinek et al., 2012, Science 337(6096):816-821 (original Cas9 gRNA design).
+        - Claim:Guide Targets the 20nt sequence upstream of NGG - Cong et al., 2013, Science
+        - Claim:TracrRNA scaffold sequence - Jinek et al., 2012, Science 337(6096):816-821 (original Cas9 gRNA design).
     Input:
         seq (str): DNA target sequence (A, T, G, C only).
 
@@ -32,10 +36,10 @@ class DesignCas9Grna:
             Description: No NGG PAM site found raises ValueError.
     """
 
-    _tracrRNA: str
+    _sgRNA_scaffold: str
 
     def initiate(self) -> None:
-        self._tracrRNA = "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGC"
+        self._sgRNA_scaffold = "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGC"
 
     def run(self, seq: str) -> list:
         seq = seq.upper()
@@ -53,7 +57,7 @@ class DesignCas9Grna:
             if seq[i+1:i+3] == "GG":
                 pam = seq[i:i+3]
                 protospacer = seq[i-20:i]
-                grna_rna = (protospacer + self._tracrRNA).replace("T", "U")
+                grna_rna = (protospacer + self._sgRNA_scaffold).replace("T", "U")
                 results.append({
                     "grna_sequence": grna_rna,
                     "protospacer": protospacer,

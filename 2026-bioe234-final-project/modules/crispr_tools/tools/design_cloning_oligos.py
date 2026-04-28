@@ -278,9 +278,13 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         "and BsmBI cloning. Overhangs must be verified from the plasmid map/protocol."
     ),
     citations=(
+        Citation("Chow et al Nat Methods. 2019 May;16(5):405–408",
+                 "https://doi.org/10.1038/s41592-019-0371-5",
+                 "U6-driven crRNA cassette; LbCpf1 direct repeat; BsmBI cloning cassette; lentiviral delivery; puromycin selection"),
         Citation("Addgene #123360",
                 "https://www.addgene.org/123360/",
-                "LbCpf1 crRNA cloning cassette using BsmBI"),
+                "Plasmid map verification"
+
     ),
 ),
 
@@ -304,9 +308,13 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         "into a BsmBI cassette. Overhangs must be verified from the plasmid map/protocol."
     ),
     citations=(
-        Citation("Addgene #114087",
-                "https://www.addgene.org/114087/",
-                "FnCas12a crRNA entry vector; clone spacer oligos into BsmBI cassette"),
+        Citation(
+            "Kleinstiver et al. Nat Biotechnol 2019",
+            "https://doi.org/10.1038/s41587-018-0011-0",
+            "FnCas12a crRNA cloning vector using BsmBI spacer insertion",
+            "Addgene #114087",
+            "https://www.addgene.org/114087/",
+            "FnCas12a crRNA entry vector; clone spacer oligos into BsmBI cassette"),
     ),
 ),
 
@@ -341,8 +349,8 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
             "is not re-cuttable by either enzyme alone."
         ),
         citations=(
-            Citation("Jiang et al. Nat Biotechnol 2015",
-                     "https://doi.org/10.1038/nbt.3234",
+            Citation("Jiang et al. Appl Environ Microbiol. 2015 Apr;81(7):2506-14. doi: 10.1128/AEM.04023-14. Epub 2015 Jan 30.",
+                     "https://journals.asm.org/doi/10.1128/aem.04023-14",
                      "pTargetF/pCas9-CR4 two-plasmid system; SpeI restriction ligation"),
             Citation("Addgene #62226",
                      "https://www.addgene.org/62226/",
@@ -565,50 +573,6 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         ),
     ),
 
-    # ── Educational / backbone-only presets ─────────────────────────────────
-    "pet28a": VectorSpec(
-        name="pET28a",
-        cloning_method="RestrictionLigation",
-        dna_source="pcr_product",
-        enzyme="BsaI",
-        promoter="T7",
-        nuclease_system="N/A",
-        guide_type="N/A",
-        scaffold_in_vector=False,
-        recognition_site="GGTCTC",
-        top_overhang="TAGT",
-        bottom_overhang="AAAC",
-        restriction_site_sequence="GGTCTC",
-        backbone_resource="pET28a",
-        cell_strain="Mach1",
-        selection="Kan",
-        notes="Bundled pET28a GenBank for backbone-validation tests. Not a CRISPR guide vector.",
-        citations=(
-            Citation("Local project file", "modules/crispr_tools/data/pET28a.gb",
-                     "Bundled pET28a backbone"),
-        ),
-    ),
-
-    "pbr322": VectorSpec(
-        name="pBR322",
-        cloning_method="TypeIISOligoCloning",
-        dna_source="annealed_oligos",
-        enzyme="N/A",
-        promoter="N/A",
-        nuclease_system="N/A",
-        guide_type="N/A",
-        scaffold_in_vector=False,
-        top_overhang="CACC",
-        bottom_overhang="AAAC",
-        backbone_resource="pBR322",
-        cell_strain="DH5alpha",
-        selection="Amp",
-        notes="Bundled pBR322 GenBank for backbone-validation tests. Not a CRISPR guide vector.",
-        citations=(
-            Citation("Local project file", "modules/crispr_tools/data/pBR322.gb",
-                     "Bundled pBR322 backbone"),
-        ),
-    ),
 }
 
 # Workflow-level citations (method references independent of any vector)

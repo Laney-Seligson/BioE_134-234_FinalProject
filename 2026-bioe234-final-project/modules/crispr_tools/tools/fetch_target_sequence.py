@@ -13,8 +13,16 @@ Resolution order
 
 The NCBI path uses three Entrez calls:
   esearch  → gene ID from gene name + organism
-  elink    → linked nucleotide record ID
+  esummary → linked nucleotide record ID
   efetch   → FASTA for that nucleotide record
+
+Citations: 
+
+National Center for Biotechnology Information. (n.d.). Entrez programming utilities help (E-utilities). U.S. National Library of Medicine. https://www.ncbi.nlm.nih.gov/books/NBK25501/
+
+National Center for Biotechnology Information. (n.d.). Gene database help. U.S. National Library of Medicine. https://www.ncbi.nlm.nih.gov/books/NBK3841/
+
+  
 
 No API key is required for low-volume use, but NCBI rate-limits unauthenticated
 requests to 3/second. Set NCBI_API_KEY in your .env for higher limits.

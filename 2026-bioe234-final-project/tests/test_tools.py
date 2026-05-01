@@ -16,17 +16,18 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from modules.seq_basics.tools.translate import translate
 from modules.seq_basics.tools.reverse_complement import reverse_complement
-from modules.crispr_tools.tools.create_construction_file import create_construction_file
+from modules.construction_file_tools.tools.create_construction_file import create_construction_file
 from modules.crispr_tools.tools.design_cloning_oligos import design_cloning_oligos
-from modules.crispr_tools.tools.construction_file_validation import (
+from modules.construction_file_tools.tools.validate_construction_file import (
     validate_construction_record,
 )
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.rank_guides import rank_guides
-from modules.crispr_tools.tools.colony_calculator import colony_calculator
-from modules.crispr_tools.tools.interpret_ice_tide import interpret_ice_tide
-from modules.crispr_tools.tools.verify_edit import verify_edit
-from modules.crispr_tools.tools.lab_sheet import lab_sheet
+from modules.labsheet_tools.tools.colony_calculator import colony_calculator
+from modules.labsheet_tools.tools.interpret_ice_tide import interpret_ice_tide
+from modules.crispr_tools.tools.predict_editing_efficiency import predict_editing_efficiency
+from modules.labsheet_tools.tools.verify_edit import verify_edit
+from modules.labsheet_tools.tools.lab_sheet import lab_sheet
 from modules.crispr_tools.tools.lookup_gene_sequence import LookupGeneSequence
 
 
@@ -332,7 +333,7 @@ def test_verify_edit_cas12a_forward_strand():
 def test_verify_edit_cas12a_reverse_strand():
     # RC protospacer on + strand, TAAA after it (= RC of TTTA = TTTV PAM on minus strand)
     protospacer = "ATGATGATGATGATGATGATGAT"
-    from modules.crispr_tools.tools.verify_edit import _reverse_complement
+    from modules.labsheet_tools.tools.verify_edit import _reverse_complement
     rc = _reverse_complement(protospacer)
     # forward strand: [padding][RC protospacer][TAAA][padding]
     reference = "A" * 20 + rc + "TAAA" + "A" * 200
@@ -489,7 +490,8 @@ def test_lab_sheet_goldengate_assemble_section():
     assert "A: Assemble" in text
     assert "DNA Mix:" in text
     assert "BsaI" in text
-    assert "T4 DNA ligase" in text
+    # NEB product naming: "T4 DNA Ligase" — capital L (case-insensitive check)
+    assert "t4 dna ligase" in text.lower()
     assert "program: main/GG1" in text
 
 
@@ -497,7 +499,8 @@ def test_lab_sheet_gibson_assemble_section():
     result = lab_sheet(_make_record(strategy="Gibson"))
     text = result["lab_sheet_text"]
     assert "A: Assemble" in text
-    assert "2X Gibson Mix" in text
+    # NEB product is "Gibson Assembly Master Mix (2X)" — substring 'Gibson' is enough
+    assert "Gibson" in text and "2X" in text
     assert "program: main/GIB2" in text
 
 
@@ -943,3 +946,515 @@ def test_interpret_ice_tide_unedited_dominant_warns():
     )
     assert result["dominant_indel"] == "0"
     assert any("unedited" in w.lower() for w in result["warnings"])
+
+
+
+# ---------------------------------------------------------------------------
+# predict_editing_efficiency tests
+# ---------------------------------------------------------------------------
+
+def test_predict_editing_efficiency_good_guide_high_score():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG",  # GC=50%, ends in G
+        pam="AGG",
+        nuclease="cas9",
+        delivery="rnp",
+        outcome="nhej",
+    )
+    # Good guide + RNP + NHEJ should predict moderate-to-high efficiency
+    assert result["on_target_efficiency_pct"] > 50
+    assert result["warnings"] == []
+    assert "feature_contributions" in result
+    assert len(result["confidence_range"]) == 2
+
+
+def test_predict_editing_efficiency_polyt_guide_dies():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATTTTTGCATGCATGG",  # contains TTTT
+        pam="AGG",
+        nuclease="cas9",
+    )
+    # Poly-T should kill the score and produce a warning
+    assert result["on_target_efficiency_pct"] < 25
+    assert any("TTTT" in w or "Pol III" in w for w in result["warnings"])
+
+
+def test_predict_editing_efficiency_weak_pam_warns():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG",
+        pam="AAG",  # NAG is weak
+        nuclease="cas9",
+    )
+    assert any("PAM" in w for w in result["warnings"])
+
+
+def test_predict_editing_efficiency_hdr_lower_than_nhej():
+    nhej = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", outcome="nhej"
+    )
+    hdr = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", outcome="hdr"
+    )
+    # HDR is ~10% of NHEJ
+    assert hdr["on_target_efficiency_pct"] < nhej["on_target_efficiency_pct"] / 5
+
+
+def test_predict_editing_efficiency_rnp_better_than_plasmid():
+    rnp = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", delivery="rnp"
+    )
+    plasmid = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG", pam="AGG", delivery="plasmid"
+    )
+    assert rnp["on_target_efficiency_pct"] > plasmid["on_target_efficiency_pct"]
+
+
+def test_predict_editing_efficiency_empty_protospacer_raises():
+    with pytest.raises(ValueError):
+        predict_editing_efficiency(protospacer="", pam="AGG")
+
+
+def test_predict_editing_efficiency_wrong_length_raises():
+    with pytest.raises(ValueError):
+        # 19bp instead of 20
+        predict_editing_efficiency(protospacer="ATGCATGCATGCATGCATG", pam="AGG", nuclease="cas9")
+
+
+def test_predict_editing_efficiency_invalid_delivery_raises():
+    with pytest.raises(ValueError):
+        predict_editing_efficiency(
+            protospacer="ATGCATGCATGCATGCATGG", pam="AGG", delivery="magic_beans"
+        )
+
+
+# ---------------------------------------------------------------------------
+# CFD score tests for predict_offtargets
+# ---------------------------------------------------------------------------
+
+def test_predict_offtargets_cfd_perfect_match_is_one():
+    protospacer = "ATGATGATGATGATGATGAT"
+    reference = protospacer + "AGG" + "C" * 50
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # First site should be the on-target with CFD = 1.0
+    on = result["offtarget_sites"][0]
+    assert on["mismatches"] == 0
+    assert on["cfd_score"] == 1.0
+
+
+def test_predict_offtargets_aggregate_cfd_excludes_on_target():
+    protospacer = "ATGATGATGATGATGATGAT"
+    # only on-target in reference
+    reference = protospacer + "AGG" + "C" * 50
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas9")
+    # aggregate CFD excludes the on-target -> 0 if no other matches
+    assert result["aggregate_offtarget_cfd"] == 0.0
+
+
+def test_predict_offtargets_pam_distal_mismatch_higher_cfd_than_seed_mismatch():
+    # seed mismatch (PAM-proximal) penalizes harder than PAM-distal mismatch
+    # protospacer ATGATGATGATGATGATGAT
+    # PAM-distal mismatch (position 20 from PAM-proximal end = position 1 in seq):
+    #   change first base
+    seed_mismatch_off = "ATGATGATGATGATGATGAA"  # last base differs (PAM-proximal pos 1)
+    distal_mismatch_off = "TTGATGATGATGATGATGAT"  # first base differs (PAM-distal pos 20)
+    # Both with PAM
+    reference = seed_mismatch_off + "AGG" + "C" * 30 + distal_mismatch_off + "AGG" + "C" * 30
+    result = predict_offtargets(
+        protospacer="ATGATGATGATGATGATGAT",
+        reference=reference,
+        nuclease="cas9",
+        max_mismatches=1,
+    )
+    # find the two off-target entries
+    seed_site = next(s for s in result["offtarget_sites"] if s["sequence"] == seed_mismatch_off)
+    distal_site = next(s for s in result["offtarget_sites"] if s["sequence"] == distal_mismatch_off)
+    # Distal mismatch should have HIGHER CFD (less harmful) than seed mismatch
+    assert distal_site["cfd_score"] > seed_site["cfd_score"]
+
+
+def test_predict_offtargets_no_pam_cfd_is_zero():
+    protospacer = "ATGATGATGATGATGATGAT"
+    # no NGG after the protospacer
+    reference = protospacer + "ACC" + "C" * 50
+    result = predict_offtargets(protospacer=protospacer, reference=reference, nuclease="cas9")
+    for s in result["offtarget_sites"]:
+        if not s["has_pam"]:
+            assert s["cfd_score"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Citation-field smoke tests — every Jillian tool must emit a "citations"
+# field shaped like Laney's: list of {"label", "reference", "claim"} dicts.
+# ---------------------------------------------------------------------------
+
+def _assert_well_formed_citations(citations):
+    assert isinstance(citations, list)
+    assert len(citations) > 0
+    for c in citations:
+        assert isinstance(c, dict)
+        assert set(c.keys()) == {"label", "reference", "claim"}
+        assert all(isinstance(c[k], str) and c[k] for k in c)
+
+
+def test_rank_guides_emits_citations():
+    result = rank_guides(
+        guides=[{"protospacer": "ATGCATGCATGCATGCATGG"}],
+        reference="ATGCATGCATGCATGCATGGAGG" + "C" * 50,
+        nuclease="cas9",
+    )
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_predict_offtargets_emits_citations():
+    result = predict_offtargets(
+        protospacer="ATGCATGCATGCATGCATGG",
+        reference="ATGCATGCATGCATGCATGGAGG" + "C" * 50,
+        nuclease="cas9",
+    )
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_predict_editing_efficiency_emits_citations():
+    result = predict_editing_efficiency(
+        protospacer="ATGCATGCATGCATGCATGG",
+        pam="AGG",
+        nuclease="cas9",
+        delivery="rnp",
+        outcome="nhej",
+    )
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_colony_calculator_emits_citations_for_preset():
+    result = colony_calculator(preset="hdr_mammalian", desired_clones=1)
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_colony_calculator_emits_citations_for_custom_efficiency():
+    result = colony_calculator(editing_efficiency=0.5, desired_clones=1)
+    _assert_well_formed_citations(result["citations"])
+
+
+def test_interpret_ice_tide_cites_ice_paper_for_ice():
+    result = interpret_ice_tide(editing_pct=80, r_squared=0.95, tool="ice")
+    _assert_well_formed_citations(result["citations"])
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Hsiau" in labels
+
+
+def test_interpret_ice_tide_cites_tide_paper_for_tide():
+    result = interpret_ice_tide(editing_pct=80, r_squared=0.95, tool="tide")
+    _assert_well_formed_citations(result["citations"])
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Brinkman" in labels
+
+
+def test_lab_sheet_emits_protocol_sources_and_disclaimer():
+    """lab_sheet output should include protocol_sources (one entry per
+    canonical recipe used), a flat citations list, and a verify_before_use
+    disclaimer. This is the auditable-recipe contract from _protocols.py."""
+    result = lab_sheet(_make_record(strategy="GoldenGate"))
+
+    # disclaimer present and non-empty
+    assert "verify_before_use" in result
+    assert isinstance(result["verify_before_use"], str)
+    assert "confirm" in result["verify_before_use"].lower()
+
+    # protocol_sources: one entry per step type
+    sources = result["protocol_sources"]
+    assert isinstance(sources, list)
+    assert len(sources) >= 1
+    for entry in sources:
+        assert "step" in entry and "sources" in entry
+        assert isinstance(entry["sources"], list) and len(entry["sources"]) >= 1
+        for s in entry["sources"]:
+            assert set(s.keys()) == {"label", "reference", "claim"}
+
+    # citations: flat list shape consistent with other tools
+    assert isinstance(result["citations"], list)
+    assert len(result["citations"]) >= 1
+    for c in result["citations"]:
+        assert set(c.keys()) == {"label", "reference", "claim"}
+
+
+def test_lab_sheet_goldengate_cites_engler_and_neb():
+    """GoldenGate assembly should cite Engler 2008 + NEB E1601."""
+    result = lab_sheet(_make_record(strategy="GoldenGate"))
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Engler" in labels
+    assert "BsaI" in labels or "E1601" in labels
+
+
+def test_lab_sheet_gibson_cites_gibson_2009():
+    """Gibson assembly should cite Gibson 2009 + NEB E2611."""
+    result = lab_sheet(_make_record(strategy="Gibson"))
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Gibson" in labels
+
+
+def test_lab_sheet_pick_uses_colony_calculator_default():
+    """Default Mach1 → cloning success rate 0.8, n=2 colonies for 95% conf."""
+    result = lab_sheet(_make_record())
+    plan = result["colony_plan"][0]
+    assert plan["colonies_to_pick"] == 2
+    assert plan["labels"] == ["A1A", "A1B"]
+
+
+def test_lab_sheet_pick_scales_for_low_efficiency():
+    """Low editing efficiency → many more colonies recommended."""
+    result = lab_sheet(_make_record(), editing_efficiency=0.05)
+    plan = result["colony_plan"][0]
+    assert plan["colonies_to_pick"] >= 50
+    # pick section text should reflect the count
+    assert f"{plan['colonies_to_pick']}" in result["lab_sheet_text"]
+
+
+def test_lab_sheet_pick_uses_preset():
+    """Passing a colony_preset should plumb through to colony_calculator."""
+    result = lab_sheet(_make_record(), colony_preset="hdr_mammalian")
+    plan = result["colony_plan"][0]
+    assert plan["preset"] == "hdr_mammalian"
+    assert plan["colonies_to_pick"] > 30
+
+
+def test_lab_sheet_gel_size_computed_from_primers():
+    """When parts list carries sequences, gel size should be a real bp number."""
+    template = (
+        "AAAAAAAAAAATGCATGCATGCATGCATGCATGCATGCATGCATGCAT"
+        "AAAAAAAAAAATGCATGCATGCATGCATGCATGCATGCATGCATGCAT"
+    )
+    fwd = "ATGCATGCATGCATGCATGC"  # matches inside template
+    rev_rc = template[60:80]
+    # reverse complement to make a reverse primer
+    comp = str.maketrans("ACGT", "TGCA")
+    rev = rev_rc.translate(comp)[::-1]
+    record = {
+        "construct_name": "test",
+        "assembly_strategy": "Gibson",
+        "parts": [
+            {"part_type": "dsdna", "name": "tmpl", "sequence": template},
+            {"part_type": "oligo", "name": "f", "sequence": fwd},
+            {"part_type": "oligo", "name": "r", "sequence": rev},
+        ],
+        "operations": [
+            {
+                "step_type": "PCR",
+                "inputs": ["f", "r", "tmpl"],
+                "parameters": {"forward_primer": "f", "reverse_primer": "r", "template": "tmpl"},
+                "output": "amp",
+            }
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    # any positive bp size should appear, not literal "?"
+    assert "bp" in result["lab_sheet_text"]
+
+
+def test_lab_sheet_crispr_delivery_electroporation():
+    """CRISPRDelivery step with method=electroporation should render the
+    Lonza Nucleofection recipe."""
+    record = {
+        "construct_name": "edit_K562",
+        "assembly_strategy": "CRISPR",
+        "parts": [],
+        "operations": [
+            {
+                "step_type": "CRISPRDelivery",
+                "inputs": ["cas9_rnp", "K562_cells"],
+                "parameters": {"method": "electroporation"},
+                "output": "edited_pool",
+            }
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    text = result["lab_sheet_text"]
+    assert "CRISPRDelivery" in text
+    assert "Nucleofect" in text or "Lonza" in text
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Lonza" in labels
+
+
+def test_lab_sheet_emits_protocols_io_links():
+    """Every protocol used should be matched by a clickable protocols.io URL."""
+    result = lab_sheet(_make_record())
+    links = result["protocols_io_links"]
+    assert len(links) >= 1
+    for entry in links:
+        assert entry["search_url"].startswith("https://www.protocols.io/search?q=")
+        assert entry["protocol"]
+
+
+def test_lab_sheet_restriction_ligation_renders():
+    """RestrictionLigation steps used to be silently dropped — lab sheet
+    would jump straight from PCR to Transform. Make sure they now render
+    in full (digest, gel-purify, ligate)."""
+    record = {
+        "construct_name": "pTargetF_lacZ",
+        "assembly_strategy": "RestrictionLigation",
+        "parts": [],
+        "operations": [
+            {
+                "step_type": "PCR",
+                "inputs": ["f", "r", "lacZ_template"],
+                "parameters": {"forward_primer": "f", "reverse_primer": "r", "template": "lacZ_template"},
+                "output": "lacZ_pcr",
+            },
+            {
+                "step_type": "RestrictionLigation",
+                "inputs": ["pTargetF", "lacZ_pcr"],
+                "parameters": {"enzyme": "EcoRI-HF + BamHI-HF"},
+                "output": "pTargetF_lacZ",
+            },
+            {
+                "step_type": "Transform",
+                "inputs": ["pTargetF_lacZ"],
+                "parameters": {"cells": "Mach1", "selection": "Spec", "temperature_c": 37},
+                "output": "pTargetF_lacZ_e",
+            },
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    text = result["lab_sheet_text"]
+    # RestrictionLigation must appear AFTER PCR but BEFORE Transform
+    assert "RestrictionLigation" in text
+    assert text.find("RestrictionLigation") > text.find("PCR")
+    assert text.find("RestrictionLigation") < text.find("Transform")
+    # Recipe content
+    assert "EcoRI" in text or "BamHI" in text
+    assert "T4 DNA Ligase" in text or "T4 ligase" in text.lower() or "ligate" in text.lower()
+    # cited
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Sambrook" in labels or "Inoue" in labels
+
+
+def test_lab_sheet_typeiis_oligo_cloning_renders():
+    """TypeIISOligoCloning step should render anneal+digest-ligate
+    instructions BEFORE Transform — without this the workflow is
+    biologically incomplete (transforms an empty vector)."""
+    record = {
+        "construct_name": "pX330_guide",
+        "assembly_strategy": "TypeIISOligoCloning",
+        "parts": [],
+        "operations": [
+            {
+                "step_type": "TypeIISOligoCloning",
+                "inputs": ["top_oligo", "bottom_oligo", "pX330"],
+                "parameters": {"enzyme": "BbsI-HF", "overhangs": "CACC/AAAC"},
+                "output": "pX330_guide",
+            },
+            {
+                "step_type": "Transform",
+                "inputs": ["pX330_guide"],
+                "parameters": {"cells": "Mach1", "selection": "Amp", "temperature_c": 37},
+                "output": "pX330_guide_e",
+            },
+        ],
+        "notes": "",
+    }
+    result = lab_sheet(record)
+    text = result["lab_sheet_text"]
+    # TypeIIS section must precede Transform
+    assert "TypeIISOligoCloning" in text
+    assert text.find("TypeIISOligoCloning") < text.find("Transform")
+    # Recipe content
+    assert "BbsI" in text
+    assert "anneal" in text.lower() or "Anneal" in text
+    assert "T4 DNA Ligase" in text or "ligase" in text.lower()
+    # Cited
+    labels = " ".join(c["label"] for c in result["citations"])
+    assert "Engler" in labels
+
+
+def test_lab_sheet_uses_guide_specific_sequencing_primers():
+    """When the caller passes verify_edit-style primers, sequencing
+    section should drop L4440 and use the guide-specific primers."""
+    primers = [
+        {"name": "verify_F", "sequence": "ATGCATGCATGCATGCATGC", "location": "oligos1/M1"},
+        {"name": "verify_R", "sequence": "GCATGCATGCATGCATGCAT", "location": "oligos1/M2"},
+    ]
+    result = lab_sheet(_make_record(), sequencing_primers=primers)
+    text = result["lab_sheet_text"]
+    assert "verify_F" in text
+    assert "verify_R" in text
+    assert "L4440" not in text
+
+
+def test_lab_sheet_auto_calls_verify_edit():
+    """When protospacer + verification_reference are passed, lab_sheet
+    should call verify_edit internally and emit a dedicated post-edit
+    EditVerification section (separate from plasmid Sequencing). The
+    plasmid Sequencing section keeps L4440 — different target."""
+    reference = "A" * 100 + "TCAGAAACCTGCCAGTTTGC" + "TGG" + "A" * 200
+    result = lab_sheet(
+        _make_record(),
+        protospacer="TCAGAAACCTGCCAGTTTGC",
+        verification_reference=reference,
+        nuclease="cas9",
+    )
+    assert result["verify_edit_summary"] is not None
+    summary = result["verify_edit_summary"]
+    assert summary["protospacer"] == "TCAGAAACCTGCCAGTTTGC"
+    # at least one genomic primer should be designed for a usable reference
+    assert summary["forward_primer"] or summary["reverse_primer"]
+    # Distinct EditVerification section now appears
+    assert "EditVerification" in result["lab_sheet_text"]
+    assert "ICE" in result["lab_sheet_text"] or "TIDE" in result["lab_sheet_text"]
+    # Plasmid Sequencing still uses L4440 (different target)
+    assert "L4440" in result["lab_sheet_text"]
+
+
+def test_lab_sheet_explicit_primers_win_over_auto():
+    """If both auto-call inputs and explicit sequencing_primers are
+    provided, explicit primers should win (verify_edit not invoked)."""
+    primers = [{"name": "my_primer", "location": "oligos1/Z9"}]
+    result = lab_sheet(
+        _make_record(),
+        protospacer="TCAGAAACCTGCCAGTTTGC",
+        verification_reference="ACGTACGTACGT",  # too short, would otherwise fail
+        sequencing_primers=primers,
+    )
+    assert "my_primer" in result["lab_sheet_text"]
+    assert result["verify_edit_summary"] is None
+
+
+def test_lab_sheet_defaults_to_l4440_when_no_primers_given():
+    """Backward-compat: with no sequencing_primers passed, fall back to L4440."""
+    result = lab_sheet(_make_record())
+    assert "L4440" in result["lab_sheet_text"]
+
+
+def test_lab_sheet_unknown_crispr_method_raises():
+    record = {
+        "construct_name": "x",
+        "assembly_strategy": "CRISPR",
+        "parts": [],
+        "operations": [{
+            "step_type": "CRISPRDelivery",
+            "inputs": [],
+            "parameters": {"method": "wormhole"},
+            "output": "y",
+        }],
+        "notes": "",
+    }
+    with pytest.raises(ValueError):
+        lab_sheet(record)
+
+
+def test_verify_edit_emits_citations():
+    reference = (
+        "CCCTAGATGCCTGGCTCAGAAACCTGCCAGTTTGCTGGCACGTTTTTTTCTTTTGTCTT"
+        "TAGTTCTCACGTTTGTCATACTTGACAACGCTTCTTTAACCAAATATAATTGTTC"
+    )
+    result = verify_edit(
+        protospacer="TCAGAAACCTGCCAGTTTGC",
+        reference=reference,
+        nuclease="cas9",
+    )
+    _assert_well_formed_citations(result["citations"])
+    labels = " ".join(c["label"] for c in result["citations"])
+    # Cas9 mechanism + primer Tm + ICE/TIDE protocol papers should all appear
+    assert "Jinek" in labels
+    assert "Wallace" in labels

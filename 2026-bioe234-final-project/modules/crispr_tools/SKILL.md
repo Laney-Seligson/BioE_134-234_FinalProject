@@ -1,6 +1,6 @@
 ---
 name: crispr_tools
-description: CRISPR pipeline tools — guide RNA design, off-target prediction, cloning oligo design, edit verification, and ICE/TIDE interpretation.
+description: CRISPR pipeline tools — guide RNA design, off-target prediction, cloning oligo design, and editing efficiency prediction.
 ---
 
 # crispr_tools — Skill Guidance for Gemini
@@ -105,84 +105,46 @@ Use when the user asks:
 - `max_mismatches` (optional): max mismatches to still flag a site. Default 3.
 
 **What it returns:**
-A ranked list of off-target sites, each with position, strand, mismatch count, seed-region mismatches, PAM presence, and a risk level (HIGH / MEDIUM / LOW). Also includes a one-sentence specificity summary.
+A ranked list of off-target sites, each with position, strand, mismatch count, seed-region mismatches, PAM presence, risk level (HIGH / MEDIUM / LOW), and a `cfd_score`. Two aggregate fields: `aggregate_offtarget_cfd` (sum of all off-target CFD scores; lower = more specific guide) and `max_offtarget_cfd` (worst single off-target; above 0.1 warrants concern). Also includes a one-sentence specificity summary.
 
 **Risk logic (Hsu et al. 2013):**
 - HIGH: 0 mismatches, or no seed-region mismatches + PAM present
-- MEDIUM: ≤1 seed mismatch + PAM, or ≤2 total mismatches + PAM
+- MEDIUM: <=1 seed mismatch + PAM, or <=2 total mismatches + PAM
 - LOW: everything else
 
-The seed region is positions 1–12 from the PAM end — mismatches there are more dangerous because that is where Cas9 first contacts DNA.
+The seed region is positions 1-12 from the PAM end — mismatches there are more dangerous because that is where Cas9 first contacts DNA.
+
+**CFD score (Doench 2016):** Each off-target's `cfd_score` is the predicted cutting frequency relative to the on-target (0 = no cutting, 1 = same as on-target). Sites without a PAM have CFD = 0. Use `max_offtarget_cfd` as a quick specificity flag: >0.1 means at least one off-target could be cut at >10% the on-target rate.
 
 ---
 
-### `crispr_verify_edit`
-After a CRISPR experiment, calculates the expected Cas9 cut site and designs flanking sequencing primers for ICE/TIDE analysis to verify editing efficiency.
+### `crispr_predict_editing_efficiency`
+Predicts on-target editing efficiency **before the experiment** using a simplified Doench 2016 Rule Set 2 model. Returns a predicted % efficiency and a +-15% confidence range. Use this to give the user a guide-specific estimate — more accurate than the generic delivery presets in `colony_calculator`.
 
-Use when the user asks:
-- "how do I verify my CRISPR edit?"
-- "where did Cas9 cut?"
-- "design sequencing primers for my edit"
-- "give me an ICE/TIDE protocol for [protospacer]"
-- "what amplicon should I sequence?"
+Use when:
+- The user asks "how well will this guide work?" or "what efficiency do we expect?"
+- During the full design workflow — call after `crispr_rank_guides` to give a pre-experiment efficiency prediction for the best guide
+- When offering colony picking guidance — call this first to get a guide-specific efficiency, then pass it to `colony_calculator`
 
 **Inputs:**
-- `protospacer`: the 20 bp DNA protospacer used during the edit (no PAM).
-- `reference`: the original unedited reference sequence. Accepts resource name, raw string, FASTA, or GenBank.
-- `primer_offset` (optional): bp from cut site to each primer. Default 150. Reduce for short test sequences.
-- `primer_len` (optional): primer length in bp. Default 20.
+- `protospacer` (str): 20 bp (Cas9) or 23 bp (Cas12a). No PAM.
+- `pam` (str): the PAM adjacent to the protospacer (e.g. `"AGG"` for Cas9, `"TTTA"` for Cas12a).
+- `nuclease` (str): `"cas9"` (default) or `"cas12a"`.
+- `downstream_3nt` (str, optional): 3 nt immediately after the PAM — used for NGGT vs NGGA PAM preference (Cas9 only).
+- `delivery` (str, default `"plasmid"`): one of `"rnp"`, `"plasmid"`, `"lentivirus"`, `"aav"`, `"electroporation"`.
+- `outcome` (str, default `"nhej"`): one of `"nhej"` (knockout), `"hdr"` (knockin), `"base_edit"`, `"prime_edit"`.
 
 **What it returns:**
-- `cut_position`: where Cas9 cuts (between nt 17–18 of the protospacer, 3 bp upstream of PAM)
-- `forward_primer` / `reverse_primer`: sequencing primer sequences and positions
-- `amplicon_sequence` / `amplicon_length`: what to PCR-amplify
-- `cut_offset_in_amplicon`: where the cut falls inside the amplicon (needed for ICE/TIDE)
-- `interpretation_guide`: step-by-step ICE/TIDE protocol with all coordinates filled in
+- `on_target_efficiency_pct`: predicted % editing after delivery/outcome adjustment
+- `confidence_range`: [low, high] as +-15 percentage points
+- `feature_contributions`: breakdown of what helped/hurt the score (position weights, PAM context, GC, poly-T)
+- `interpretation`: plain-English verdict (high / moderate / low / very low)
+- `warnings`: red flags like poly-T runs, weak PAM, GC out of range
 
-**Workflow after calling this tool:**
-1. PCR-amplify the amplicon using the returned primers
-2. Sanger-sequence the PCR product
-3. Upload the .ab1 trace to ICE (Synthego) or TIDE (Brinkman et al. 2014) with the amplicon sequence and cut offset
-4. Once the user has their ICE/TIDE results, use `interpret_ice_tide` to interpret them (see below)
+**How efficiency feeds into colony picking:**
+Pass `on_target_efficiency_pct / 100` as `editing_efficiency` to `colony_calculator` for a guide-specific colony count rather than a generic preset.
 
-**Required follow-up:** After presenting the verify_edit output, always close with:
-
-> "Once you have your ICE or TIDE results, come back and I can interpret the editing efficiency for you — just share the KO score (ICE) or indel percentage (TIDE) and the R² fit value."
-
----
-
-### `interpret_ice_tide`
-Interprets the output of an ICE (Synthego) or TIDE (Brinkman et al. 2014) analysis and gives a plain-English verdict with actionable next steps. This closes the loop started by `crispr_verify_edit`.
-
-Use when the user:
-- Shares an ICE or TIDE result ("my ICE score is 45%, R² = 0.93")
-- Asks "what does this editing efficiency mean?"
-- Asks "is my CRISPR experiment working?"
-- Asks "what should I do next based on my ICE/TIDE result?"
-
-**Inputs:**
-- `editing_pct` (float): the KO score (ICE) or total indel percentage (TIDE). Range 0–100.
-- `r_squared` (float): the R² fit quality reported by the tool. Range 0–1.
-- `tool` (str): `"ice"` or `"tide"` (default `"ice"`).
-- `indel_distribution` (dict, optional): mapping of indel size to percentage, e.g. `{"+1": 45.2, "-3": 12.1, "0": 42.7}`. If provided, the dominant indel is highlighted and contradictions with `editing_pct` are flagged.
-- `sample_id` (str, optional): a label for the report.
-
-**What it returns:**
-- `efficiency_classification`: `FAILED` (<10%), `MARGINAL` (10–30%), `GOOD` (30–70%), or `EXCELLENT` (≥70%)
-- `fit_quality`: `HIGH` (R²≥0.90), `MODERATE` (0.80–0.89), or `LOW` (<0.80)
-- `is_reliable`: False if R²<0.80 — result should not be trusted regardless of editing percentage
-- `warnings`: list of issues (low fit quality, unedited reads dominating, etc.)
-- `next_steps`: list of concrete recommended actions
-- `summary`: one-paragraph plain-English verdict
-
-**Thresholds (Hsiau et al. 2019, Brinkman et al. 2014):**
-- R²<0.80 → unreliable; re-sequence before drawing any conclusions
-- <10% editing → FAILED; check guide design, delivery, and PAM
-- 10–30% → MARGINAL; consider re-transfecting or higher dose
-- 30–70% → GOOD; pick colonies and screen single clones
-- ≥70% → EXCELLENT; proceed directly to clone isolation
-
-Always present the `summary`, `warnings`, and `next_steps` fields clearly. If `is_reliable` is False, lead with the reliability warning before the editing percentage.
+**Caveat:** This is a simplified linear approximation of Doench Rule Set 2, not the full Azimuth/CRISPOR model. Treat predictions as estimates, not guarantees — especially for HDR where cell type and donor design dominate.
 
 ---
 
@@ -214,12 +176,17 @@ When the user asks to "design CRISPR cloning oligos" or "design a guide RNA and 
 
 1. Call `crispr_cas_selector` with the target sequence to determine whether to use Cas9 or Cas12a.
 2. Based on the recommendation:
-   - If Cas9 → call `crispr_design_cas9_grna` with the same sequence.
-   - If Cas12a → call `crispr_design_cas12a_crrna` with the same sequence.
-3. Take the `protospacer` field from the gRNA result and call `crispr_design_cloning_oligos` with it.
-4. Call `crispr_predict_offtargets` with the `protospacer` and the same reference sequence to check for off-target sites.
-5. Report all four results together: recommended Cas system, gRNA/crRNA sequence, protospacer, efficiency score, top/bottom cloning oligos, and the off-target specificity summary.
-6. **Only after all steps above are complete**, ask:
+   - If Cas9 -> call `crispr_design_cas9_grna` with the same sequence.
+   - If Cas12a -> call `crispr_design_cas12a_crrna` with the same sequence.
+3. Call `crispr_rank_guides` with the full `guides` list returned in step 2 and the same reference sequence. This scores all candidates on efficiency (GC content, no poly-T, PAM-proximal G) and specificity (off-target risk), then selects the best one.
+4. Call `crispr_predict_editing_efficiency` with `best_guide.protospacer` and its PAM to get a guide-specific predicted efficiency % (adjust `delivery` and `outcome` from context if known, otherwise use defaults: `delivery="plasmid"`, `outcome="nhej"`).
+5. Take `best_guide.protospacer` from the ranking result and call `crispr_design_cloning_oligos` with it.
+6. Call `crispr_predict_offtargets` with `best_guide.protospacer` and the same reference sequence to get the full off-target site list including CFD scores.
+7. Report all results together. **Always include:**
+   - The `scoring_rationale` from `crispr_rank_guides` (why this guide was selected)
+   - The `interpretation` and `on_target_efficiency_pct` from `crispr_predict_editing_efficiency` (pre-experiment efficiency estimate)
+   - The `max_offtarget_cfd` from `crispr_predict_offtargets` (specificity flag — flag if >0.1)
+8. **Only after all steps above are complete**, ask:
 
    > "All CRISPR design and validation steps are complete. Would you like me to generate:
    > **(a) a construction file** — a structured record of the cloning workflow,
@@ -227,21 +194,23 @@ When the user asks to "design CRISPR cloning oligos" or "design a guide RNA and 
    > **(c) both**, or
    > **(d) neither**?"
 
-   - If **(a) construction file only**: call `create_construction_file`, present the result, then offer the lab sheet per the section above.
-   - If **(b) lab sheet only** or **(c) both**: call `create_construction_file` first, present the result, then immediately call `crispr_lab_sheet` with the returned `structured_construction_file`.
+   - If **(a) construction file only**: call `create_construction_file`, present the result, then offer the lab sheet.
+   - If **(b) lab sheet only** or **(c) both**: call `create_construction_file` first, present the result, then immediately call `crispr_lab_sheet`. After presenting the lab sheet, offer colony picking (see `labsheet_tools` SKILL for colony calculator guidance), then close with the sequencing/ICE-TIDE handoff.
    - If **(d) neither**: acknowledge and stop.
 
 Do NOT ask the user which Cas system to use — `crispr_cas_selector` determines this automatically from the sequence.
 Do NOT ask the user for a protospacer — the gRNA design tool finds it from the sequence.
-Do NOT stop between steps 1–5 to ask for confirmation.
-Do NOT offer the construction file or lab sheet before step 5 is complete.
+Do NOT stop between steps 1-7 to ask for confirmation.
+Do NOT offer the construction file or lab sheet before step 7 is complete.
+Do NOT call `crispr_verify_edit` during this workflow — offer it separately after the construction file/lab sheet are done so the user can order sequencing primers alongside cloning oligos.
+Do NOT offer ICE/TIDE interpretation during this workflow — it belongs after the user has sequencing results in hand.
 
 ---
 
 ## Sequence input rules (handled automatically)
 
 You never need to paste the full sequence. The framework resolves these automatically:
-- `"pBR322"` → full 4361 bp sequence
-- A raw string like `"ATGCGATCG"` → used as-is
-- A FASTA string starting with `>` → sequence extracted automatically
-- A GenBank string starting with `LOCUS` → sequence extracted automatically
+- `"pBR322"` -> full 4361 bp sequence
+- A raw string like `"ATGCGATCG"` -> used as-is
+- A FASTA string starting with `>` -> sequence extracted automatically
+- A GenBank string starting with `LOCUS` -> sequence extracted automatically

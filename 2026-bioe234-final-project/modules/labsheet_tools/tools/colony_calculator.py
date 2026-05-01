@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 
+from modules.crispr_tools.tools.citations import cites, format_citations
+
 
 def _binomial_at_least_k(n: int, p: float, k: int) -> float:
     """
@@ -192,6 +194,21 @@ class ColonyCalculator:
             f"(1.5x bump for failed PCR/contamination losses). {advice}"
         )
 
+        # Pick citations based on which preset/efficiency context applies.
+        citation_keys: list[str] = []
+        if preset == "cas9_rnp_mammalian":
+            citation_keys.extend(["kim_2014_rnp", "lin_2014"])
+        elif preset == "cas9_plasmid_mammalian":
+            citation_keys.append("kim_2014_rnp")
+        elif preset in ("cas9_ecoli", "cas12a_ecoli"):
+            citation_keys.append("jiang_2013")
+        elif preset in ("hdr_mammalian", "hdr_ecoli"):
+            citation_keys.append("paquet_2016")
+        else:
+            # User-supplied efficiency — cite the general benchmark papers
+            # that span the typical range so they can sanity-check.
+            citation_keys.extend(["kim_2014_rnp", "paquet_2016", "jiang_2013"])
+
         return {
             "editing_efficiency": editing_efficiency,
             "desired_clones": desired_clones,
@@ -201,6 +218,7 @@ class ColonyCalculator:
             "probability_at_chosen_n": round(actual_prob, 4),
             "safety_margin_recommendation": safety_n,
             "recommendation": recommendation,
+            "citations": format_citations(cites(*citation_keys)),
         }
 
 

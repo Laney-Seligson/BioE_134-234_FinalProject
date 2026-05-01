@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional
 
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
+from modules.crispr_tools.tools.citations import cites, format_citations
 
 _SUPPORTED_NUCLEASES = {"cas9", "cas12a"}
 
@@ -171,6 +171,9 @@ class RankGuides:
         if not reference or not reference.strip():
             raise ValueError("reference must not be empty.")
 
+        # Accept either a list of dicts (from design tools) or a list of plain strings
+        guides = [{"protospacer": g} if isinstance(g, str) else g for g in guides]
+
         scored = []
         for guide in guides:
             protospacer = guide.get("protospacer")
@@ -213,10 +216,19 @@ class RankGuides:
             f"{best['specificity_details']['medium_risk_offtargets']} MEDIUM)."
         )
 
+        # Citations are based on which scoring rules were applied:
+        # - Doench 2016 for the on-target efficiency rules
+        # - Hsu 2013 for off-target seed-region scoring (via predict_offtargets)
+        # - Cas12a-specific work when nuclease=cas12a
+        citation_keys = ["doench_2016", "hsu_2013"]
+        if nuclease == "cas12a":
+            citation_keys.extend(["zetsche_2015", "kim_2016_cas12a", "kim_2018_cas12a"])
+
         return {
             "ranked_guides": scored,
             "best_guide": best,
             "scoring_rationale": rationale,
+            "citations": format_citations(cites(*citation_keys)),
         }
 
 

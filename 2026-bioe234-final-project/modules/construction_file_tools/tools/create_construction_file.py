@@ -201,7 +201,16 @@ class CreateConstructionFile:
             self._require_nonempty_string(insert_name, "insert_name")
             self._require_nonempty_string(insert_sequence, "insert_sequence")
 
-        backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
+        if assembly_strategy == "TypeIISOligoCloning":
+            # Backbone sequence is not needed for computation in TypeIIS oligo cloning
+            # (no PCR primer design or overlap calculation). Accept the plasmid name
+            # as-is and store "N" when no real sequence is provided.
+            _dna_chars = set("ACGTNacgtn")
+            _compact = "".join(ch for ch in backbone_sequence if ch.isalpha())
+            if not (_compact and set(_compact) <= _dna_chars):
+                backbone_sequence = "N"
+        else:
+            backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
         if insert_sequence.strip():
             insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
 

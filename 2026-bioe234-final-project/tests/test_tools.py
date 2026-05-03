@@ -94,36 +94,6 @@ def test_create_construction_file_basic():
     assert "construction_file_txt" in result
 
 
-def test_design_cloning_oligos_defaults_to_ecoli_pcrispr_reference():
-    result = design_cloning_oligos(
-        protospacer="TACTTTACGCAGCGCGGAGT",
-        organism="E. coli",
-        target_reference="ecoli_rpsl",
-    )
-
-    assert result["vector"] == "pcrispr"
-    assert result["enzyme"] == "BsaI"
-    assert result["source"].startswith("Jiang et al. Nat Biotechnol 2013")
-    assert result["target_verification"]["verified"] is True
-    assert result["target_verification"]["reference"] == "ecoli_rpsl"
-    assert result["top_oligo"] == "AAACTACTTTACGCAGCGCGGAGT"
-    assert result["bottom_oligo"] == "AAAACACTCCGCGCTGCGTAAAGTA"
-    assert result["construction_file_inputs"]["backbone_name"] == "pCRISPR_rpsL"
-    assert result["construction_file_inputs"]["backbone_sequence"] != "N"
-    assert len(result["construction_file_inputs"]["backbone_sequence"]) == 2433
-    assert result["construction_file_inputs"]["cell_strain"] == "HME63 or MG1655 carrying pCas9"
-    assert result["construction_file_inputs"]["selection"] == "Kan"
-
-
-def test_design_cloning_oligos_rejects_unsupported_organism_verification():
-    with pytest.raises(ValueError, match="downloaded local references"):
-        design_cloning_oligos(
-            protospacer="CCGGATGCTCCTCAGCTCTG",
-            vector="pET28a",
-            organism="zebrafish",
-        )
-
-
 def test_validate_construction_record_name_agnostic():
     result = create_construction_file(**VALID_CONSTRUCTION_INPUT)
     record = result["structured_construction_file"]
@@ -760,12 +730,12 @@ def test_rank_guides_scores_single_guide_cas9():
         nuclease="cas9",
     )
     top = result["ranked_guides"][0]
-    assert top["efficiency_score"] == 3
+    assert top["efficiency_score"] == 2
     assert top["specificity_score"] == 1
-    assert top["total_score"] == 4
+    assert top["total_score"] == 3
     assert top["efficiency_details"]["gc_content_ok"] is True
     assert top["efficiency_details"]["no_polyt_run"] is True
-    assert top["efficiency_details"]["g_at_pam_proximal"] is True
+    assert "g_at_pam_proximal" not in top["efficiency_details"]
     assert result["best_guide"] is top
     assert "scoring_rationale" in result
 

@@ -283,8 +283,7 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
                  "U6-driven crRNA cassette; LbCpf1 direct repeat; BsmBI cloning cassette; lentiviral delivery; puromycin selection"),
         Citation("Addgene #123360",
                 "https://www.addgene.org/123360/",
-                "Plasmid map verification"
-
+                "Plasmid map verification"),
     ),
 ),
 
@@ -311,7 +310,8 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         Citation(
             "Kleinstiver et al. Nat Biotechnol 2019",
             "https://doi.org/10.1038/s41587-018-0011-0",
-            "FnCas12a crRNA cloning vector using BsmBI spacer insertion",
+            "FnCas12a crRNA cloning vector using BsmBI spacer insertion"),
+        Citation(
             "Addgene #114087",
             "https://www.addgene.org/114087/",
             "FnCas12a crRNA entry vector; clone spacer oligos into BsmBI cassette"),

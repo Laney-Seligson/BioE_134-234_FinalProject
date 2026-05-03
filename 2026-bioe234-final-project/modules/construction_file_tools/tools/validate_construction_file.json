@@ -161,7 +161,7 @@
 
   "execution_details": {
     "language": "Python",
-    "source": "modules/crispr_tools/tools/validate_construction_file.py",
+    "source": "modules/construction_file_tools/tools/validate_construction_file.py",
     "initialization": "initiate",
     "execution": "run",
     "disposal": null,

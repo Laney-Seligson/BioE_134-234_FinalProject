@@ -242,7 +242,7 @@ When a user refers to a paper:
 - do NOT invent missing values
 
 ### `get_paper_info`
-Loads a curated paper information JSON record from `modules/crispr_tools/data/paper_info/`.
+Loads a curated paper information JSON record from `modules/construction_file_tools/data/paper_info/`.
 
 Use when the user asks:
 - "what is the miao paper"

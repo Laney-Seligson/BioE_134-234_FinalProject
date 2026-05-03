@@ -7,7 +7,7 @@ from typing import Any
 class GetPaperInfo:
     """
     Description:
-        Load a curated paper information JSON record from the crispr_tools data directory.
+        Load a curated paper information JSON record from the construction_file_tools data directory.
         Supports both paper_important_info_v1 and paper_important_info_v2 records and
         normalizes the result so downstream tools can use a consistent structure.
 
@@ -42,8 +42,8 @@ class GetPaperInfo:
 
     def _candidate_paths(self, paper_id: str) -> list[Path]:
         base_dirs = [
-            Path("modules/crispr_tools/data/paper_info"),
-            Path("modules/crispr_tools/data"),
+            Path("modules/construction_file_tools/data/paper_info"),
+            Path("modules/construction_file_tools/data"),
         ]
         candidates: list[Path] = []
         for base in base_dirs:

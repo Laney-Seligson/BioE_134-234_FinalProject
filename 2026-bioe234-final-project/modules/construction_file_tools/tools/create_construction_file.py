@@ -201,16 +201,7 @@ class CreateConstructionFile:
             self._require_nonempty_string(insert_name, "insert_name")
             self._require_nonempty_string(insert_sequence, "insert_sequence")
 
-        if assembly_strategy == "TypeIISOligoCloning":
-            # Backbone sequence is not needed for computation in TypeIIS oligo cloning
-            # (no PCR primer design or overlap calculation). Accept the plasmid name
-            # as-is and store "N" when no real sequence is provided.
-            _dna_chars = set("ACGTNacgtn")
-            _compact = "".join(ch for ch in backbone_sequence if ch.isalpha())
-            if not (_compact and set(_compact) <= _dna_chars):
-                backbone_sequence = "N"
-        else:
-            backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
+        backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
         if insert_sequence.strip():
             insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
 
@@ -522,7 +513,7 @@ class CreateConstructionFile:
         Resolve curated paper information from either:
         - a dict passed directly as paper_info_json,
         - a JSON string passed as paper_info_json,
-        - a file in modules/crispr_tools/data/paper_info/ named <paper_id>.json,
+        - a file in modules/construction_file_tools/data/paper_info/ named <paper_id>.json,
         - or a v2 file named <paper_id>_v2.json.
 
         Supports both paper_important_info_v1 and paper_important_info_v2.
@@ -819,10 +810,10 @@ class CreateConstructionFile:
         normalized = name.strip()
 
         candidate_paths = [
-            Path("modules/crispr_tools/data") / f"{normalized}.gb",
-            Path("modules/crispr_tools/data") / f"{normalized}.gbk",
-            Path("modules/crispr_tools/data") / f"{normalized}.fasta",
-            Path("modules/crispr_tools/data") / f"{normalized}.fa",
+            Path("modules/construction_file_tools/data") / f"{normalized}.gb",
+            Path("modules/construction_file_tools/data") / f"{normalized}.gbk",
+            Path("modules/construction_file_tools/data") / f"{normalized}.fasta",
+            Path("modules/construction_file_tools/data") / f"{normalized}.fa",
             Path("modules/seq_basics/data") / f"{normalized}.gb",
             Path("modules/seq_basics/data") / f"{normalized}.gbk",
             Path("modules/seq_basics/data") / f"{normalized}.fasta",

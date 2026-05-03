@@ -209,6 +209,12 @@ Do NOT offer ICE/TIDE interpretation during this workflow — it belongs after t
 
 ---
 
+## Sequence tool priority
+
+For any CRISPR-related request, always use `crispr_fetch_target_sequence` to resolve a gene name to a DNA sequence — it returns a clean, guide-design-ready sequence. `gene_sequence_lookup_tool` and `lookup_gene_sequence` return full genome FASTA records that are too large for guide design and will crash the pipeline.
+
+---
+
 ## Sequence input rules (handled automatically)
 
 You never need to paste the full sequence. The framework resolves these automatically:

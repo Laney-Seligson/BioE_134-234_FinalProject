@@ -157,6 +157,21 @@ compatibility — the oligo will be one base longer than the protospacer.
 
 ---
 
+## When to use `crispr_run_full_workflow` vs individual tools
+
+**Use `crispr_run_full_workflow` ONLY when the user's request is explicitly a one-shot full workflow** — meaning they name a gene, an organism, AND a vector in the same message (e.g. "Design a CRISPR edit targeting lacZ in E. coli using pTargetF").
+
+**Use the individual tools (steps below) for ALL other requests**, including:
+- "Design Cas9 guides for X" → fetch → design_cas9_grna → rank_guides
+- "Fetch the sequence for X" → fetch only
+- "Design guides for X" → fetch → cas_selector → design_cas9_grna or design_cas12a_crrna → rank_guides
+- "Rank these guides" → rank_guides only
+- Any request that does not name a specific vector upfront
+
+Calling `crispr_run_full_workflow` when the user only asked for guides hides the intermediate results (guide list, ranking rationale) that the user needs to see.
+
+---
+
 ## Full CRISPR cloning workflow (autonomous — do not ask the user)
 
 When the user asks to "design CRISPR cloning oligos" or "design a guide RNA and cloning oligos" for a sequence or plasmid, execute this full pipeline automatically without asking which Cas system to use:

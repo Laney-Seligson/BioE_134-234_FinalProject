@@ -1,0 +1,115 @@
+import sys
+from pathlib import Path
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from modules.crispr_tools.tools.run_full_crispr_workflow import RunFullCrisprWorkflow
+
+FAKE_SEQ = (
+    "ATGACCATGATTACGGATTCACTGGCCGTCGTTTTACAACGTCGTGACTGGGAAAACCC"
+    "TGGCGTTACCCAACTTAATCGCCTTGCAGCACATCCCCCTTTCGCCAGCTGGCGTAATA"
+    "GCGAAGAGGCCCGCACCGATCGCCCTTCCCAACAGTTGCGCAGCCTGAATGGCGAATGG"
+    "CGCTTTGCCTGGTTTCCGGCACCAGAAGCGGTGCCGGAAAGCTGGCTGGAGTGCGATCT"
+    "TCCTGAGGCCGATACTGTCGTCGTCCCCTCAAACTGGCAGATGCACGGTTACGATGCGC"
+    "CCATCTACACCAACGTGACCTATCCCATTACGGTCAATCCGCCGTTTGTTCCCACGGAG"
+    "AATCCGACGGGTTGTTACTCGCTCACATTTAATGTTGATGAAAGCTGGCTACAGGAAGG"
+)
+
+FAKE_SEQUENCE_INFO = {
+    "sequence": FAKE_SEQ,
+    "source": "mock",
+    "resource": "lacZ",
+    "organism": "Escherichia coli",
+    "ncbi_gene_id": "945006",
+    "ncbi_accession": "NC_000913.3",
+    "length": len(FAKE_SEQ),
+    "note": "Mock sequence for unit testing.",
+}
+
+
+@pytest.fixture
+def workflow():
+    wf = RunFullCrisprWorkflow()
+    wf.initiate()
+    return wf
+
+
+def test_ranked_guides_present_in_output(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="ptargetf")
+    assert "guides" in result
+    assert isinstance(result["guides"], list)
+    assert len(result["guides"]) > 0
+
+
+def test_each_guide_has_efficiency_score(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="ptargetf")
+    for guide in result["guides"]:
+        assert "efficiency_score" in guide
+        assert "specificity_score" in guide
+        assert "total_score" in guide
+
+
+def test_each_guide_has_efficiency_details(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="ptargetf")
+    for guide in result["guides"]:
+        assert "efficiency_details" in guide
+        assert "specificity_details" in guide
+
+
+def test_scoring_rationale_present(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="ptargetf")
+    assert "scoring_rationale" in result
+    assert isinstance(result["scoring_rationale"], str)
+    assert len(result["scoring_rationale"]) > 0
+
+
+def test_guides_sorted_best_first(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="ptargetf")
+    scores = [g["total_score"] for g in result["guides"]]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_selected_guide_is_top_ranked(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="ptargetf")
+    assert result["selected_guide"]["protospacer"] == result["guides"][0]["protospacer"]
+
+
+def test_empty_query_raises(workflow):
+    with pytest.raises(ValueError):
+        workflow.run(query="", vector="ptargetf")
+
+
+def test_missing_vector_returns_needs_user_input(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="")
+    assert result["status"] == "needs_user_input"
+    assert "vector" in result["missing_fields"]

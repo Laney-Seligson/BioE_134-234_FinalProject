@@ -164,15 +164,23 @@ def _coerce_function_response_payload(tool_result: Any) -> Dict[str, Any]:
     return {"result": result_text}
  
  
-def _truncate_for_display(obj, max_str=120):
-    """Recursively truncate long strings in a dict/list for terminal display only."""
+def _truncate_strings(obj, max_str):
+    """Recursively truncate long strings in a dict/list."""
     if isinstance(obj, dict):
-        return {k: _truncate_for_display(v, max_str) for k, v in obj.items()}
+        return {k: _truncate_strings(v, max_str) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [_truncate_for_display(v, max_str) for v in obj]
+        return [_truncate_strings(v, max_str) for v in obj]
     if isinstance(obj, str) and len(obj) > max_str:
         return obj[:max_str] + f"… ({len(obj)} chars)"
     return obj
+
+def _truncate_for_display(obj):
+    return _truncate_strings(obj, max_str=120)
+
+def _truncate_for_gemini(obj):
+    """Cap string fields before sending to Gemini to avoid token limit crashes.
+    50k chars per field covers full gene sequences but not whole-genome FASTAs."""
+    return _truncate_strings(obj, max_str=50_000)
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +253,9 @@ async def _run_tool_loop(
             print(json.dumps(_truncate_for_display(fn_response), indent=2))
  
             fr_parts.append(
-                types.Part.from_function_response(name=tool_name, response=fn_response)
+                types.Part.from_function_response(
+                    name=tool_name, response=_truncate_for_gemini(fn_response)
+                )
             )
  
         # Pack all function responses into a single Content turn and append

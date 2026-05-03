@@ -1,601 +1,158 @@
-# BioE234 MCP Starter — Student Guide
+# BioE134/234 CRISPR Pipeline Project
+Names: Emory Elizabeth Adelman, Jillian Ho, Karina Jin, Laney Seligson
+[link of slide]
 
-Welcome! This document is the **primary reference** for the final project starter.  
-Read it top to bottom once before writing any code.
 
 ---
 
-## 1. What is this starter?
+## 1. Overview
 
-This repository is a framework for building **bioengineering automation tools** that an AI assistant can call via **MCP (Model Context Protocol)**.
-
-The framework handles connecting your Python codes to the AI.
-
-### Four design principles
-
-1. **You write pure Python** — biology logic only, no networking or MCP code required.  
-2. **Convention over configuration** — the framework auto-discovers your files by name.  
-3. **No plumbing in your tool files** — you never import MCP or registration code.  
-4. **Copy >> modify >> extend** — start from the examples and edit them.
+Designing CRISPR experiments typically requires coordinating multiple tools, manual sequence handling, and careful validation, making the process time-consuming and error-prone. This project is a modular pipeline designed to streamline and automate the full CRISPR and cloning workflow, taking a user from <b>an initial idea to a lab-ready experimental plan</b>. Instead of handling each step manually, the system organizes the process into connected components that guide users through sequence selection, design, and validation in a structured way. It includes built-in gene and sequence lookup functionality, allowing users to start from a gene name, organism, or identifier and automatically retrieve the relevant DNA sequence for downstream design. The pipeline supports upstream and downstream design. Including but not limited to, identifying target sequences, designing and evaluating guide RNAs, oligo design, construction file creation, construction file validation, and lab sheet generation. Overall, the goal of this project is to create a more efficient, reproducible, and reliable approach to experimental design in synthetic biology by combining structured workflows with intelligent automation.
 
 ---
 
 ## 2. Project structure
-
-```
-.
-├── server.py                      # MCP server — do not edit
-├── client_gemini.py               # Gemini CLI client — do not edit
-├── requirements.txt
-│
-├── tests/
-│   └── test_tools.py
-│
-└── modules/
-    ├── __init__.py                # Scans all sub-modules — do not edit
-    │
-    └── seq_basics/                # EXAMPLE MODULE (copy this for your project)
-        ├── __init__.py
-        ├── SKILL.md               # AI guidance for this module (optional)
-        ├── _utils.py              # Shared constants (codon table, etc.)
-        ├── _plumbing/             # Auto-registration internals — do not edit
-        │   ├── __init__.py
-        │   ├── register.py
-        │   └── resolve.py
-        ├── data/
-        │   └── pBR322.gb          # Sequence data files go here
-        └── tools/
-            ├── reverse_complement.py    # Example: Python implementation
-            ├── reverse_complement.json  # Example: C9 JSON wrapper
-            ├── translate.py
-            ├── translate.json
-            └── prompts.json             # Example test prompts
-```
-
-> **Where you spend your time:** `modules/<your_module>/tools/` and `modules/<your_module>/data/`.
+[screenshot from presentation]
 
 ---
 
 ## 3. How the pipeline works
 
 ```
-python client_gemini.py
-        │
-        ├─► launches server.py as a subprocess
-        │         │
-        │         └─► scans modules/  (one folder per project)
-        │                   └─► for each folder: reads .py + .json pairs, registers tools
-        │                                         reads .gb / .fasta files, registers resources
-        │
-        ├─► connects to server, lists tools and resources
-        │
-You:    └─► type a request
-                │
-                ▼
-            Gemini decides which tool to call and with what arguments
-                │
-                ▼
-            server calls your Python function
-                │
-                ▼
-            result returned to Gemini, which explains it to you
+Tentative leave for more use
 ```
 
 ---
 
-## 4. Quick start
+## 4. Setup
+You need to have at least Python 3.10 for this repos to work.
 
-### Step 0 — Prerequisites
-- Python 3.10 or newer
-- Visual Studio Code — [code.visualstudio.com](https://code.visualstudio.com)
-
-### Step 1 — Create a virtual environment
-
+<b>1. Create a virtual environment </b>
 Open a terminal in VS Code (`Terminal >> New Terminal`):
-
 ```bash
 python -m venv .venv
 source .venv/bin/activate        # Mac / Linux
 # .venv\Scripts\activate         # Windows
 ```
-
 You should see `(.venv)` at the start of your terminal line. Then install dependencies:
-
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 2 — Get your Gemini API key
-
-1. Go to **[https://aistudio.google.com/api-keys](https://aistudio.google.com/api-keys)**
-2. Sign in with your **UC Berkeley Google account** (free access is included).
-3. Click **"Create API Key"** and copy the key.
-4. In the project root folder, create a file named exactly **`.env`** containing:
-
+<b>2. Get your Gemini API key </b>
+Get your gemini api key from **[https://aistudio.google.com/api-keys](https://aistudio.google.com/api-keys)**
+In the project root folder, create a file named exactly **`.env`**.
+Inside the file, paste the following.
 ```
 GEMINI_API_KEY="paste_your_key_here"
 ```
+<b>Never upload `.env` to GitHub. Ensure `.env` is listed in `.gitignore`. 
+Run this in your project folder terminal: </b>
+```
+echo ".env" >> .gitignore
+```
 
-> 🔴 **Security warning:** Never upload `.env` to GitHub. Ensure `.env` is listed in `.gitignore`. 
-Run this in your project folder: 
-> echo ".env" >> .gitignore
-
-### Step 3 — Run the client
+<b>3. Run the client </b>
 
 ```bash
 python client_gemini.py
 ```
+Once you see the 
+```
+Type a request. Ctrl-C to quit.
+You: 
+```
+The client is ready and you can start entering prompts.
 
-Expected output:
-```
-[server] Starting BioE234 MCP server...
-[register] ✓ Tool registered:    dna_reverse_complement
-[register] ✓ Tool registered:    dna_translate
-[register] ✓ Resource registered: pBR322  (...)
-[server] All modules registered. Server ready.
+## 5. Individual Scope
 
-Connected to MCP server.
-Discovered tools:
-  - dna_reverse_complement: Return the reverse complement of a DNA sequence...
-  - dna_translate: Translate DNA to protein...
+#### Karina:
+
+#### Emory: 
+
+#### Laney:
+<b> create_construction_file.py:</b> 
+create_construction_file.py has two separate abilities:
+
+1. Can create a full construction file for a user who wants one for their specific inputs, and can take information from prior conversation in the same chat.
+
+  Takes information already provided by the user in the conversation or prompts the user for missing information. Generates a construction file easily viewable inline to the user in the following format:
+
+```
+PCR         primerF         primerR         insert_template        insert_pcr
+PCR         vectorF         vectorR         backbone_plasmid       vector_pcr
+assembly_method   vector_pcr      insert_pcr      enzyme_or_reagent      assembled_plasmid
+Transform   assembled_plasmid   competent_cells   antibiotic   temperature   final_construct
+
+dsdna       insert_template    INSERT_DNA_SEQUENCE
+plasmid     backbone_plasmid   BACKBONE_SEQUENCE
+oligo       primerF        SEQUENCE_FORWARD_PRIMER
+oligo       primerR        SEQUENCE_REVERSE_PRIMER
+oligo       vectorF        SEQUENCE_VECTOR_FORWARD
+oligo       vectorR        SEQUENCE_VECTOR_REVERSE
 ```
 
-Try typing:
+The user can provide any information they want, except that, due to API model limitations, backbone sequences are too long for the model to process. Therefore, we have curated a list of plasmids that the user can ask about, and the model will provide information on the ones they may select. The user then just needs to mention the plasmid they would like to use.
+
+Example:
+>Note: Break up the entire prompt into multiple prompts in order not to overwhelm the API tokens. Also, it may call errors as it realizes you did not give it all the needed information in one single prompt, but the API should continue to prompt you for the missing information.
 ```
-Translate the first 60bp of pBR322 in frame 1
+You: I want to make a construction file. I want to do Golden Gate, my construct name is pET28a_REP24, my insert name is REP24, my insert sequence is atgaaaaatgttttaatggttactacttctcatgatgttatgggtaattctaatgaaaaaactggtttatggttatctgaattaactcatccttattattctattattgataaaaatattaatattgatattgtttctattatgggtggtgaaattcctattgatcctaattctgttgctcaagaagattattataatgataaatttttagctgatgataatttaaaaaatattatgaaaaattctacttctttacgtgatgttaatattaaagaatatgatgctattatttttgctggtggtcatggtactatgtgggattttcctaataatgctaatattcattctaaagttttagatatttatgctaaaaatggtgttattggtgctatttgtcatggtgttgctgctttaattaatgttaaagataataatggtcaaaatattattcgtgataaagaagttactggtttttctaataatgaagaaaaaattgttggtttaactgatgttgttcctttttctttagaagattctttagttgaagctggtgctaaatattcttctgcttctgaatggcaatcttatgttaaatctgattctaaaattattactgctcaaaatcctcaatctgctactgattttgctaaagctattaaacaatctttatttaat
+Gemini: Should ask for the missing information
+You: my backbone name is pET28a, and I want to use the plasmid pET28a for the backbone sequence, my insert forward primer name is repF, my insert forward primer sequence is ccataGGTCTCaATGAAAAATGTTTTAATGGTTACTA, my insert reverse primer name is repR, my insert reverse primer sequence is cagatGGTCTCaCGAGATTAAATAAAGATTGTTTAAT, my vector forward primer name is vecF
+Gemini: Should ask for the missing information
+You: my vector reverse primer name is vecR, my vector forward primer sequence is ccataGGTCTCaCTCGAGCACCACCACCACCACCACT, my vector reverse primer sequence is cagatGGTCTCaTCATGGTATATCTCCTTCTTAAAGT, my restriction enzyme is BsaI. Output my construction file
+Gemini: Should output the construction file
 ```
 
-Then you should get:
+2. Create a shorthand construction file from a paper
+  The user can inquire about more information about what papers are available to choose from. They can then ask for a shorthand construction file to be created about that paper. This tool is then able to generate a shorthand construction file with the paper’s details.
+
+Example:
 ```
-Gemini: The first 60bp of pBR322 translated in frame 1 is FSCLTAYHR*ALMR*FITVK.
+You: What papers are available for me to look at?
+Gemini: list of available papers. May ask you if you want to create a shorthand construction file
+You: Yes, I want a shorthand construction file for Miao 2013
+Gemini: Should output the shorthand construction file
 ```
+
+<b>Create_construction_file.json:</b>
+  This file is the C9 JSON wrapper for the construction file generator. It defines how the MCP framework and Gemini should understand and call the construction tool, including its name, description, inputs, outputs, examples, and execution details. The wrapper tells the model that this tool can generate a full sequence-based construction file, create a structured paper-information record, or generate a shorthand workflow from paper-derived metadata, depending on the selected input mode.
+
+<b>validate_construction_file.py:</b>
+This file contains the Python implementation of the construction file validation tool. Its job is to check whether a proposed cloning workflow is biologically consistent, especially for PCR-based construction designs. It validates things like whether primers anneal correctly to the intended templates, whether they are oriented properly, whether a plausible amplicon can be formed, and whether the overall workflow structure is biologically reasonable. It can retrieve information from the construction file previously generated. This tool is useful after generating a construction file because it provides a second layer of error checking before the workflow is trusted for downstream use.
+
+Example prompt (happy path):
+>Note: Have the API create a construction file first. For this example, let’s assume there are 2 PCR steps and a Gibson step in the construction file. In this case, the construction file is valid.
+```
+You: Validate this
+Gemini: PCR step 1 passed, PCR step 2 passed, Gibson passed. Overall: Pass
+```
+Example prompt (sad path):
+>Note: Have the API create a construction file first. For this example, let’s assume there are 2 PCR steps and a goldengate step in the construction file. In this case, the goldengate overhangs do not overlap.
+```
+You: Validate this
+Gemini: PCR step 1 passed, PCR step 2 passed, goldengate failed due to not aligned overhangs. Overall: Fail
+```
+
+<b>validate_construction_file.json:</b>
+This file is the JSON wrapper for the construction file validator. It describes the validator to the MCP framework by specifying the tool metadata, accepted inputs, expected outputs, and how the Python implementation should be executed. Its main purpose is to let Gemini recognize when the user is asking to check, verify, or debug a cloning design and then correctly route that request to the validation logic.
+
+<b>Get_paper_info.py:</b>
+This file contains the Python implementation of the paper information loader. Instead of forcing the model to guess details from a paper title alone, this tool reads a curated JSON record from the module’s data directory and returns structured metadata about a paper, such as organism, system, vectors, enzymes, assembly method, delivery method, validation methods, and major constraints. This makes the paper-based workflow much more reliable because downstream tools can use structured paper information rather than hallucinating experimental details.
+
+<b>Get_paper_info.json:</b>
+This file is the JSON wrapper for the paper information loader. It defines how Gemini can call the tool by providing a paper_id, and it tells the framework where the corresponding Python implementation lives. The purpose of this wrapper is to expose curated paper metadata as a callable MCP tool so that other tools, such as shorthand workflow generation, can use literature-derived information in a structured and reproducible way.
+
+
+#### Jillian: 
 
 ---
 
-## 5. Each tool is TWO files
+## 6. Demo for whole CRISPR pipeline
 
-For every tool you build you create **two files with the same stem name** in your `tools/` folder:
+[Insert video link]
 
-```
-gc_content.py     ← Python implementation (the biology logic)
-gc_content.json   ← C9 JSON wrapper      (the metadata / schema)
-```
+## 7. Citation
 
-**There is no third "wrapper" file.** The `.json` file *is* your C9 wrapper. It is what the grading rubric means when it says "C9 Wrapper". The Python file holds only biology code — no MCP-specific code at all.
 
----
-
-## 6. The Python file - Function Object Pattern
-
-Your Python file must follow the **Function Object Pattern**: a class with `initiate()` and `run()` methods, and a structured docstring. This is the same pattern used throughout the course.
-
-- **`initiate()`** — one-time setup (build lookup tables, load config, etc.)
-- **`run()`** — the actual computation; called once per tool invocation
-
-### Template
-
-```python
-class GcContent:
-    """
-    Description:
-        Computes the fraction of G and C bases in a DNA sequence.
-
-    Input:
-        seq (str): DNA sequence (resource name or raw string).
-
-    Output:
-        float: GC fraction between 0.0 and 1.0.
-
-    Tests:
-        - Case:
-            Input: seq="ATGCATGC"
-            Expected Output: 0.5
-            Description: Balanced sequence, 50% GC.
-        - Case:
-            Input: seq="AAAA"
-            Expected Output: 0.0
-            Description: All A bases, 0% GC.
-        - Case:
-            Input: seq=""
-            Expected Output: 0.0
-            Description: Edge case — empty sequence returns 0.
-    """
-
-    def initiate(self) -> None:
-        pass   # nothing to set up for this tool
-
-    def run(self, seq: str) -> float:
-        """Return GC fraction between 0 and 1."""
-        seq = seq.upper()
-        gc = sum(1 for b in seq if b in "GC")
-        return gc / len(seq) if seq else 0.0
-
-
-# Optional: module-level alias so pytest can import the function directly.
-_instance = GcContent()
-_instance.initiate()
-gc_content = _instance.run   # gc_content("ATGC") → 0.5
-```
-
-### Naming rule — critical
-
-> ⚠️ **Name your file after what it does, not `bio_functions.py`.**  
-> If every student uses `bio_functions.py`, files will conflict.
-
-Good names: `gc_content.py`, `find_pam_sites.py`, `design_primers.py`, `codon_count.py`
-
-The **class name** can be anything descriptive. The **file name** is what you use in the JSON wrapper's `execution_details.source`.
-
-### Rules
-- Always add type hints: `seq: str`, `frame: int`, `pam: str = "NGG"`, etc.
-- Return JSON-serialisable values: `str`, `int`, `float`, `list`, `dict`.
-- Raise `ValueError` with clear messages for invalid inputs.
-- Never `print()` inside a tool — return values instead.
-
----
-
-## 7. The JSON file — C9 wrapper
-
-The `.json` file formally describes your tool. It follows the schema in [`Function_Development_Specification.md`](Function_Development_Specification.md) and is what the grader evaluates as the "C9 Wrapper" component.
-
-### Template
-
-```json
-{
-  "id": "org.bioe234.function.seq.gc_content.v1",
-  "name": "DNA GC Content",
-  "description": "Compute the GC content (fraction of G and C bases) of a DNA sequence.",
-  "type": "function",
-  "keywords": ["DNA", "GC content", "sequence analysis"],
-  "date_created": null,
-  "date_last_modified": null,
-
-  "inputs": [
-    {
-      "name": "seq",
-      "type": "string",
-      "description": "DNA sequence. Accepts a resource name (e.g. 'pBR322') or a raw sequence string."
-    }
-  ],
-
-  "outputs": [
-    {
-      "type": "number",
-      "description": "GC fraction between 0.0 (no GC) and 1.0 (all GC)."
-    }
-  ],
-
-  "examples": [
-    {
-      "input":  { "seq": "ATGCATGC" },
-      "output": { "result": 0.5 }
-    },
-    {
-      "input":  { "seq": "AAAA" },
-      "output": { "result": 0.0 }
-    }
-  ],
-
-  "execution_details": {
-    "language": "Python",
-    "source": "modules/seq_basics/tools/gc_content.py",
-    "initialization": "initiate",
-    "execution": "run",
-    "disposal": null,
-
-    "mcp_name": "dna_gc_content",
-    "seq_params": ["seq"]
-  }
-}
-```
-
-### Required fields
-
-| Field | Notes |
-|-------|-------|
-| `id` | Unique ID in the format `org.bioe234.function.<domain>.<name>.v1` |
-| `name` | Human-readable display name |
-| `description` | One clear sentence describing what the tool does |
-| `type` | Always `"function"` |
-| `keywords` | List of relevant terms |
-| `inputs` | Array — each entry needs `name`, `type`, `description` |
-| `outputs` | Array — each entry needs `type`, `description` |
-| `examples` | Array — at least one `{input, output}` pair |
-| `execution_details.language` | `"Python"` |
-| `execution_details.source` | Path to your `.py` file |
-| `execution_details.execution` | `"run"` |
-| `execution_details.mcp_name` | The tool identifier Gemini will use (snake_case) |
-
-`execution_details.mcp_name` and `execution_details.seq_params` are framework-specific extensions — they exist inside `execution_details` because they are about how your code runs, not what it does biologically.
-
-### Supported input/output types
-`string`, `integer`, `number`, `boolean`, `array`, `object`
-
----
-
-## 8. Tools with multiple input parameters
-
-```python
-# hamming_distance.py
-class HammingDistance:
-    def initiate(self): pass
-    def run(self, seq1: str, seq2: str) -> int:
-        if len(seq1) != len(seq2):
-            raise ValueError("Sequences must have equal length.")
-        return sum(a != b for a, b in zip(seq1, seq2))
-```
-
-In your JSON, list both names under `seq_params`:
-
-```json
-"execution_details": {
-  ...,
-  "mcp_name": "dna_hamming_distance",
-  "seq_params": ["seq1", "seq2"]
-}
-```
-
-Both `seq1` and `seq2` can be resource names or raw sequences.
-
----
-
-## 9. Non-sequence tools
-
-If your tool does not take a DNA/RNA sequence, **omit `seq_params`** entirely:
-
-```python
-# restriction_site_count.py
-class RestrictionSiteCount:
-    def initiate(self): pass
-    def run(self, dna: str, site: str) -> int:
-        return dna.upper().count(site.upper())
-```
-
-```json
-"execution_details": {
-  "language": "Python",
-  "source": "modules/seq_basics/tools/restriction_site_count.py",
-  "initialization": "initiate",
-  "execution": "run",
-  "mcp_name": "dna_restriction_site_count"
-}
-```
-
----
-
-## 10. How sequences are resolved automatically
-
-When a parameter is listed in `seq_params`, the framework automatically converts it before your `run()` is called:
-
-| What you pass | What `run()` receives |
-|---|---|
-| `"pBR322"` | Full 4361bp sequence string |
-| `">seq1\nATGC..."` | `"ATGC"` |
-| `"LOCUS pBR322 ..."` | Full sequence string |
-| `"ATGCGATCG"` | `"ATGCGATCG"` |
-| `"ATG CGA\n1 TCG"` | `"ATGCGATCG"` (whitespace/numbers stripped) |
-
-Your function always receives a clean uppercase string. No file parsing needed.
-
----
-
-## 11. Adding sequence data files
-
-Drop `.gb` or `.fasta` files into `modules/<your_module>/data/`. Restart the server and they are immediately available as resources.
-
-```
-data/
-  pBR322.gb       →  resource name "pBR322"
-  mg1655.fasta    →  resource name "mg1655"
-```
-
----
-
-## 12. Test prompts — prompts.json
-
-You must submit a `prompts.json` file alongside your tool. Each entry is a natural-language prompt a user might type, paired with the expected tool call. See `modules/seq_basics/tools/prompts.json` for the exact format.
-
-```json
-[
-  {
-    "prompt": "What is the GC content of ATGCATGC?",
-    "expected_tool": "dna_gc_content",
-    "expected_args": { "seq": "ATGCATGC" },
-    "notes": "Basic raw sequence input."
-  }
-]
-```
-
----
-## 13. SKILL.md — Guiding the AI
-
-Each module can contain a `SKILL.md` file. When found, its contents are automatically
-injected into Gemini's system prompt at startup, giving the AI background knowledge
-it needs to use your tools correctly.
-
-**Is it required?** No. The system works without it. But without it, Gemini has only the
-short `description` fields from your `.json` wrappers to go on. A good `SKILL.md`
-meaningfully improves the quality of Gemini's responses — it knows what your resources
-contain, how to interpret results, and what edge cases to watch for.
-
-**What to put in it:**
-- What the module does in one paragraph
-- A table of your resources and what they contain
-- For each tool: when to use it, what the parameters mean, how to interpret the output
-- Any domain vocabulary or biological context Gemini needs
-
-**Template** — create `modules/<your_module>/SKILL.md`:
-
-```markdown
-# <your_module> — Skill Guidance for Gemini
-
-## What this module does
-One paragraph describing the biological domain and purpose of this module.
-
-## Available resources
-| Resource name | Description |
-|---------------|-------------|
-| `my_genome`   | E. coli K-12 MG1655 complete genome, 4.6 Mbp. |
-
-## Tools and when to use them
-
-### `my_tool_mcp_name`
-What it computes and when Gemini should call it.
-- Trigger phrases: "find X", "scan for Y", "does this sequence contain Z"
-- Parameter notes: what each parameter means in plain language
-- Output notes: how to interpret the result
-
-## Interpreting results
-Any domain knowledge that helps Gemini explain results correctly.
-```
-
-**See `modules/seq_basics/SKILL.md` for a complete working example.**
-
-> **Token budget:** SKILL.md is included in every request. Keep it under ~300 lines.
-> Long files increase cost and can push other context out of Gemini's window.
-
----
-
-
-
-## 14. Creating your own module
-
-```
-modules/
-  <your_module>/
-    __init__.py          ← copy from seq_basics/ (can be empty)
-    SKILL.md             ← describe what this module does for the AI
-    data/
-      my_genome.gb       ← example data
-    tools/
-      find_pam.py        ← example tool 1
-      find_pam.json      ← example json file for tool 1
-      prompts.json       ← example tool 2
-      test_find_pam.py   ← example json file for tool 2
-```
-
-`modules/__init__.py` auto-discovers new folders — you do not need to edit it.
-
----
-
-## 15. Running tests
-
-```bash
-pytest -vv -l
-```
-
-Write tests that cover both typical inputs and edge cases. See `tests/test_tools.py` for examples — it shows how to test both the class directly and via the module-level alias.
-
----
-
-## 16. What to submit
-
-| File | Grading component |
-|------|------------------|
-| `<tool_name>.py` | Function Code |
-| `<tool_name>.json` | C9 Wrapper |
-| `prompts.json` | Test Prompts |
-| `test_<tool_name>.py` | Pytest |
-| `README.md` | Documentation |
-| `<your_functions_docs>.md` | Theory Docs |
-
-Submit your GitHub repo URL on bCourses. The repo should reflect your **individual** contribution, not the whole team's work.
-
----
-
-## 17. Troubleshooting
-
-**Tool doesn't appear after startup**  
-Look for `[register] WARNING` lines in the terminal. The message will say exactly what is missing — usually a `.json` wrapper file, a missing `run()` method, or a malformed JSON.
-
-**API key error**  
-Ensure `.env` is in the project root (not a subfolder) and contains `GEMINI_API_KEY="..."`. Restart the terminal after creating the file.
-
-**Gemini 503**  
-Server busy. Wait 30 seconds — the client retries automatically.
-
-**`python` not found**  
-Use `python3` on Mac/Linux.
-
-**`ModuleNotFoundError`**  
-Activate your virtual environment first: `source .venv/bin/activate`.
-
----
-
-## Still stuck?
-
-Email your TA: **javadamn@berkeley.edu**
-
----
-
-## Individual Contributions — Jillian Ho
-
-This section documents the two tools I built for the `crispr_tools` module as my individual contribution to the group project.
-
----
-
-### Tool 1: `crispr_predict_offtargets`
-
-**Files:** `modules/crispr_tools/tools/predict_offtargets.py`, `predict_offtargets.json`
-
-**What it does:**  
-Scans a reference DNA sequence for potential CRISPR off-target sites — locations where the guide RNA could accidentally bind and cause Cas9 to cut somewhere unintended. It slides a window across both strands of the reference, counts mismatches against the 20 bp protospacer, and scores each candidate site using seed-region weighting (Hsu et al. 2013) and PAM presence.
-
-**Inputs:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `protospacer` | string | yes | 20 bp DNA protospacer from gRNA design (no PAM) |
-| `reference` | string | yes | Reference sequence to scan — resource name, raw string, FASTA, or GenBank |
-| `max_mismatches` | integer | no | Max mismatches to report (default: 3) |
-
-**Output:**  
-A ranked list of off-target sites, each with position, strand, mismatch count, seed-region mismatches, PAM presence, and risk level (HIGH / MEDIUM / LOW), plus a one-sentence specificity summary.
-
-**Risk classification logic:**
-- HIGH: 0 mismatches, or seed-region mismatches = 0 and PAM present
-- MEDIUM: ≤1 seed mismatch + PAM, or ≤2 total mismatches + PAM
-- LOW: all other flagged sites
-
-The seed region is positions 1–12 from the PAM-proximal end, where Cas9 makes initial contact with DNA — mismatches there are more likely to still permit cutting.
-
-**Example usage (in the Gemini client):**
-```
-Check if the guide TCAGAAACCTGCCAGTTTGC has any off-target sites in pBR322.
-```
-
----
-
-### Tool 2: `crispr_verify_edit`
-
-**Files:** `modules/crispr_tools/tools/verify_edit.py`, `verify_edit.json`
-
-**What it does:**  
-After a CRISPR experiment, calculates the expected Cas9 cut site for a given protospacer and designs flanking Sanger sequencing primers for ICE/TIDE analysis. This lets you verify whether editing actually occurred and estimate editing efficiency from sequencing trace data.
-
-**Inputs:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `protospacer` | string | yes | 20 bp DNA protospacer used during editing (no PAM) |
-| `reference` | string | yes | Original unedited reference sequence — resource name, raw string, FASTA, or GenBank |
-| `primer_offset` | integer | no | Distance in bp from cut site to each primer (default: 150) |
-| `primer_len` | integer | no | Sequencing primer length in bp (default: 20) |
-
-**Output:**
-- `cut_position`: where Cas9 cuts (between nt 17–18 of protospacer, 3 bp upstream of PAM)
-- `forward_primer` / `reverse_primer`: sequencing primer sequences and positions
-- `amplicon_sequence` / `amplicon_length`: the PCR product to sequence
-- `cut_offset_in_amplicon`: where the cut falls inside the amplicon (needed by ICE/TIDE)
-- `interpretation_guide`: step-by-step ICE/TIDE protocol with all coordinates filled in
-
-**Workflow:**
-1. Run the tool to get cut site, primers, and amplicon
-2. PCR-amplify the amplicon with the returned primers
-3. Sanger-sequence the PCR product
-4. Upload the `.ab1` trace to [ICE (Synthego)](https://ice.synthego.com) or TIDE with the amplicon sequence and cut offset
-
-**Example usage (in the Gemini client):**
-```
-I edited pBR322 using the guide TCAGAAACCTGCCAGTTTGC. How do I verify the edit worked?
-```

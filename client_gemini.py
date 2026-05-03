@@ -164,7 +164,17 @@ def _coerce_function_response_payload(tool_result: Any) -> Dict[str, Any]:
     return {"result": result_text}
  
  
-# ---------------------------------------------------------------------------
+def _truncate_for_display(obj, max_str=120):
+    """Recursively truncate long strings in a dict/list for terminal display only."""
+    if isinstance(obj, dict):
+        return {k: _truncate_for_display(v, max_str) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_truncate_for_display(v, max_str) for v in obj]
+    if isinstance(obj, str) and len(obj) > max_str:
+        return obj[:max_str] + f"… ({len(obj)} chars)"
+    return obj
+
+
 # ---------------------------------------------------------------------------
 async def _run_tool_loop(
     mcp,
@@ -232,7 +242,7 @@ async def _run_tool_loop(
                 fn_response = {"error": str(e)}
  
             print(f"[Tool result] ← {tool_name}:")
-            print(json.dumps(fn_response, indent=2))
+            print(json.dumps(_truncate_for_display(fn_response), indent=2))
  
             fr_parts.append(
                 types.Part.from_function_response(name=tool_name, response=fn_response)

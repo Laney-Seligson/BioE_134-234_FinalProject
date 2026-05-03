@@ -157,6 +157,21 @@ compatibility — the oligo will be one base longer than the protospacer.
 
 ---
 
+## When to use `crispr_run_full_workflow` vs individual tools
+
+**Use `crispr_run_full_workflow` ONLY when the user's request is explicitly a one-shot full workflow** — meaning they name a gene, an organism, AND a vector in the same message (e.g. "Design a CRISPR edit targeting lacZ in E. coli using pTargetF").
+
+**Use the individual tools (steps below) for ALL other requests**, including:
+- "Design Cas9 guides for X" → fetch → design_cas9_grna → rank_guides
+- "Fetch the sequence for X" → fetch only
+- "Design guides for X" → fetch → cas_selector → design_cas9_grna or design_cas12a_crrna → rank_guides
+- "Rank these guides" → rank_guides only
+- Any request that does not name a specific vector upfront
+
+Calling `crispr_run_full_workflow` when the user only asked for guides hides the intermediate results (guide list, ranking rationale) that the user needs to see.
+
+---
+
 ## Full CRISPR cloning workflow (autonomous — do not ask the user)
 
 When the user asks to "design CRISPR cloning oligos" or "design a guide RNA and cloning oligos" for a sequence or plasmid, execute this full pipeline automatically without asking which Cas system to use:
@@ -191,6 +206,12 @@ Do NOT stop between steps 1-7 to ask for confirmation.
 Do NOT offer the construction file or lab sheet before step 7 is complete.
 Do NOT call `crispr_verify_edit` during this workflow — offer it separately after the construction file/lab sheet are done so the user can order sequencing primers alongside cloning oligos.
 Do NOT offer ICE/TIDE interpretation during this workflow — it belongs after the user has sequencing results in hand.
+
+---
+
+## Sequence tool priority
+
+For any CRISPR-related request, always use `crispr_fetch_target_sequence` to resolve a gene name to a DNA sequence — it returns a clean, guide-design-ready sequence. `gene_sequence_lookup_tool` and `lookup_gene_sequence` return full genome FASTA records that are too large for guide design and will crash the pipeline.
 
 ---
 

@@ -457,8 +457,8 @@ async def run_chat() -> None:
             )
             conversation_history.append(user_content)
  
-            # Always send: system message + full conversation history
-            current_contents = [system_content, *conversation_history]
+            # Cap history to avoid exceeding Gemini's 1M token limit
+            current_contents = [system_content, *conversation_history[-20:]]
  
             resp = safe_generate(model=model, contents=current_contents, config=config)
  

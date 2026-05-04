@@ -1,7 +1,7 @@
 {
   "id": "org.bioe234.function.crispr.run_full_crispr_workflow.v1",
   "name": "Run Full CRISPR Workflow",
-  "description": "Runs a full Cas9 CRISPR workflow: resolves a target sequence from raw DNA, local resource, or gene name plus organism; designs Cas9 guides; selects one protospacer; designs cloning oligos for a chosen vector; creates a sequence_build construction file; and validates the resulting construction inputs.",
+  "description": "Runs a full Cas9 CRISPR workflow for the explicit query provided: resolves a target sequence from raw DNA, local resource, or gene name plus organism; designs Cas9 guides; selects one protospacer; designs cloning oligos for a chosen vector; creates a sequence_build construction file; and validates the resulting construction inputs. Do not infer or silently choose a gene from prior multi-gene results. If multiple genes were returned upstream, ask which gene to use or call this workflow separately for each requested gene.",
   "type": "function",
   "keywords": [
     "CRISPR",
@@ -18,7 +18,7 @@
     {
       "name": "query",
       "type": "string",
-      "description": "Raw DNA sequence, local resource name, or gene symbol to resolve."
+      "description": "Explicit raw DNA sequence, local resource name, or gene symbol to resolve. Required; do not reuse a previous gene unless the user explicitly selected it."
     },
     {
       "name": "organism",
@@ -28,7 +28,7 @@
     {
       "name": "vector",
       "type": "string",
-      "description": "Vector preset name to use for cloning oligo design, such as px330."
+      "description": "Vector preset name to use for cloning oligo design. Use px330 for mammalian cells, pml104 or pml107 for S. cerevisiae (yeast), pcrispr for E. coli, pdr274 for zebrafish. If omitted, the tool returns needs_user_input with organism-appropriate recommendations."
     },
     {
       "name": "construct_name",
@@ -67,6 +67,20 @@
         "status": "ready",
         "protospacer": "AGAAACCTGCCAGTTTGCTG"
       }
+    },
+    {
+      "input": {
+        "query": "GENE_SYMBOL_SELECTED_BY_USER",
+        "organism": "Saccharomyces cerevisiae",
+        "vector": "pml104",
+        "confirmed": true
+      },
+      "output": {
+        "status": "ready",
+        "selected_guide": { "protospacer": "..." },
+        "cloning": { "top_oligo": "...", "bottom_oligo": "..." }
+      },
+      "notes": "For multi-gene upstream results, run once per selected gene or ask the user which gene to use."
     }
   ],
   "execution_details": {

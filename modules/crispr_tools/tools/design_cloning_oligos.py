@@ -40,6 +40,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from modules.crispr_tools.tools.fetch_addgene_vector import FetchAddgeneVector as _AddgeneFetcher
+
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -463,12 +465,12 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
     ),
 
     # ── Yeast (Saccharomyces cerevisiae) ─────────────────────────────────────
-    # pML104: all-in-one S. cerevisiae vector.  SpCas9 under TEF1 promoter;
-    # sgRNA under SNR52 RNA Pol III promoter.  BsaI TypeIIS cloning.
-    # Overhangs must be verified from the plasmid map before ordering oligos.
+    # pML104/pML107: all-in-one S. cerevisiae vectors. SpCas9 under pTDH3;
+    # sgRNA under SNR52 RNA Pol III promoter. The guide is cloned into a
+    # BclI-SwaI cassette: BclI leaves a 5' GATC overhang and SwaI is blunt.
 
     "pml104": VectorSpec(
-        name="pML107",
+        name="pML104",
         cloning_method="TypeIISOligoCloning",
         dna_source="annealed_oligos",
         enzyme="BclI-SwaI",
@@ -478,25 +480,60 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         scaffold_in_vector=True,
         recognition_site="TGATCA",   # BclI recognition site (Dam-methylation-sensitive)
         top_overhang="GATC",         # BclI 5′ overhang after digest
-        bottom_overhang="AAAC",      # SwaI-end complement — verify from Addgene #67639 protocol
+        bottom_overhang="",          # SwaI produces a blunt end
         u6_prefers_5prime_g=False,   # SNR52 does not require a 5′G
+        cell_strain="Saccharomyces cerevisiae (lithium acetate transformation)",
+        selection="URA3 (yeast) / Ampicillin (bacteria)",
+        notes=(
+            "All-in-one S. cerevisiae CRISPR vector (pRSII426 backbone, 2μ, high copy). "
+            "Cas9 under pTDH3 (GAP) promoter; sgRNA under pSNR52 RNA Pol III promoter. "
+            "Guide spacer cloned by annealing two oligos into BclI/SwaI-digested vector; "
+            "the top oligo has a 5′ GATC BclI-compatible overhang and the opposite end is blunt. "
+            "IMPORTANT: BclI is Dam-methylation-sensitive — purify plasmid from a "
+            "Dam- E. coli strain (e.g. SCS110) before digestion or BclI will not cut. "
+            "Include GTTTTAGAGCTAG after the 20 nt guide to rebuild the 5′ sgRNA segment."
+        ),
+        citations=(
+            Citation("Laughery et al. Yeast 2015",
+                     "https://doi.org/10.1002/yea.3098",
+                     "pML104/pML107 all-in-one S. cerevisiae CRISPR vectors; BclI-SwaI guide spacer cloning"),
+            Citation("Addgene #67638",
+                     "https://www.addgene.org/67638/",
+                     "pML104 plasmid repository record; pRSII426 backbone; URA3 selection; BclI-SwaI guide cloning"),
+        ),
+    ),
+
+    "pml107": VectorSpec(
+        name="pML107",
+        cloning_method="TypeIISOligoCloning",
+        dna_source="annealed_oligos",
+        enzyme="BclI-SwaI",
+        promoter="SNR52",
+        nuclease_system="SpCas9",
+        guide_type="sgRNA",
+        scaffold_in_vector=True,
+        recognition_site="TGATCA",
+        top_overhang="GATC",
+        bottom_overhang="",
+        u6_prefers_5prime_g=False,
         cell_strain="Saccharomyces cerevisiae (lithium acetate transformation)",
         selection="LEU2 (yeast) / Ampicillin (bacteria)",
         notes=(
             "All-in-one S. cerevisiae CRISPR vector (pRSII425 backbone, 2μ, high copy). "
             "Cas9 under pTDH3 (GAP) promoter; sgRNA under pSNR52 RNA Pol III promoter. "
-            "Guide spacer cloned by annealing two oligos into BclI/SwaI-digested vector. "
+            "Guide spacer cloned by annealing two oligos into BclI/SwaI-digested vector; "
+            "the top oligo has a 5′ GATC BclI-compatible overhang and the opposite end is blunt. "
             "IMPORTANT: BclI is Dam-methylation-sensitive — purify plasmid from a "
             "Dam- E. coli strain (e.g. SCS110) before digestion or BclI will not cut. "
-            "Verify exact oligo overhangs from Addgene #67639 protocol before ordering."
+            "Include GTTTTAGAGCTAG after the 20 nt guide to rebuild the 5′ sgRNA segment."
         ),
         citations=(
             Citation("Laughery et al. Yeast 2015",
                      "https://doi.org/10.1002/yea.3098",
-                     "pML107 all-in-one S. cerevisiae CRISPR vector; BclI-SwaI guide spacer cloning"),
+                     "pML104/pML107 all-in-one S. cerevisiae CRISPR vectors; BclI-SwaI guide spacer cloning"),
             Citation("Addgene #67639",
                      "https://www.addgene.org/67639/",
-                     "pML107 plasmid repository record; pRSII425 backbone; LEU2 selection; pTDH3-Cas9; pSNR52-sgRNA"),
+                     "pML107 plasmid repository record; pRSII425 backbone; LEU2 selection; BclI-SwaI guide cloning"),
         ),
     ),
 
@@ -622,6 +659,170 @@ GOLDEN_GATE_ENZYME_SPECS: dict[str, dict] = {
 }
 
 # ---------------------------------------------------------------------------
+# Addgene API fallback: standard TypeIIS overhangs for well-characterised CRISPR
+# enzymes. BbsI/BsmBI are consistent across virtually all published CRISPR vectors.
+# BsaI overhangs vary by vector — leave empty so the fallback asks the user.
+# ---------------------------------------------------------------------------
+
+_TYPEII_ENZYME_OVERHANGS: dict[str, dict] = {
+    "BbsI":  {"top": "CACC", "bottom": "AAAC", "recognition": "GAAGAC"},
+    "BsmBI": {"top": "CACC", "bottom": "AAAC", "recognition": "CGTCTC"},
+}
+
+
+def _parse_addgene_id(vector: str) -> Optional[int]:
+    """Return numeric Addgene ID if vector looks like one, else None."""
+    v = vector.strip()
+    if v.lower().startswith("addgene:"):
+        v = v[8:].strip()
+    return int(v) if v.isdigit() else None
+
+
+def _addgene_data_to_vector_spec(
+    data: dict,
+) -> "tuple[Optional[VectorSpec], Optional[dict]]":
+    """
+    Try to build a VectorSpec from a FetchAddgeneVector result dict.
+
+    Returns (VectorSpec, None) on success, or (None, needs_user_input_dict)
+    when critical fields can't be inferred (e.g. BsaI overhangs are vector-
+    specific and are not in the standard lookup table).
+    """
+    addgene_id = data.get("addgene_id", "")
+    name = data.get("name") or f"Addgene #{addgene_id}"
+    url = data.get("url") or f"https://www.addgene.org/{addgene_id}/"
+    description = (data.get("description") or "").lower()
+
+    # Map raw clone_method string to our cloning method keys
+    raw = (data.get("clone_method_raw") or "").lower()
+    if "gibson" in raw:
+        cloning_method = "GibsonAssembly"
+        dna_source = "overlap_fragment"
+    elif "golden gate" in raw:
+        cloning_method = "GoldenGateAssembly"
+        dna_source = "overlap_fragment"
+    elif "restriction" in raw and "type ii" not in raw:
+        cloning_method = "RestrictionLigation"
+        dna_source = "pcr_product"
+    else:
+        # Covers "Type IIS Restriction Enzyme Cloning" and unknowns
+        cloning_method = "TypeIISOligoCloning"
+        dna_source = "annealed_oligos"
+
+    enzyme = data.get("enzyme") or ""
+    promoter = data.get("promoter") or ""
+
+    # Infer nuclease system from description / name
+    if any(kw in description for kw in ("cas12a", "cpf1", "cas12a")):
+        nuclease_system, guide_type = "Cas12a", "crRNA"
+    elif "sacas9" in description:
+        nuclease_system, guide_type = "SaCas9", "sgRNA"
+    else:
+        nuclease_system, guide_type = "SpCas9", "sgRNA"
+
+    # Selection markers
+    all_markers = [
+        m for m in (data.get("resistance_markers") or []) + [data.get("bacterial_resistance") or ""]
+        if m
+    ]
+    selection = ", ".join(sorted(set(all_markers)))
+    cell_strain = data.get("growth_strain") or ""
+
+    doi = data.get("article_doi") or ""
+    citations: tuple[Citation, ...] = tuple(filter(None, [
+        Citation(f"Article (DOI: {doi})", f"https://doi.org/{doi}", f"Original publication for {name}") if doi else None,
+        Citation(f"Addgene #{addgene_id}", url, f"{name} plasmid repository record"),
+    ]))
+    notes = (
+        f"Dynamically fetched from Addgene #{addgene_id}. "
+        "Verify overhangs and cloning parameters against the plasmid protocol before ordering oligos."
+    )
+
+    if cloning_method == "TypeIISOligoCloning":
+        enz_info = _TYPEII_ENZYME_OVERHANGS.get(enzyme, {})
+        top_overhang = enz_info.get("top", "")
+        bottom_overhang = enz_info.get("bottom", "")
+        recognition_site = enz_info.get("recognition", "")
+
+        if not top_overhang or not bottom_overhang:
+            return None, {
+                "status": "needs_user_input",
+                "addgene_id": addgene_id,
+                "plasmid_name": name,
+                "cloning_method": cloning_method,
+                "enzyme": enzyme,
+                "promoter": promoter,
+                "missing_fields": ["top_overhang", "bottom_overhang"],
+                "questions": [
+                    f"Vector '{name}' (Addgene #{addgene_id}) uses {enzyme} — "
+                    f"standard overhangs for {enzyme} are not in the lookup table "
+                    f"(they vary by vector). Please provide top and bottom 5′ "
+                    f"overhangs from the plasmid protocol at {url}."
+                ],
+                "partial_spec": {
+                    "name": name,
+                    "cloning_method": cloning_method,
+                    "enzyme": enzyme,
+                    "promoter": promoter,
+                    "nuclease_system": nuclease_system,
+                },
+            }
+
+        spec = VectorSpec(
+            name=name,
+            cloning_method=cloning_method,
+            dna_source=dna_source,
+            enzyme=enzyme,
+            promoter=promoter,
+            nuclease_system=nuclease_system,
+            guide_type=guide_type,
+            scaffold_in_vector=True,
+            recognition_site=recognition_site,
+            top_overhang=top_overhang,
+            bottom_overhang=bottom_overhang,
+            u6_prefers_5prime_g="U6" in promoter.upper(),
+            cell_strain=cell_strain,
+            selection=selection,
+            notes=notes,
+            citations=citations,
+        )
+        return spec, None
+
+    if cloning_method == "GibsonAssembly":
+        spec = VectorSpec(
+            name=name,
+            cloning_method=cloning_method,
+            dna_source=dna_source,
+            enzyme="Gibson",
+            promoter=promoter,
+            nuclease_system=nuclease_system,
+            guide_type=guide_type,
+            scaffold_in_vector=True,
+            recommended_overlap_bp=20,
+            cell_strain=cell_strain,
+            selection=selection,
+            notes=notes,
+            citations=citations,
+        )
+        return spec, None
+
+    # RestrictionLigation / GoldenGate / unknown — partial info only
+    return None, {
+        "status": "needs_user_input",
+        "addgene_id": addgene_id,
+        "plasmid_name": name,
+        "cloning_method": cloning_method,
+        "enzyme": enzyme,
+        "missing_fields": ["cloning_parameters"],
+        "questions": [
+            f"Vector '{name}' (Addgene #{addgene_id}) uses {cloning_method}. "
+            f"Please supply the full cloning parameters (overhangs, restriction sites) "
+            f"from the protocol at {url}."
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Known promoter and scaffold sequences for auto-cassette assembly
 # Used by RestrictionLigation when scaffold_in_vector=False and the promoter
 # and nuclease are both known — avoids asking the user for the full cassette.
@@ -675,6 +876,7 @@ _ORGANISM_COMPAT: dict[str, list[str]] = {
 # ---------------------------------------------------------------------------
 
 _COMPLEMENT: dict[str, str] = {"A": "T", "T": "A", "G": "C", "C": "G"}
+_YEAST_BCLI_SWAI_SGRNA_PREFIX = "GTTTTAGAGCTAG"
 
 
 def _validate_dna(seq: str, label: str) -> str:
@@ -691,6 +893,15 @@ def _validate_dna(seq: str, label: str) -> str:
 
 def _reverse_complement(seq: str) -> str:
     return "".join(_COMPLEMENT[b] for b in reversed(seq))
+
+
+def _uses_yeast_bcli_swai_cloning(spec: Optional[VectorSpec]) -> bool:
+    return (
+        spec is not None
+        and spec.promoter.upper() == "SNR52"
+        and spec.enzyme == "BclI-SwaI"
+        and spec.top_overhang == "GATC"
+    )
 
 
 def _read_sequence_file(path: Path) -> str:
@@ -803,7 +1014,8 @@ class CRISPRCloningDesigner:
             raise ValueError(
                 f"Unknown vector '{vector}'. "
                 f"Known vectors: {', '.join(sorted(VECTOR_SPECS))}. "
-                "Pass vector='custom' to design with a vector not in this list."
+                "Pass vector='custom' to design with a vector not in this list, "
+                "or pass an Addgene plasmid ID (e.g. '42230') to fetch from the Addgene API."
             )
         return VECTOR_SPECS[key]
 
@@ -974,7 +1186,9 @@ class CRISPRCloningDesigner:
                 "(20 nt for SpCas9 / SaCas9, 23 nt for Cas12a; A/T/G/C only)"
             )
 
-        resolved_top_overhang = top_overhang or (spec.top_overhang if spec else None)
+        # Spec values are authoritative for known vectors — user-supplied overrides
+        # are only used when the spec field is absent or empty (e.g. pcfd3).
+        resolved_top_overhang = (spec.top_overhang if spec and spec.top_overhang else top_overhang) or None
         if not resolved_top_overhang:
             missing.append("top_overhang")
             questions.append(
@@ -982,14 +1196,14 @@ class CRISPRCloningDesigner:
                 "Please provide the top-strand 5′ overhang from the plasmid map or protocol."
             )
 
-        resolved_bottom_overhang = bottom_overhang or (spec.bottom_overhang if spec else None)
-        if not resolved_bottom_overhang:
+        resolved_bottom_overhang = (spec.bottom_overhang if spec and spec.bottom_overhang else bottom_overhang) or None
+        if not resolved_bottom_overhang and not _uses_yeast_bcli_swai_cloning(spec):
             missing.append("bottom_overhang")
             questions.append(
                 "Type IIS cloning overhangs are vector-specific and are not determined by the guide sequence. "
                 "Please provide the bottom-strand 5′ overhang from the plasmid map or protocol."
                 )
-        resolved_enzyme = enzyme or (spec.enzyme if spec else None)
+        resolved_enzyme = (spec.enzyme if spec and spec.enzyme else enzyme) or None
         if not resolved_enzyme:
             missing.append("enzyme")
             questions.append(
@@ -1232,15 +1446,16 @@ class CRISPRCloningDesigner:
         construction_file_inputs uses assembly_strategy="DirectSynthesis" because
         annealed oligos are synthesized directly — no backbone PCR occurs.
         """
-        top_oh = top_overhang_override or (spec.top_overhang if spec else "")
-        bot_oh = bottom_overhang_override or (spec.bottom_overhang if spec else "")
+        # Spec overhangs and enzyme are authoritative for known vectors.
+        top_oh = (spec.top_overhang if spec and spec.top_overhang else top_overhang_override) or ""
+        bot_oh = (spec.bottom_overhang if spec and spec.bottom_overhang else bottom_overhang_override) or ""
         use_g  = prepend_g_override if prepend_g_override is not None else (
             spec.u6_prefers_5prime_g if spec else False
         )
-        enz = enzyme_override or (spec.enzyme if spec else "N/A")
+        enz = (spec.enzyme if spec and spec.enzyme else enzyme_override) or "N/A"
 
         top_oh = _validate_dna(top_oh, "top_overhang")
-        bot_oh = _validate_dna(bot_oh, "bottom_overhang")
+        bot_oh = _validate_dna(bot_oh, "bottom_overhang") if bot_oh else ""
 
         g_prepended = False
         original    = protospacer
@@ -1248,8 +1463,17 @@ class CRISPRCloningDesigner:
             protospacer = "G" + protospacer
             g_prepended = True
 
-        top_oligo = top_oh + protospacer
-        bot_oligo = bot_oh + _reverse_complement(protospacer)
+        if _uses_yeast_bcli_swai_cloning(spec):
+            sgRNA_prefix = _YEAST_BCLI_SWAI_SGRNA_PREFIX
+            top_oligo = top_oh + protospacer + sgRNA_prefix
+            bot_oligo = _reverse_complement(sgRNA_prefix) + _reverse_complement(protospacer)
+            insert_sequence = protospacer + sgRNA_prefix
+            end_structure = "BclI-compatible 5' GATC overhang and SwaI blunt end"
+        else:
+            top_oligo = top_oh + protospacer
+            bot_oligo = bot_oh + _reverse_complement(protospacer)
+            insert_sequence = protospacer
+            end_structure = "two sticky-end overhangs"
 
         slug       = (spec.name if spec else "custom").lower().replace(" ", "_")
         top_name   = f"{slug}_guide_top"
@@ -1267,7 +1491,7 @@ class CRISPRCloningDesigner:
             "backbone_name": backbone_name,
             "backbone_sequence": backbone_seq,
             "insert_name": ins_name,
-            "insert_sequence": protospacer,
+            "insert_sequence": insert_sequence,
             # Type IIS annealed-oligo cloning uses dedicated top/bottom oligo
             # fields; reusing the insert primer fields creates duplicate parts.
             "insert_forward_primer_name": "",
@@ -1303,6 +1527,7 @@ class CRISPRCloningDesigner:
             "bottom_oligo_name": bot_name,
             "top_oligo": top_oligo,
             "bottom_oligo": bot_oligo,
+            "end_structure": end_structure,
             "g_prepended": g_prepended,
             "final_protospacer": protospacer,
             "construction_file_inputs": construction_file_inputs,
@@ -1731,8 +1956,23 @@ class CRISPRCloningDesigner:
           workflow-specific parameters for your vector.
 
         """
-        # Resolve vector spec (None for custom)
-        spec = self.resolve_vector(vector)
+        # Addgene fallback: if the vector string looks like an Addgene ID and is
+        # not in the local preset registry, fetch metadata from the Addgene API
+        # and try to build a VectorSpec from it.
+        addgene_id = _parse_addgene_id(vector) if vector else None
+        if addgene_id is not None and (not vector or vector.lower().strip() not in VECTOR_SPECS):
+            fetcher = _AddgeneFetcher()
+            fetcher.initiate()
+            fetch_result = fetcher.run(addgene_id)
+            if fetch_result.get("status") == "needs_user_input":
+                return fetch_result  # API key missing — surface to user
+            addgene_spec, needs_input = _addgene_data_to_vector_spec(fetch_result)
+            if needs_input:
+                return needs_input  # Overhangs unknown — ask user
+            spec = addgene_spec
+        else:
+            # Resolve vector spec (None for custom)
+            spec = self.resolve_vector(vector)
 
         # Organism compatibility guard
         if spec is not None and target_organism:

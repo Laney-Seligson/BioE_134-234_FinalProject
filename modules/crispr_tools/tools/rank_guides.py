@@ -208,8 +208,8 @@ class RankGuides:
 
         best = scored[0]
         rationale = (
-            f"Best guide '{best['protospacer']}' scored {best['total_score']} "
-            f"(efficiency {best['efficiency_score']}, specificity {best['specificity_score']}). "
+            f"Best guide '{best['protospacer']}' scored {best['total_score']}/3 "
+            f"(efficiency {best['efficiency_score']}/2, specificity {best['specificity_score']}/1). "
             f"GC content: {best['efficiency_details']['gc_content']:.0%}. "
             f"Off-target sites: {best['specificity_details']['total_offtargets']} total "
             f"({best['specificity_details']['high_risk_offtargets']} HIGH, "

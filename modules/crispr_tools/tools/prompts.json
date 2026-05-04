@@ -140,6 +140,30 @@
     "expected_args": {},
     "notes": "High-level intent — tests whether model gathers all required fields first."
   },
+  {
+    "prompt": "Fetch the sequence for rpsL in E. coli.",
+    "expected_tool": "crispr_fetch_target_sequence",
+    "expected_args": { "query": "rpsL", "organism": "Escherichia coli" },
+    "notes": "Gene name input — triggers NCBI Entrez fetch for rpsL."
+  },
+  {
+    "prompt": "Rank these Cas9 guide RNAs against the lacZ sequence in E. coli.",
+    "expected_tool": "crispr_rank_guides",
+    "expected_args": { "nuclease": "cas9" },
+    "notes": "Tests guide ranking with efficiency (GC, poly-T) and specificity (off-target) scoring."
+  },
+  {
+    "prompt": "Design oligos to clone protospacer ACAGAAACCTGCCAGTTTGC into pX330.",
+    "expected_tool": "crispr_design_cloning_oligos",
+    "expected_args": { "vector": "px330", "protospacer": "ACAGAAACCTGCCAGTTTGC" },
+    "notes": "TypeIIS BbsI cloning into pX330 — should return top/bottom oligos with CACC/AAAC overhangs."
+  },
+  {
+    "prompt": "Design a CRISPR edit targeting lacZ in E. coli using pTargetF.",
+    "expected_tool": "crispr_run_full_crispr_workflow",
+    "expected_args": { "query": "lacZ", "organism": "Escherichia coli", "vector": "ptargetf" },
+    "notes": "End-to-end pipeline: fetches lacZ, designs + ranks guides, designs cloning oligos, builds and validates a cloning record."
+  },
   [
     {
       "prompt": "Make a shorthand construction file from the Miao 2013 paper.",

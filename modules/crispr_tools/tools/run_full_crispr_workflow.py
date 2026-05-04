@@ -56,6 +56,15 @@ _VECTOR_RECOMMENDATIONS: dict[str, list[dict]] = {
             "citation": "Jiang et al. Nat Biotechnol 2015. doi:10.1038/nbt.3234",
         },
     ],
+    "yeast": [
+        {
+            "vector_key": "pml104",
+            "vector_name": "pML104",
+            "use_case": "All-in-one S. cerevisiae CRISPR vector. SpCas9 under TEF1 promoter; sgRNA under SNR52 RNA Pol III promoter. Episomal 2μ origin; URA3 selection.",
+            "delivery": "Electroporation / lithium acetate transformation",
+            "citation": "Laughery et al. Yeast 2015. doi:10.1002/yea.3080",
+        },
+    ],
     "plant": [
         {
             "vector_key": "pkse401",
@@ -93,6 +102,7 @@ _PLANT_KEYWORDS = {
     "maize", "zea mays", "rice", "oryza sativa", "tomato", "solanum lycopersicum",
     "wheat", "triticum", "soybean", "glycine max", "poplar", "populus",
 }
+_YEAST_KEYWORDS = {"saccharomyces", "s. cerevisiae", "yeast", "cerevisiae"}
 
 
 def _classify_organism(organism: str) -> str:
@@ -103,6 +113,8 @@ def _classify_organism(organism: str) -> str:
         return "zebrafish"
     if any(kw in o for kw in _PLANT_KEYWORDS):
         return "plant"
+    if any(kw in o for kw in _YEAST_KEYWORDS):
+        return "yeast"
     if any(kw in o for kw in _MAMMALIAN_KEYWORDS):
         return "mammalian"
     return "mammalian"  # default fallback for unlisted organisms
@@ -146,8 +158,37 @@ _CONSTRUCTION_INPUT_FIELDS = {
 
 class RunFullCrisprWorkflow:
     """
-    Resolve a target sequence, design Cas9 guides, select one protospacer,
-    design cloning oligos, build a construction file, and validate it.
+    Description:
+        End-to-end CRISPR pipeline: fetches target sequence, designs and ranks
+        guides, selects a protospacer, designs cloning oligos, and builds and
+        validates a cloning record.
+
+    Input:
+        query (str): Gene name, local resource key, or raw DNA sequence.
+        organism (str): Target organism. Default: "Escherichia coli".
+        vector (str): Cloning vector key (e.g. "px330"). Prompted if absent.
+        construct_name (str): Optional name for the output construct.
+        guide_index (int): Rank index of guide to use. Default: 0.
+        validate_strict (bool): Strict validation mode. Default: False.
+        force_vector (bool): Skip Cas-system compatibility check. Default: False.
+
+    Output:
+        dict: status="ready" with sequence_info, guides, selected_guide,
+              cloning, and validation; or status="needs_user_input".
+
+    Tests:
+        - Case:
+            Input: query="rpsL", organism="Escherichia coli", vector="pcrispr"
+            Expected Output: status == "ready", "selected_guide" in result
+            Description: Full workflow with a valid gene and vector.
+        - Case:
+            Input: query="rpsL", organism="Escherichia coli", vector=""
+            Expected Output: status == "needs_user_input", missing_fields contains "vector"
+            Description: Missing vector returns a structured prompt.
+        - Case:
+            Input: query=""
+            Expected Exception: ValueError
+            Description: Empty query raises ValueError.
     """
 
     def initiate(self) -> None:

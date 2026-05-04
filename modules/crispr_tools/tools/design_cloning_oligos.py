@@ -749,16 +749,35 @@ def _needs_user_input(
 
 class CRISPRCloningDesigner:
     """
-    Guided CRISPR cloning workflow designer.
+    Description:
+        Designs oligos or primers for CRISPR guide insertion via TypeIIS ligation,
+        restriction ligation, Gibson, or Golden Gate assembly.
 
-    Behaves like a cloning assistant:
-      - If enough information is present → design and return results.
-      - If inputs are missing → return a structured 'needs_user_input' dict
-        with human-readable questions rather than raising an error.
-      - Hard errors are reserved for invalid DNA sequences and broken biology.
+    Input:
+        vector (str): Known vector key (e.g. "px330") or "custom".
+        protospacer (str): 20-nt guide for TypeIIS cloning.
+        insert_sequence (str): Insert DNA for Gibson/Golden Gate.
+        left_overlap_context (str): Vector sequence 5′ of insertion site.
+        right_overlap_context (str): Vector sequence 3′ of insertion site.
+        cloning_method (str): Required when vector="custom".
 
-    Entry point: .run(...)
-    Harness compatibility: .initiate() + .run() pattern is preserved.
+    Output:
+        dict: status="ready" with oligo/primer sequences, or
+              status="needs_user_input" with missing fields and questions.
+
+    Tests:
+        - Case:
+            Input: vector="px330", protospacer="ACAGAAACCTGCCAGTTTGC"
+            Expected Output: status == "ready", top_oligo starts with "CACC"
+            Description: TypeIIS cloning with a known vector.
+        - Case:
+            Input: vector="px330" (no protospacer)
+            Expected Output: status == "needs_user_input"
+            Description: Missing protospacer returns structured prompt.
+        - Case:
+            Input: vector="px330", protospacer="INVALID!!"
+            Expected Exception: ValueError
+            Description: Non-DNA protospacer raises ValueError.
     """
 
     def initiate(self) -> None:

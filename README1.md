@@ -79,12 +79,16 @@ The client is ready and you can start entering prompts.
   - design cloning oligos 
   - build and validate construction file using Laney’s Scripts 
 
+- MCP Wrapper: `run_full_crispr_workflow.json`
+- Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
 
 <b>2. fetch_target_sequence</b>
 - What it does: 
   - Resolves a gene name or accession to a clean DNA sequence using NCBI Entrez tools 
 
+- MCP Wrapper: `fetch_target_sequence.json`
+- Pytests (`tests/unit/test_fetch_target_sequence.py`): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
 - Sample Prompt: “Fetch the sequence for recA in E.Coli.” 
 - Output: 
   <details>
@@ -122,6 +126,8 @@ The client is ready and you can start entering prompts.
 - What it does: 
   - Scans a sequence for NGG PAM sites and returns up to 10 SpCas9 guide RNA candidates 
 
+- MCP Wrapper: `design_cas9_grna.json`
+- Pytests (`tests/unit/test_design_cas9_grna.py`): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
 - Sample Prompt: “Design Cas9 guides for the lacZ locus.” 
 - Output: 
   <details>
@@ -371,9 +377,11 @@ The client is ready and you can start entering prompts.
   - Hsu, Patrick D., David A. Scott, Joshua A. Weinstein, F. Ann Ran, Silvana Konermann, Vineeta Agarwala, Yinqing Li, et al. 2013. "DNA Targeting Specificity of RNA-Guided Cas9 Nucleases." Nature Biotechnology 31 (9): 827–832. https://doi.org/10.1038/nbt.2647.
 
 <b> 4. design_cas12a_crrna </b>
-- What is does: 
-  - Scans a sequence of TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates 
+- What it does: 
+  - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates 
 
+- MCP Wrapper: `design_cas12a_crrna.json`
+- Pytests (`tests/unit/test_design_cas12a_crrna.py`): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
 - Sample Prompt: “Give me Cas12a guides for the araB locus.”
 - Output: 
   <details>
@@ -460,6 +468,8 @@ The client is ready and you can start entering prompts.
 <b> 5. cas_selector</b>
 - What it does: 
   - Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements 
+- MCP Wrapper: `cas_selector.json`
+- Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a, multiplexing override, empty sequence error
 - Sample Prompt: “Which Cas nuclease should I use for 3 targets in E.Coli?” 
 - Citations: 
   - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
@@ -475,6 +485,8 @@ The client is ready and you can start entering prompts.
     - poly-T runs
     - off-target risk
   - returns a sorted list with rationale !
+- MCP Wrapper: `rank_guides.json`
+- Pytests (`tests/unit/test_rank_guides.py`): sorted output, poly-T penalty, GC scoring, citations present, empty list error
 - Sample Prompt: “Rank these guides against the lacZ sequence.”
 - Output: 
   <details>
@@ -749,6 +761,8 @@ The client is ready and you can start entering prompts.
     - Gibson
     - Golden Gate cloning 
 
+- MCP Wrapper: `design_cloning_oligos.json`
+- Pytests (`tests/unit/test_design_cloning_oligos.py`): pCRISPR E. coli produces ready oligos, organism mismatch → needs_user_input
 - Sample Prompt: “Design oligos to clone this protospacer into px330.” 
 - Output: 
   <details>

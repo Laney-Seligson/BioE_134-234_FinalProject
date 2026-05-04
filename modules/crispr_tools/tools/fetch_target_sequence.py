@@ -46,6 +46,33 @@ _VALID_DNA   = set("ATGC")
 
 
 class FetchTargetSequence:
+    """
+    Description:
+        Resolves a gene name, local resource key, or raw DNA string to a
+        clean uppercase DNA sequence via raw input, local registry, or NCBI Entrez.
+
+    Input:
+        query (str): Raw DNA sequence, local resource name, or gene name.
+        organism (str): Organism for NCBI lookup. Default: "Escherichia coli".
+
+    Output:
+        dict: Keys: sequence (str), source (str), resource (str),
+              organism (str), length (int), note (str).
+
+    Tests:
+        - Case:
+            Input: query="ATGCATGCATGC"
+            Expected Output: source == "raw_input", sequence == "ATGCATGCATGC"
+            Description: Raw DNA is returned as-is.
+        - Case:
+            Input: query="rpsL", organism="Escherichia coli"
+            Expected Output: source == "ncbi", length > 0
+            Description: Gene name triggers NCBI fetch.
+        - Case:
+            Input: query=""
+            Expected Exception: ValueError
+            Description: Empty query raises ValueError.
+    """
 
     def initiate(self) -> None:
         pass

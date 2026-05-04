@@ -1,0 +1,91 @@
+{
+  "id": "org.bioe234.function.crispr.predict_offtargets.v1",
+  "name": "CRISPR Off-Target Site Predictor",
+  "description": "Scans a reference DNA sequence for potential off-target sites where a CRISPR guide could mis-cut. Slides the protospacer across both strands of the reference, counts mismatches at each window, checks for a valid PAM (NGG for Cas9, TTTV for Cas12a), and assigns each site a HIGH/MEDIUM/LOW risk score using seed-region logic. Supports Cas9 and Cas12a, and circular references for plasmid scanning.",
+  "type": "function",
+  "keywords": ["CRISPR", "Cas9", "Cas12a", "off-target", "specificity", "CFD", "seed region", "PAM", "mismatch", "guide RNA"],
+  "date_created": "2026-04-16",
+  "date_last_modified": "2026-05-04",
+
+  "inputs": [
+    {
+      "name": "protospacer",
+      "type": "string",
+      "description": "The DNA protospacer WITHOUT the PAM. 20 bp for Cas9, 23 bp for Cas12a. Only A, T, G, C — no ambiguous bases."
+    },
+    {
+      "name": "reference",
+      "type": "string",
+      "description": "The DNA sequence to scan for off-target sites. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves these automatically."
+    },
+    {
+      "name": "nuclease",
+      "type": "string",
+      "optional": true,
+      "description": "Which nuclease to model. One of 'cas9' (default) or 'cas12a'. Determines protospacer length, PAM (NGG for Cas9, TTTV for Cas12a), and seed-region size."
+    },
+    {
+      "name": "max_mismatches",
+      "type": "integer",
+      "optional": true,
+      "description": "Flag sites with this many mismatches or fewer. Default 3."
+    },
+    {
+      "name": "is_circular",
+      "type": "boolean",
+      "optional": true,
+      "description": "If true, wrap the reference end-to-start before scanning so sites spanning the origin of a circular plasmid are not missed. Default false."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A dictionary containing protospacer, nuclease, reference_length, strands_scanned, sites_evaluated, offtarget_sites (list of {position, strand, sequence, mismatches, mismatch_positions, seed_mismatches, has_pam, risk}), high_risk_count, max_offtarget_cfd, and a one-sentence specificity_summary."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "protospacer": "ATGATGATGATGATGATGAT",
+        "reference": "ATGATGATGATGATGATGATAGG",
+        "nuclease": "cas9",
+        "max_mismatches": 3
+      },
+      "output": {
+        "result": {
+          "protospacer": "ATGATGATGATGATGATGAT",
+          "nuclease": "cas9",
+          "reference_length": 23,
+          "high_risk_count": 1,
+          "specificity_summary": "1 HIGH-risk on-target site found; 0 additional off-target sites within 3 mismatches."
+        }
+      }
+    },
+    {
+      "input": {
+        "protospacer": "TCAGAAACCTGCCAGTTTGC",
+        "reference": "pBR322",
+        "nuclease": "cas9"
+      },
+      "output": {
+        "result": {
+          "high_risk_count": 0,
+          "specificity_summary": "No HIGH-risk sites found in pBR322."
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/crispr_tools/tools/predict_offtargets.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+
+    "mcp_name": "crispr_predict_offtargets",
+    "seq_params": ["reference"]
+  }
+}

@@ -468,33 +468,35 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
     # Overhangs must be verified from the plasmid map before ordering oligos.
 
     "pml104": VectorSpec(
-        name="pML104",
+        name="pML107",
         cloning_method="TypeIISOligoCloning",
         dna_source="annealed_oligos",
-        enzyme="BsaI",
+        enzyme="BclI-SwaI",
         promoter="SNR52",
         nuclease_system="SpCas9",
         guide_type="sgRNA",
         scaffold_in_vector=True,
-        recognition_site="GGTCTC",
-        top_overhang="",    # verify from Addgene #67639 plasmid map / protocol
-        bottom_overhang="", # verify from Addgene #67639 plasmid map / protocol
-        u6_prefers_5prime_g=False,  # SNR52 does not require a 5′G
-        cell_strain="Saccharomyces cerevisiae",
-        selection="URA3",
+        recognition_site="TGATCA",   # BclI recognition site (Dam-methylation-sensitive)
+        top_overhang="GATC",         # BclI 5′ overhang after digest
+        bottom_overhang="AAAC",      # SwaI-end complement — verify from Addgene #67639 protocol
+        u6_prefers_5prime_g=False,   # SNR52 does not require a 5′G
+        cell_strain="Saccharomyces cerevisiae (lithium acetate transformation)",
+        selection="LEU2 (yeast) / Ampicillin (bacteria)",
         notes=(
-            "All-in-one S. cerevisiae CRISPR vector.  SpCas9 under TEF1 promoter; "
-            "sgRNA under SNR52 RNA Pol III promoter.  Episomal 2μ origin; URA3 "
-            "selection.  BsaI TypeIIS cloning — verify exact 4-nt overhangs from "
-            "the plasmid map/protocol before ordering oligos."
+            "All-in-one S. cerevisiae CRISPR vector (pRSII425 backbone, 2μ, high copy). "
+            "Cas9 under pTDH3 (GAP) promoter; sgRNA under pSNR52 RNA Pol III promoter. "
+            "Guide spacer cloned by annealing two oligos into BclI/SwaI-digested vector. "
+            "IMPORTANT: BclI is Dam-methylation-sensitive — purify plasmid from a "
+            "Dam- E. coli strain (e.g. SCS110) before digestion or BclI will not cut. "
+            "Verify exact oligo overhangs from Addgene #67639 protocol before ordering."
         ),
         citations=(
             Citation("Laughery et al. Yeast 2015",
-                     "https://doi.org/10.1002/yea.3080",
-                     "pML104 all-in-one S. cerevisiae CRISPR vector; BsaI guide cloning"),
+                     "https://doi.org/10.1002/yea.3098",
+                     "pML107 all-in-one S. cerevisiae CRISPR vector; BclI-SwaI guide spacer cloning"),
             Citation("Addgene #67639",
                      "https://www.addgene.org/67639/",
-                     "pML104 plasmid repository record"),
+                     "pML107 plasmid repository record; pRSII425 backbone; LEU2 selection; pTDH3-Cas9; pSNR52-sgRNA"),
         ),
     ),
 

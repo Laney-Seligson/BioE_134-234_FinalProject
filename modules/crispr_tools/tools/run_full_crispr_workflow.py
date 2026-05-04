@@ -221,7 +221,8 @@ class RunFullCrisprWorkflow:
         construct_name: Optional[str] = None,
         guide_index: int = 0,
         validate_strict: bool = False,
-        force_vector : bool = False,
+        force_vector: bool = False,
+        confirmed: bool = False,
     ) -> dict:
         if not query or not query.strip():
             raise ValueError("query must not be empty.")
@@ -245,6 +246,31 @@ class RunFullCrisprWorkflow:
         sequence_info = self.sequence_fetcher.run(query=query, organism=organism)
         seq = sequence_info["sequence"]
         spec = self.oligo_designer.resolve_vector(vector)
+
+        if not confirmed:
+            method = spec.cloning_method if spec else "custom"
+            enzyme = spec.enzyme if spec else "N/A"
+            strain = spec.cell_strain if spec else "N/A"
+            selection = spec.selection if spec else "N/A"
+            vector_name = spec.name if spec else vector
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["confirmed"],
+                "questions": [
+                    f"Please confirm you want to proceed with the following before running the full workflow:\n"
+                    f"  Vector: {vector_name}\n"
+                    f"  Cloning method: {method}\n"
+                    f"  Enzyme: {enzyme}\n"
+                    f"  Cell strain: {strain}\n"
+                    f"  Selection: {selection}\n"
+                    f"Reply with confirmed=true to continue, or choose a different vector."
+                ],
+                "vector": vector_name,
+                "cloning_method": method,
+                "enzyme": enzyme,
+                "cell_strain": strain,
+                "selection": selection,
+            }
 
         if spec is None:
             raise ValueError(

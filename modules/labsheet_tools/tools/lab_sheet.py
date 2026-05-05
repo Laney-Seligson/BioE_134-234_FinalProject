@@ -817,9 +817,19 @@ def _format_edit_verification_section(
         warning_block = "\nprimer_warnings:\n" + "\n".join(f"- {w}" for w in primer_warnings)
 
     handoff = (
-        "After running ICE/TIDE, call interpret_ice_tide with the KO score "
-        "(or total indel %) and R^2 fit value to get a plain-English "
-        "verdict and concrete next steps."
+        "After running ICE/TIDE, paste your result back. Required: "
+        "the editing percentage (KO score for ICE, total indel % for TIDE) "
+        "AND the R^2 fit value (both are reported on the same ICE/TIDE "
+        "results page). Optional but useful: the indel size distribution "
+        "(e.g. '+1: 45%, -3: 12%') so the dominant indel can be flagged, "
+        "and which tool you used (ICE vs TIDE — default is ICE).\n"
+        "Example prompt: 'My ICE score is 45% with R^2 = 0.93' or 'TIDE: "
+        "62% indels, R^2 0.91, dominant indel +1 at 38%'.\n"
+        "After interpret_ice_tide returns, the workflow continues with: "
+        "(a) more single-clone Sanger if you need a homozygous edit "
+        "(call interpret_ice_tide again per clone), "
+        "(b) colony_calculator to size additional screening, or "
+        "(c) functional validation of the edited line (out of scope here)."
     )
 
     return "\n".join([
@@ -1275,6 +1285,7 @@ class LabSheet:
         pam: str | None = None,
         delivery: str = "plasmid",
         outcome: str = "nhej",
+        location_overrides: dict | None = None,
     ) -> dict:
         if not construction_record:
             raise ValueError("construction_record must not be empty.")
@@ -1463,6 +1474,17 @@ class LabSheet:
             operations, thread, notes, transform_plans, parts_map,
             sequencing_primers, verify_edit_result,
         )
+
+        # Apply user-supplied location overrides as a final pass over both
+        # the text and TSV outputs. Examples:
+        #   {"oligos1": "Freezer 3 / Rack B", "boxA": "Bench drawer 2"}
+        # Replacements are longest-token-first so "boxA1" beats "boxA".
+        if location_overrides:
+            sorted_keys = sorted(location_overrides.keys(), key=len, reverse=True)
+            for token in sorted_keys:
+                replacement = str(location_overrides[token])
+                lab_sheet_text = lab_sheet_text.replace(token, replacement)
+                lab_sheet_tsv = lab_sheet_tsv.replace(token, replacement)
 
         # Build a list of canonical protocol sources (one entry per step type
         # that fired). Each entry includes the manufacturer/method paper its

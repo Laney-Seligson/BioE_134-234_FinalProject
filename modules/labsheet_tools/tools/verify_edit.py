@@ -336,6 +336,24 @@ class VerifyEdit:
         if not reference:
             raise ValueError("Reference sequence must not be empty.")
 
+        # Friendly guard: catch the common agent mistake of passing a gene
+        # symbol (e.g. "ADE1", "TYR", "lacZ") as the reference instead of
+        # an actual sequence. Without this, the seq_basics resolver throws
+        # a confusing "Invalid sequence characters detected: ['D','E']"
+        # because it tries to parse "ADE1" as raw DNA.
+        _is_likely_gene_symbol = (
+            len(reference) <= 12
+            and reference.isalnum()
+            and any(b not in "ATGCNRYSWKMBDHV" for b in reference)
+        )
+        if _is_likely_gene_symbol:
+            raise ValueError(
+                f"reference='{reference}' looks like a gene symbol, not a "
+                f"DNA sequence. Call crispr_fetch_target_sequence first to "
+                f"get the actual sequence for '{reference}', then pass that "
+                f"sequence (or its FASTA/GenBank string) into reference."
+            )
+
         invalid_ps = [b for b in set(protospacer) if b not in "ATGC"]
         if invalid_ps:
             raise ValueError(

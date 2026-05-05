@@ -54,7 +54,7 @@
   "outputs": [
     {
       "type": "object",
-      "description": "A full workflow result containing sequence_info, guides, selected_guide, cloning, construction_file_inputs, construction, and validation."
+      "description": "A full workflow result containing workflow_trace, sequence_info, guides, selected_guide, cloning, construction_file_inputs, construction, and validation. workflow_trace summarizes each internal tool-equivalent step in order, with input summaries and output summaries."
     }
   ],
   "examples": [

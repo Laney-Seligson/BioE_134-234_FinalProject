@@ -224,6 +224,18 @@ class RunFullCrisprWorkflow:
         force_vector: bool = False,
         confirmed: bool = False,
     ) -> dict:
+        workflow_trace: list[dict] = []
+
+        def add_trace(step: int, tool: str, inputs: dict, output_summary: dict) -> None:
+            workflow_trace.append(
+                {
+                    "step": step,
+                    "tool": tool,
+                    "inputs": inputs,
+                    "output_summary": output_summary,
+                }
+            )
+
         if not query or not query.strip():
             raise ValueError("query must not be empty.")
         if not vector or not vector.strip():
@@ -239,11 +251,25 @@ class RunFullCrisprWorkflow:
                     f"See vector_recommendations for literature-backed options."
                 ],
                 "vector_recommendations": recs,
+                "workflow_trace": workflow_trace,
             }
         if not isinstance(guide_index, int) or guide_index < 0:
             raise ValueError("guide_index must be a non-negative integer.")
 
         sequence_info = self.sequence_fetcher.run(query=query, organism=organism)
+        add_trace(
+            1,
+            "crispr_fetch_target_sequence",
+            {"query": query, "organism": organism},
+            {
+                "source": sequence_info.get("source"),
+                "resource": sequence_info.get("resource"),
+                "organism": sequence_info.get("organism"),
+                "length": sequence_info.get("length"),
+                "ncbi_gene_id": sequence_info.get("ncbi_gene_id"),
+                "ncbi_accession": sequence_info.get("ncbi_accession"),
+            },
+        )
         seq = sequence_info["sequence"]
         spec = self.oligo_designer.resolve_vector(vector)
 
@@ -270,6 +296,7 @@ class RunFullCrisprWorkflow:
                 "enzyme": enzyme,
                 "cell_strain": strain,
                 "selection": selection,
+                "workflow_trace": workflow_trace,
             }
 
         if spec is None:
@@ -281,6 +308,17 @@ class RunFullCrisprWorkflow:
         cas_recommendation = self.cas_selector.run(
             seq=seq,
             repair_template=False,
+        )
+        add_trace(
+            2,
+            "crispr_cas_selector",
+            {"sequence_length": len(seq), "repair_template": False},
+            {
+                "recommendation": cas_recommendation.get("recommendation"),
+                "cas9_valid_guides": cas_recommendation.get("cas9_valid_guides"),
+                "cas12a_valid_guides": cas_recommendation.get("cas12a_valid_guides"),
+                "gc_content": cas_recommendation.get("gc_content"),
+            },
         )
 
         def normalize_system(system: str) -> str:
@@ -306,18 +344,37 @@ class RunFullCrisprWorkflow:
                     f"Yes, continue with {spec.name} ({vector_system})",
                     f"No, switch to a {recommended_system}-compatible vector"
                 ],
+                "workflow_trace": workflow_trace,
             }
                     
         if spec.nuclease_system == "SpCas9":
             guides = self.cas9_designer.run(seq)
+            guide_tool = "crispr_design_cas9_grna"
         elif spec.nuclease_system == "Cas12a":
             guides = self.cas12a_designer.run(seq)
+            guide_tool = "crispr_design_cas12a_crrna"
         else:
             raise ValueError(f"Unsupported nuclease system: {spec.nuclease_system}")
+        add_trace(
+            3,
+            guide_tool,
+            {"sequence_length": len(seq)},
+            {"guide_count": len(guides), "nuclease_system": spec.nuclease_system},
+        )
         nuclease_key = "cas12a" if spec.nuclease_system == "Cas12a" else "cas9"
         ranking = rank_guides(guides=guides, reference=seq, nuclease=nuclease_key)
         ranked_guides    = ranking["ranked_guides"]
         scoring_rationale = ranking["scoring_rationale"]
+        add_trace(
+            4,
+            "crispr_rank_guides",
+            {"guide_count": len(guides), "reference_length": len(seq), "nuclease": nuclease_key},
+            {
+                "ranked_guide_count": len(ranked_guides),
+                "best_guide": ranking.get("best_guide", {}).get("protospacer"),
+                "best_score": ranking.get("best_guide", {}).get("total_score"),
+            },
+        )
 
         if guide_index >= len(ranked_guides):
             raise ValueError(
@@ -332,9 +389,24 @@ class RunFullCrisprWorkflow:
             protospacer=protospacer,
             construct_name=construct_name,
         )
+        add_trace(
+            5,
+            "crispr_design_cloning_oligos",
+            {"vector": vector, "protospacer": protospacer, "construct_name": construct_name},
+            {
+                "status": cloning.get("status"),
+                "vector": cloning.get("vector"),
+                "cloning_method": cloning.get("cloning_method"),
+                "enzyme": cloning.get("enzyme"),
+                "top_oligo": cloning.get("top_oligo"),
+                "bottom_oligo": cloning.get("bottom_oligo"),
+                "end_structure": cloning.get("end_structure"),
+            },
+        )
         if cloning.get("status") != "ready":
             return {
                 "status": cloning.get("status", "needs_user_input"),
+                "workflow_trace": workflow_trace,
                 "sequence_info": sequence_info,
                 "guides": ranked_guides,
                 "selected_guide": selected_guide,
@@ -353,13 +425,34 @@ class RunFullCrisprWorkflow:
             input_mode="sequence_build",
             **construction_payload,
         )
+        add_trace(
+            6,
+            "create_construction_file",
+            {"input_mode": "sequence_build", "assembly_strategy": construction_payload.get("assembly_strategy")},
+            {
+                "construct_name": construction.get("construct_name"),
+                "assembly_strategy": construction.get("assembly_strategy"),
+                "file_name": construction.get("file_name"),
+            },
+        )
         validation = self.construction_validator.run(
             strict=validate_strict,
             **construction_payload,
         )
+        add_trace(
+            7,
+            "validate_construction_file",
+            {"assembly_strategy": construction_payload.get("assembly_strategy"), "strict": validate_strict},
+            {
+                "summary": validation.get("summary"),
+                "is_valid": validation.get("is_valid"),
+                "detail_count": len(validation.get("details", [])),
+            },
+        )
 
         return {
             "status": "ready",
+            "workflow_trace": workflow_trace,
             "sequence_info": sequence_info,
             "guides": ranked_guides,
             "selected_guide": selected_guide,

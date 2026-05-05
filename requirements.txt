@@ -1,4 +1,4 @@
-fastmcp
+fastmcp<3
 google-genai
 python-dotenv
 biopython>=1.80

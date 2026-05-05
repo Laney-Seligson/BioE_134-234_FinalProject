@@ -179,3 +179,14 @@ Use when the user:
 - ≥70% → EXCELLENT; proceed directly to clone isolation
 
 Always present the `summary`, `warnings`, and `next_steps` fields clearly. If `is_reliable` is False, lead with the reliability warning before the editing percentage.
+
+**MANDATORY tool-call rule (do not skip):** Whenever the user mentions ANY ICE or TIDE editing percentage with an R² value — including comparisons of multiple clones — you MUST call `interpret_ice_tide` once per result before answering. Never classify reliability, fit quality, or efficiency band from your own knowledge. If the user gives you two clones (e.g. "A1A is 95% R²=0.97, A1B is 12% R²=0.85"), call `interpret_ice_tide` twice — once per clone. Only after both tool results return may you compose the comparison verdict, and you must pull the classification, reliability, and warnings from the tool output, not from training.
+
+**Suggested follow-ups:** Every `interpret_ice_tide` result includes a `suggested_next_prompts` field with literal copy-pasteable questions for the user. After presenting the verdict, end your reply with:
+
+> "You could ask next:
+> • <prompt 1>
+> • <prompt 2>
+> • <prompt 3>"
+
+This keeps inexperienced users moving through the workflow without having to invent the right phrasing themselves. The same pattern applies to `colony_calculator` and `verify_edit` outputs — surface their `suggested_next_prompts` at the end of every reply that uses those tools.

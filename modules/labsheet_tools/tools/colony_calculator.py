@@ -35,6 +35,12 @@ _EFFICIENCY_PRESETS = {
     "cas9_plasmid_mammalian": 0.20,
     "cas9_ecoli": 0.50,
     "cas12a_ecoli": 0.40,
+    # Cas9 in S. cerevisiae via pML104/pML107 typically reaches 50-95%
+    # editing because yeast HDR is highly efficient and the dual cas9 +
+    # gRNA cassette is delivered as a single high-copy 2u plasmid.
+    # Conservative midpoint of 0.50 is comparable to E. coli.
+    # (Laughery et al. Yeast 2015; DiCarlo et al. Nucleic Acids Res 2013)
+    "cas9_yeast": 0.50,
     "hdr_mammalian": 0.05,
     "hdr_ecoli": 0.10,
 }
@@ -200,7 +206,7 @@ class ColonyCalculator:
             citation_keys.extend(["kim_2014_rnp", "lin_2014"])
         elif preset == "cas9_plasmid_mammalian":
             citation_keys.append("kim_2014_rnp")
-        elif preset in ("cas9_ecoli", "cas12a_ecoli"):
+        elif preset in ("cas9_ecoli", "cas12a_ecoli", "cas9_yeast"):
             citation_keys.append("jiang_2013")
         elif preset in ("hdr_mammalian", "hdr_ecoli"):
             citation_keys.append("paquet_2016")
@@ -208,6 +214,14 @@ class ColonyCalculator:
             # User-supplied efficiency — cite the general benchmark papers
             # that span the typical range so they can sanity-check.
             citation_keys.extend(["kim_2014_rnp", "paquet_2016", "jiang_2013"])
+
+        # Literal copy-pasteable follow-ups so a new user knows what to
+        # type next after picking colonies.
+        suggested_next_prompts = [
+            "Design Sanger primers to verify the edit at the genomic locus.",
+            "Once I have my Sanger results back, interpret an ICE result of 45% editing with R-squared 0.93.",
+            f"What if I want {desired_clones + 1} edited clones instead of {desired_clones}? Recompute.",
+        ]
 
         return {
             "editing_efficiency": editing_efficiency,
@@ -218,6 +232,7 @@ class ColonyCalculator:
             "probability_at_chosen_n": round(actual_prob, 4),
             "safety_margin_recommendation": safety_n,
             "recommendation": recommendation,
+            "suggested_next_prompts": suggested_next_prompts,
             "citations": format_citations(cites(*citation_keys)),
         }
 

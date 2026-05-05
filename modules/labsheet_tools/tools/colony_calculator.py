@@ -35,6 +35,12 @@ _EFFICIENCY_PRESETS = {
     "cas9_plasmid_mammalian": 0.20,
     "cas9_ecoli": 0.50,
     "cas12a_ecoli": 0.40,
+    # Cas9 in S. cerevisiae via pML104/pML107 typically reaches 50-95%
+    # editing because yeast HDR is highly efficient and the dual cas9 +
+    # gRNA cassette is delivered as a single high-copy 2u plasmid.
+    # Conservative midpoint of 0.50 is comparable to E. coli.
+    # (Laughery et al. Yeast 2015; DiCarlo et al. Nucleic Acids Res 2013)
+    "cas9_yeast": 0.50,
     "hdr_mammalian": 0.05,
     "hdr_ecoli": 0.10,
 }
@@ -200,7 +206,7 @@ class ColonyCalculator:
             citation_keys.extend(["kim_2014_rnp", "lin_2014"])
         elif preset == "cas9_plasmid_mammalian":
             citation_keys.append("kim_2014_rnp")
-        elif preset in ("cas9_ecoli", "cas12a_ecoli"):
+        elif preset in ("cas9_ecoli", "cas12a_ecoli", "cas9_yeast"):
             citation_keys.append("jiang_2013")
         elif preset in ("hdr_mammalian", "hdr_ecoli"):
             citation_keys.append("paquet_2016")

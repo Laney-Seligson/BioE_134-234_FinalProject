@@ -144,18 +144,30 @@ _DEFAULT_CLONING_SUCCESS = 0.8
 # preset. Keeps the lab sheet sensible when the user runs CRISPR workflows
 # without supplying editing_efficiency by hand.
 _MAMMALIAN_HINTS = ("HEK", "K562", "HELA", "U2OS", "IPSC", "JURKAT", "CHO", "293")
+_YEAST_HINTS = ("SACCHAROMYCES", "YEAST", "CEREVISIAE", "S. CEREVISIAE", "S.CEREVISIAE", "BY4741", "BY4742", "W303")
+_ECOLI_HINTS = ("E. COLI", "E.COLI", "ESCHERICHIA", "DH5A", "DH10B", "MACH1", "TOP10", "BL21", "JM109", "NEB10", "STBL3", "STBL4")
 
 
 def _guess_preset(cells: str) -> str | None:
     """Map a strain/cell-line name to a colony_calculator preset, or None
-    to fall back to _DEFAULT_CLONING_SUCCESS."""
+    to fall back to _DEFAULT_CLONING_SUCCESS.
+
+    Mammalian → cas9_plasmid_mammalian (20%)
+    Yeast     → cas9_yeast (50%)
+    E. coli   → None (the default 80% cloning rate is right for routine
+                vector cloning; CRISPR editing in E. coli is uncommon and
+                would need an explicit caller-supplied preset anyway.)
+    """
     if not cells:
         return None
     up = cells.upper()
     for hint in _MAMMALIAN_HINTS:
         if hint in up:
             return "cas9_plasmid_mammalian"
-    return None  # E. coli / yeast default → use cloning success rate
+    for hint in _YEAST_HINTS:
+        if hint in up:
+            return "cas9_yeast"
+    return None  # E. coli / unknown → use cloning success rate default
 
 
 def _colony_labels(n: int) -> list[str]:
@@ -1272,6 +1284,34 @@ class LabSheet:
         operations = construction_record.get("operations", [])
         notes = construction_record.get("notes", "")
         parts_map = _build_parts_map(construction_record.get("parts", []))
+
+        # Auto-sniff the protospacer from the construction record's parts
+        # if the caller didn't supply one. The full-workflow tool builds a
+        # part named like "<vector>_annealed_guide_insert" whose sequence
+        # is "<20bp protospacer><sgRNA scaffold tail>". When that pattern
+        # is present we lift out the first 20 nt as the protospacer so
+        # predict_editing_efficiency runs even when the upstream tool
+        # didn't thread protospacer through to lab_sheet explicitly.
+        if protospacer is None:
+            for part in (construction_record.get("parts") or []):
+                pname = (part.get("name") or "").lower()
+                if "guide" in pname and "insert" in pname:
+                    seq = (part.get("sequence") or "").upper()
+                    # Sequence must look like real DNA and be at least 20 nt
+                    if len(seq) >= 20 and set(seq[:20]) <= set("ACGT"):
+                        protospacer = seq[:20]
+                        break
+        # Same for PAM — agent rarely passes it, but the parts list
+        # sometimes carries the reference around the cut site. We don't
+        # try to extract that automatically (high error rate); we just
+        # default pam to "NGG" so predict_editing_efficiency can fire on
+        # Cas9 guides without the user spelling out the PAM.
+        if protospacer and pam is None and nuclease.lower() == "cas9":
+            pam = "NGG"
+        if protospacer and pam is None and nuclease.lower() == "cas12a":
+            # Use TTTA (most common Cas12a PAM, real V base) so the
+            # predictor's PAM bonus actually fires.
+            pam = "TTTA"
 
         # Best-effort pre-experiment editing efficiency prediction.
         # Surfaced in the output so the user knows what to expect at the

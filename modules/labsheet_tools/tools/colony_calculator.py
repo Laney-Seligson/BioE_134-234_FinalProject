@@ -209,6 +209,14 @@ class ColonyCalculator:
             # that span the typical range so they can sanity-check.
             citation_keys.extend(["kim_2014_rnp", "paquet_2016", "jiang_2013"])
 
+        # Literal copy-pasteable follow-ups so a new user knows what to
+        # type next after picking colonies.
+        suggested_next_prompts = [
+            "Design Sanger primers to verify the edit at the genomic locus.",
+            "Once I have my Sanger results back, interpret an ICE result of 45% editing with R-squared 0.93.",
+            f"What if I want {desired_clones + 1} edited clones instead of {desired_clones}? Recompute.",
+        ]
+
         return {
             "editing_efficiency": editing_efficiency,
             "desired_clones": desired_clones,
@@ -218,6 +226,7 @@ class ColonyCalculator:
             "probability_at_chosen_n": round(actual_prob, 4),
             "safety_margin_recommendation": safety_n,
             "recommendation": recommendation,
+            "suggested_next_prompts": suggested_next_prompts,
             "citations": format_citations(cites(*citation_keys)),
         }
 

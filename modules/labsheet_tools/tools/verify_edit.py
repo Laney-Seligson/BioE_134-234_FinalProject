@@ -449,6 +449,11 @@ class VerifyEdit:
             "amplicon_length": amplicon_length,
             "cut_offset_in_amplicon": cut_offset_in_amplicon,
             "interpretation_guide": interpretation_guide,
+            "suggested_next_prompts": [
+                "Generate a lab sheet that includes this genomic verification step.",
+                "Once I have my Sanger trace back, interpret an ICE result of 45% editing with R-squared 0.93.",
+                "How many colonies should I pick to recover an edited clone at typical Cas9 efficiency?",
+            ],
             "citations": format_citations(cites(*citation_keys)),
         }
 

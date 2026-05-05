@@ -254,6 +254,41 @@ class InterpretIceTide:
         else:
             citation_keys = ["brinkman_2014_tide"]
 
+        # Literal copy-pasteable follow-up prompts. The agent shows these
+        # to the user so an inexperienced experimentalist knows exactly
+        # what to type next. Branch-specific so the suggestion matches
+        # what the result actually means.
+        eff_str = f"{editing_pct:.0f}%"
+        if not is_reliable:
+            suggested_next_prompts = [
+                "How do I improve my Sanger trace quality so I get a higher R-squared fit?",
+                "Should I re-sequence with a different primer or run a fresh PCR amplicon?",
+            ]
+        elif efficiency_class == "FAILED":
+            suggested_next_prompts = [
+                "My editing failed. What could be wrong with my guide design or delivery?",
+                f"Recommend a different delivery method for my CRISPR experiment given {eff_str} efficiency.",
+                "Predict the editing efficiency for a different protospacer in this gene.",
+            ]
+        elif efficiency_class == "MARGINAL":
+            suggested_next_prompts = [
+                f"How many colonies should I pick if my editing efficiency is {eff_str}?",
+                "Should I re-transfect with a higher dose, or pick more colonies and screen by Sanger?",
+                "Design verification primers around my cut site to check single clones.",
+            ]
+        elif efficiency_class == "GOOD":
+            suggested_next_prompts = [
+                f"How many colonies should I pick at {eff_str} editing efficiency to recover one homozygous clone?",
+                "Design Sanger primers to verify single clones at the genomic locus.",
+                "I picked clones — interpret two more ICE results: A1A is 95% R^2=0.97, A1B is 12% R^2=0.85.",
+            ]
+        else:  # EXCELLENT
+            suggested_next_prompts = [
+                "This clone is edited — what controls do I need before functional validation?",
+                "Design genotyping PCR primers to confirm the indel in this clone.",
+                f"Pick how many additional colonies to find a homozygous edit at {eff_str} efficiency?",
+            ]
+
         return {
             "sample_id": sample_id,
             "tool": tool,
@@ -266,6 +301,7 @@ class InterpretIceTide:
             "dominant_indel_pct": dominant_pct,
             "warnings": warnings,
             "next_steps": next_steps,
+            "suggested_next_prompts": suggested_next_prompts,
             "summary": summary,
             "citations": format_citations(cites(*citation_keys)),
         }

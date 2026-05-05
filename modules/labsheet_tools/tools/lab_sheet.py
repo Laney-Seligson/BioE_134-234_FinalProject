@@ -1310,14 +1310,34 @@ class LabSheet:
         rxn_lig_ops = [op for op in operations if op.get("step_type") == "RestrictionLigation"]
 
         # Safety net: any step_type not in a known bucket gets explicit
-        # placeholder rendering instead of being silently dropped (the
-        # bug that made TypeIIS / RestrictionLigation lab sheets read
-        # like 1-line summaries).
+        # placeholder rendering instead of being silently dropped.
+        # We split this into two classes:
+        #   - "generic_assembly_ops": agent-flexible synonyms ("Assemble",
+        #     "Ligate", "Anneal") that LOOK like an assembly step. Render
+        #     these BEFORE Transform so the biology sequence stays intact.
+        #   - "unknown_ops": truly unrecognized step types (no obvious slot).
+        #     Render last with a WARNING so the user spots the gap.
         _known = {
             "PCR", "GoldenGate", "Gibson", "Transform", "DirectSynthesis",
             "TypeIISOligoCloning", "RestrictionLigation", "CRISPRDelivery",
         }
-        unknown_ops = [op for op in operations if op.get("step_type") not in _known]
+        _GENERIC_ASSEMBLY_SYNONYMS = {
+            "assemble", "assembly", "ligate", "ligation", "anneal",
+            "annealedoligocloning", "oligocloning", "annealed_oligo_cloning",
+        }
+
+        def _is_generic_assembly(op: dict) -> bool:
+            t = (op.get("step_type") or "").lower().replace(" ", "").replace("-", "_")
+            return t in _GENERIC_ASSEMBLY_SYNONYMS
+
+        generic_assembly_ops = [
+            op for op in operations
+            if op.get("step_type") not in _known and _is_generic_assembly(op)
+        ]
+        unknown_ops = [
+            op for op in operations
+            if op.get("step_type") not in _known and not _is_generic_assembly(op)
+        ]
 
         # Decide colony-screening burden once per Transform op via the
         # colony_calculator tool, instead of hardcoding "pick 2 colonies".
@@ -1348,6 +1368,27 @@ class LabSheet:
 
         for op in rxn_lig_ops:
             sections.append(_format_restriction_ligation_section(op, thread))
+
+        # Generic assembly steps with a synonym name (e.g. agent passes
+        # step_type="Assemble" instead of "TypeIISOligoCloning"). These
+        # MUST render before Transform — otherwise the lab sheet reads
+        # transform-first which is biologically wrong.
+        for op in generic_assembly_ops:
+            # Pick the closest registry recipe based on parameters.enzyme
+            params = op.get("parameters", {})
+            enzyme = (params.get("enzyme") or "").lower()
+            if any(e in enzyme for e in ("bsai", "bsmbi", "bbsi", "swai", "bcli")):
+                # Type IIS-class — render via the typeiis section
+                sections.append(_format_typeiis_oligo_section(op, thread))
+            elif "gibson" in enzyme:
+                op_copy = {**op, "step_type": "Gibson"}
+                sections.append(_format_assemble_section(op_copy, thread))
+            else:
+                # Fall back to GoldenGate-shape rendering — most agent-
+                # generated "Assemble" steps are some form of restriction-
+                # plus-ligase reaction.
+                op_copy = {**op, "step_type": "GoldenGate"}
+                sections.append(_format_assemble_section(op_copy, thread))
 
         for op, plan in zip(transform_ops, transform_plans):
             sections.append(_format_transform_section(op, thread))

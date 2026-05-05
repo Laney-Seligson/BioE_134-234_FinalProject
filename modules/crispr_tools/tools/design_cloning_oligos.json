@@ -1,7 +1,7 @@
 {
   "id": "org.bioe234.function.crispr.design_cloning_oligos.v2",
   "name": "CRISPR Cloning Workflow Designer",
-  "description": "Guided wet-lab simulation tool for three CRISPR guide-cloning workflows: TypeIISOligoCloning (BbsI/BsmBI/BsaI annealed-oligo ligation), RestrictionLigation (e.g. SpeI for pTargetF), and GibsonAssembly (overlap-based seamless assembly). If all required inputs are present the tool designs oligos/primers and returns results (status='ready'). If inputs are missing it returns a structured 'needs_user_input' response with human-readable questions instead of an error. Known vectors: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322. Pass vector='custom' to design with any other vector.",
+  "description": "Guided wet-lab simulation tool for three CRISPR guide-cloning workflows: TypeIISOligoCloning (BbsI/BsmBI/BsaI annealed-oligo ligation, plus the pML104/pML107 BclI-SwaI annealed-oligo cassette), RestrictionLigation (e.g. SpeI for pTargetF), and GibsonAssembly (overlap-based seamless assembly). If all required inputs are present the tool designs oligos/primers and returns results (status='ready'). If inputs are missing it returns a structured 'needs_user_input' response with human-readable questions instead of an error. Known vectors: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322, pml104 (yeast S. cerevisiae, BclI-SwaI annealed-oligo cloning), pml107 (yeast S. cerevisiae, BclI-SwaI annealed-oligo cloning). For yeast targets use pml104 or pml107. Pass vector='custom' to design with any other vector.",
   "type": "function",
   "keywords": ["CRISPR", "cloning", "oligo", "protospacer", "BbsI", "BsmBI", "BsaI", "SpeI", "Gibson", "pX330", "lentiCRISPR", "pDR274", "pCRISPR", "pTargetF", "guide RNA", "sgRNA", "construction file", "local reference", "Type IIS"],
   "date_created": null,
@@ -11,7 +11,7 @@
     {
       "name": "vector",
       "type": "string",
-      "description": "Vector name. Known presets: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322. Pass 'custom' to design with a vector not in this list. If omitted and organism/target_reference is supplied, a default is chosen automatically (ecoli_rpsl → pcrispr)."
+      "description": "Vector name. Known presets: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322, pml104, pml107. For S. cerevisiae (yeast) use pml104 or pml107. Pass 'custom' to design with a vector not in this list. If omitted and organism/target_reference is supplied, a default is chosen automatically (ecoli_rpsl → pcrispr)."
     },
     {
       "name": "cloning_method",
@@ -31,7 +31,7 @@
     {
       "name": "bottom_overhang",
       "type": "string",
-      "description": "5' overhang for the bottom-strand oligo. Required for vector='custom' with TypeIISOligoCloning. Inferred from preset vectors (e.g. AAAC for pX330)."
+      "description": "5' overhang for the bottom-strand oligo. Required for vector='custom' with TypeIISOligoCloning unless the vector uses a blunt end. Inferred from preset vectors (e.g. AAAC for pX330; blank for the SwaI blunt end in pML104/pML107)."
     },
     {
       "name": "prepend_g",
@@ -122,6 +122,10 @@
       "output": { "status": "needs_user_input", "missing_fields": ["protospacer"], "questions": ["What is the protospacer sequence?"] }
     },
     {
+      "input":  { "vector": "pml104", "protospacer": "CAGCTGGCGTAATAGCGAAG" },
+      "output": { "status": "ready", "cloning_method": "TypeIISOligoCloning", "top_oligo": "GATCCAGCTGGCGTAATAGCGAAGGTTTTAGAGCTAG", "bottom_oligo": "CTAGCTCTAAAACCTTCGCTATTACGCCAGCTG", "end_structure": "BclI-compatible 5' GATC overhang and SwaI blunt end" }
+    },
+    {
       "input":  { "vector": "custom", "cloning_method": "TypeIISOligoCloning", "protospacer": "ACAGAAACCTGCCAGTTTGC", "top_overhang": "CACC", "bottom_overhang": "AAAC", "enzyme": "BbsI", "scaffold_in_vector": true, "promoter": "U6", "u6_prefers_5prime_g": true },
       "output": { "status": "ready", "cloning_method": "TypeIISOligoCloning", "vector": "custom", "top_oligo": "CACCACAGAAACCTGCCAGTTTGC" }
     },
@@ -136,6 +140,11 @@
     {
       "input":  { "protospacer": "TACTTTACGCAGCGCGGAGT", "organism": "E. coli", "target_reference": "ecoli_rpsl" },
       "output": { "status": "ready", "vector": "pCRISPR::rpsL", "target_verification": { "verified": true, "reference": "ecoli_rpsl" } }
+    },
+    {
+      "input":  { "vector": "pml104", "protospacer": "GTATGTGTGTGGATTCAACAG" },
+      "output": { "status": "ready", "cloning_method": "TypeIISOligoCloning", "enzyme": "BclI-SwaI", "top_oligo": "GATCGTATGTGTGTGGATTCAACAGGTTTTAGAGCTAG", "bottom_oligo": "CTAGCTCTAAAACCTGTTGAATCCACACACATAC", "end_structure": "BclI-compatible 5' GATC overhang and SwaI blunt end" },
+      "notes": "pml104 is the URA3 all-in-one SpCas9 + sgRNA vector for S. cerevisiae (yeast). Uses BclI-SwaI cloning: 5' GATC overhang at the BclI end and a blunt SwaI end."
     }
   ],
 

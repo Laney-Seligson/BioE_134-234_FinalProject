@@ -149,7 +149,7 @@ class TestNewVectorPresets:
         assert VECTOR_SPECS["pml104"].cloning_method == "TypeIISOligoCloning"
 
     def test_pml104_enzyme(self):
-        assert VECTOR_SPECS["pml104"].enzyme == "BsaI"
+        assert VECTOR_SPECS["pml104"].enzyme == "BclI-SwaI"
 
     def test_pml104_cell_strain_is_yeast(self):
         assert "Saccharomyces" in VECTOR_SPECS["pml104"].cell_strain
@@ -157,12 +157,22 @@ class TestNewVectorPresets:
     def test_pml104_has_citations(self):
         assert len(VECTOR_SPECS["pml104"].citations) > 0
 
-    def test_pml104_missing_overhangs_ask_for_them(self):
+    def test_pml104_design_uses_bcli_swai_blunt_insert(self):
         r = design_cloning_oligos(
             vector="pml104", protospacer=PROTOSPACER, target_organism="yeast"
         )
-        assert r["status"] == "needs_user_input"
-        assert "top_overhang" in r["missing_fields"]
+        assert r["status"] == "ready"
+        assert r["top_overhang"] == "GATC"
+        assert r["bottom_overhang"] == ""
+        assert r["top_oligo"] == "GATCCAGCTGGCGTAATAGCGAAGGTTTTAGAGCTAG"
+        assert r["bottom_oligo"] == "CTAGCTCTAAAACCTTCGCTATTACGCCAGCTG"
+        assert r["end_structure"] == "BclI-compatible 5' GATC overhang and SwaI blunt end"
+
+    def test_pml107_in_registry(self):
+        assert "pml107" in VECTOR_SPECS
+
+    def test_pml107_marker_is_leu2(self):
+        assert "LEU2" in VECTOR_SPECS["pml107"].selection
 
     def test_pdd162_in_registry(self):
         assert "pdd162" in VECTOR_SPECS

@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 from fastmcp import Client
+from fastmcp.client.transports import PythonStdioTransport
 from google import genai
 from google.genai import types, errors
 
@@ -340,7 +342,7 @@ async def run_chat() -> None:
                 raise
 
     # Launch the MCP server as a subprocess over stdio.
-    async with Client("server.py") as mcp:
+    async with Client(PythonStdioTransport("server.py", python_cmd=sys.executable)) as mcp:
 
         # Discover capabilities
         mcp_tools = await mcp.list_tools()

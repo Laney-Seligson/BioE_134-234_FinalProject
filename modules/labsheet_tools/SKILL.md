@@ -38,19 +38,28 @@ A `lab_sheet_text` field containing the full plain-text bench protocol, organize
 
 Always present `lab_sheet_text` in a code block so it formats cleanly.
 
-**Required behavior after `crispr_lab_sheet`:** Once the lab sheet is presented, always ask:
+**The colony plan is already in the lab sheet.** `crispr_lab_sheet` internally calls `crispr_colony_calculator` and embeds the result in the Pick section + a `colony_plan` field on the output dict. **Do NOT ask the user "would you like a colony picking estimate?"** — that estimate is already there. Surface it explicitly in your reply:
 
-> "Would you like a colony picking estimate? After transformation, you'll need to screen enough colonies to be confident of recovering an edited clone — the number depends on your expected editing efficiency and delivery method. I can calculate how many to pick."
+> "Pick X colonies (Y% editing efficiency assumed; safety margin Z) — the rationale is in the Pick section above."
 
-If the user says yes (or anything like "sure", "yes", "go ahead"):
-- Call `crispr_colony_calculator` with the appropriate preset (infer from context — see tool section below)
-- Present the result clearly: efficiency used, colonies to pick, safety margin, and the plain-English recommendation
+Only re-call `crispr_colony_calculator` if the user wants different parameters than the defaults (e.g. they want 2 homozygous clones at 99% confidence instead of 1 clone at 95%, or they want to override the assumed efficiency with their own benchmark).
 
-Then close with:
+**Optional storage-location customization:** After presenting the lab sheet, you MAY ask once:
 
-> "Once you've picked colonies, run a diagnostic PCR, and sent samples for Sanger sequencing, come back and I'll design your sequencing primers and help you interpret your ICE/TIDE results."
+> "The lab sheet uses placeholder storage labels like `boxA/A1` and `oligos1/J1`. Want to swap those for real labels (ELN ID, freezer rack, etc.)? If yes, give me a mapping like `{'boxA': 'Bench-3 freezer / Rack 2', 'oligos1': 'My oligo box / Drawer A'}` and I'll regenerate."
 
-If the user says no or skips: close with just the ICE/TIDE handoff prompt above.
+If the user provides a mapping, re-call `crispr_lab_sheet` with `location_overrides={...}`.
+
+**Close with this exact handoff:**
+
+> "Once your transformation comes up, miniprep the colonies, and submit Sanger reactions, paste your ICE/TIDE result back. I need:
+> • the editing percentage (KO score for ICE, total indel % for TIDE)
+> • the R² fit value (both are on the ICE/TIDE results page)
+> Optional but helpful: the indel-size distribution (e.g. '+1: 45%, -3: 12%') and which tool you ran (ICE vs TIDE).
+> Example: *'My ICE score is 45% with R² = 0.93, dominant indel +1 at 38%.'*
+> After we interpret it, next steps are usually: more single-clone Sanger if you need a homozygous edit, additional colony screening, or functional validation of the edited line."
+
+This handoff replaces all earlier "come back when you have results" copy. Be specific about which numbers to provide so the user isn't guessing what to type.
 
 ---
 

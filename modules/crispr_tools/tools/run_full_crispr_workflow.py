@@ -65,6 +65,15 @@ _VECTOR_RECOMMENDATIONS: dict[str, list[dict]] = {
             "citation": "Laughery et al. Yeast 2015. doi:10.1002/yea.3080",
         },
     ],
+    "caenorhabditis": [
+        {
+            "vector_key": "pdd162",
+            "vector_name": "pDD162",
+            "use_case": "C. elegans all-in-one SpCas9 + sgRNA vector. Guide targets are inserted into the empty sgRNA cassette for germline genome editing.",
+            "delivery": "Germline microinjection",
+            "citation": "Dickinson et al. Nat Methods 2013. doi:10.1038/nmeth.2641; Addgene #47549",
+        },
+    ],
     "plant": [
         {
             "vector_key": "pkse401",
@@ -103,6 +112,10 @@ _PLANT_KEYWORDS = {
     "wheat", "triticum", "soybean", "glycine max", "poplar", "populus",
 }
 _YEAST_KEYWORDS = {"saccharomyces", "s. cerevisiae", "yeast", "cerevisiae"}
+_CAENORHABDITIS_KEYWORDS = {
+    "caenorhabditis", "caenorhabditis elegans", "c. elegans", "celegans",
+    "nematode", "worm",
+}
 
 
 def _classify_organism(organism: str) -> str:
@@ -115,6 +128,8 @@ def _classify_organism(organism: str) -> str:
         return "plant"
     if any(kw in o for kw in _YEAST_KEYWORDS):
         return "yeast"
+    if any(kw in o for kw in _CAENORHABDITIS_KEYWORDS):
+        return "caenorhabditis"
     if any(kw in o for kw in _MAMMALIAN_KEYWORDS):
         return "mammalian"
     return "mammalian"  # default fallback for unlisted organisms
@@ -238,21 +253,6 @@ class RunFullCrisprWorkflow:
 
         if not query or not query.strip():
             raise ValueError("query must not be empty.")
-        if not vector or not vector.strip():
-            category = _classify_organism(organism)
-            recs = _VECTOR_RECOMMENDATIONS.get(category, _VECTOR_RECOMMENDATIONS["mammalian"])
-            return {
-                "status": "needs_user_input",
-                "missing_fields": ["vector"],
-                "organism": organism,
-                "organism_category": category,
-                "questions": [
-                    f"Which vector would you like to use for {organism}? "
-                    f"See vector_recommendations for literature-backed options."
-                ],
-                "vector_recommendations": recs,
-                "workflow_trace": workflow_trace,
-            }
         if not isinstance(guide_index, int) or guide_index < 0:
             raise ValueError("guide_index must be a non-negative integer.")
 
@@ -271,39 +271,6 @@ class RunFullCrisprWorkflow:
             },
         )
         seq = sequence_info["sequence"]
-        spec = self.oligo_designer.resolve_vector(vector)
-
-        if not confirmed:
-            method = spec.cloning_method if spec else "custom"
-            enzyme = spec.enzyme if spec else "N/A"
-            strain = spec.cell_strain if spec else "N/A"
-            selection = spec.selection if spec else "N/A"
-            vector_name = spec.name if spec else vector
-            return {
-                "status": "needs_user_input",
-                "missing_fields": ["confirmed"],
-                "questions": [
-                    f"Please confirm you want to proceed with the following before running the full workflow:\n"
-                    f"  Vector: {vector_name}\n"
-                    f"  Cloning method: {method}\n"
-                    f"  Enzyme: {enzyme}\n"
-                    f"  Cell strain: {strain}\n"
-                    f"  Selection: {selection}\n"
-                    f"Reply with confirmed=true to continue, or choose a different vector."
-                ],
-                "vector": vector_name,
-                "cloning_method": method,
-                "enzyme": enzyme,
-                "cell_strain": strain,
-                "selection": selection,
-                "workflow_trace": workflow_trace,
-            }
-
-        if spec is None:
-            raise ValueError(
-            "Custom vectors are not supported in the full workflow yet. "
-            "Please use a known vector preset or provide enzyme/overhang handling."
-        )
 
         cas_recommendation = self.cas_selector.run(
             seq=seq,
@@ -325,6 +292,34 @@ class RunFullCrisprWorkflow:
             return {"SpCas9": "Cas9", "Cas9": "Cas9", "Cas12a": "Cas12a"}.get(system, system)
 
         recommended_system = normalize_system(cas_recommendation["recommendation"])
+
+        if not vector or not vector.strip():
+            category = _classify_organism(organism)
+            recs = _VECTOR_RECOMMENDATIONS.get(category, _VECTOR_RECOMMENDATIONS["mammalian"])
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["vector"],
+                "organism": organism,
+                "organism_category": category,
+                "sequence_info": sequence_info,
+                "cas_recommendation": cas_recommendation,
+                "recommended_system": recommended_system,
+                "questions": [
+                    f"The sequence-based Cas selector recommends {recommended_system}. "
+                    f"Which vector would you like to use for {organism}? "
+                    f"See vector_recommendations for organism-appropriate options."
+                ],
+                "vector_recommendations": recs,
+                "workflow_trace": workflow_trace,
+            }
+
+        spec = self.oligo_designer.resolve_vector(vector)
+        if spec is None:
+            raise ValueError(
+            "Custom vectors are not supported in the full workflow yet. "
+            "Please use a known vector preset or provide enzyme/overhang handling."
+        )
+
         vector_system = normalize_system(spec.nuclease_system)
 
         if recommended_system != vector_system and not force_vector:
@@ -343,6 +338,34 @@ class RunFullCrisprWorkflow:
                 "options": [
                     f"Yes, continue with {spec.name} ({vector_system})",
                     f"No, switch to a {recommended_system}-compatible vector"
+                ],
+                "workflow_trace": workflow_trace,
+            }
+
+        if not confirmed:
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["confirmed"],
+                "sequence_info": sequence_info,
+                "cas_recommendation": cas_recommendation,
+                "recommended_system": recommended_system,
+                "selected_vector": spec.name,
+                "vector_system": vector_system,
+                "cloning_method": spec.cloning_method,
+                "enzyme": spec.enzyme,
+                "cell_strain": spec.cell_strain,
+                "selection": spec.selection,
+                "questions": [
+                    f"The sequence-based Cas selector recommends {recommended_system} "
+                    f"({cas_recommendation.get('cas9_valid_guides')} Cas9 guides; "
+                    f"{cas_recommendation.get('cas12a_valid_guides')} Cas12a guides). "
+                    f"The selected vector '{spec.name}' is compatible with {vector_system}. "
+                    "Do you want to continue with guide design, cloning oligo design, "
+                    "construction-file generation, and validation?"
+                ],
+                "options": [
+                    "Yes, continue with confirmed=true",
+                    "No, stop here or choose a different vector",
                 ],
                 "workflow_trace": workflow_trace,
             }

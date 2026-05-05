@@ -78,9 +78,11 @@ The client is ready and you can start entering prompts.
   - rank guide RNAs and find the single best one to use out of the 10 
   - design cloning oligos 
   - build and validate construction file using Laney’s Scripts 
+  - **confirmation gate:** after fetching the target sequence and running `cas_selector`, returns `needs_user_input` so the user can review the sequence-based nuclease recommendation and chosen vector before guide design / cloning / validation — pass `confirmed=True` to proceed
+  - **multi-gene disambiguation:** requires using the explicit query provided; if multiple genes were returned upstream it asks which gene to use (or runs separately for each) rather than silently choosing one. The ADE2-biased example in the JSON wrapper was replaced with `GENE_SYMBOL_SELECTED_BY_USER`.
 
 - MCP Wrapper: `run_full_crispr_workflow.json`
-- Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, empty query error, per-guide score fields
+- Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, workflow confirmation gate, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
 
 <b>2. fetch_target_sequence</b>
@@ -484,7 +486,7 @@ The client is ready and you can start entering prompts.
     - GC content
     - poly-T runs
     - off-target risk
-  - returns a sorted list with rationale !
+  - returns a sorted list with rationale — scoring denominator is now explicit (X/3, efficiency X/2, specificity X/1) to prevent misreading the scale
 - MCP Wrapper: `rank_guides.json`
 - Pytests (`tests/unit/test_rank_guides.py`): sorted output, poly-T penalty, GC scoring, citations present, empty list error
 - Sample Prompt: “Rank these guides against the lacZ sequence.”
@@ -706,7 +708,7 @@ The client is ready and you can start entering prompts.
       },
       "total_score": 3
     },
-    "scoring_rationale": "Best guide 'GCAGTGATTCTGTGCGAGCTTTG' scored 3 (efficiency 2, specificity 1). GC content: 52%. Off-target sites: 0 total \u2026 (139 chars)",
+    "scoring_rationale": "Best guide 'GCAGTGATTCTGTGCGAGCTTTG' scored 3/3 (efficiency 2/2, specificity 1/1). GC content: 52%. Off-target sites: 0 total \u2026 (139 chars)",
     "citations": [
       {
         "label": "Doench et al. 2016, Nat Biotechnol 34:184-191",
@@ -756,13 +758,15 @@ The client is ready and you can start entering prompts.
 <b> 7. design_cloning_oligos </b>
 - What it does: 
   - Designs annealed oligos or PCR primers into a preset vector 
-    - TypeIIS 
+    - TypeIIS (BbsI / BsmBI / BsaI annealed-oligo sticky-end ligation)
     - RestrictionLigation
     - Gibson
     - Golden Gate cloning 
+  - **Addgene API fallback:** preset vectors are handled locally; if `vector` is a numeric Addgene plasmid ID (e.g. `"42230"` or `"addgene:67639"`), the tool attempts to fetch plasmid metadata from the Addgene Developers API. Requires `ADDGENE_API_KEY` in `.env`. Dynamic results include citations in the same `{ "label", "reference", "claim" }` format as other tools. If no API key is available, use a preset vector or `vector="custom"`. This feature does not have and will not have its own JSON wrapper — it is handled entirely within `design_cloning_oligos`.
+  - if organism/vector info is missing → returns `needs_user_input` with human-readable questions instead of an error
 
 - MCP Wrapper: `design_cloning_oligos.json`
-- Pytests (`tests/unit/test_design_cloning_oligos.py`): pCRISPR E. coli produces ready oligos, organism mismatch → needs_user_input
+- Pytests (`tests/unit/test_design_cloning_oligos.py`): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
 - Sample Prompt: “Design oligos to clone this protospacer into px330.” 
 - Output: 
   <details>
@@ -858,6 +862,8 @@ The client is ready and you can start entering prompts.
   - Gibson, Daniel G., Lei Young, Ray-Yuan Chuang, J. Craig Venter, Clyde A. Hutchison III, and Hamilton O. Smith. 2009. "Enzymatic Assembly of DNA Molecules up to Several Hundred Kilobases." Nature Methods 6 (5): 343–345. https://doi.org/10.1038/nmeth.1318.
 
   - Engler, Carola, Ramona Kandzia, and Sylvestre Marillonnet. 2008. "A One Pot, One Step, Precision Cloning Method with High Throughput Capability." PLOS ONE 3 (11): e3647. https://doi.org/10.1371/journal.pone.0003647.
+
+  - Laughery, Marian F., Taylor Hunter, Angela Brown, Jake Hoopes, Tiffany Ostbye, Trevor Shumaker, and John J. Wyrick. 2015. "New Vectors for Simple and Streamlined CRISPR-Cas9 Editing in *Saccharomyces cerevisiae*." Yeast 32 (12): 711–720. https://doi.org/10.1002/yea.3098.
 </div>
 
 ### Laney:
@@ -945,5 +951,3 @@ This file is the JSON wrapper for the paper information loader. It defines how G
 [Insert video link]
 
 ## 7. Citation
-
-

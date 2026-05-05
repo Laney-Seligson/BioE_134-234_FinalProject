@@ -15,8 +15,8 @@ gRNA Design ──────────────── Off-target Predicti
 (PAM scanning, Doench/        (seed-region mismatch scoring,
  Zetsche scoring)              risk ranking)
       ↓
-Species-aware Recommender
-(Cas9 vs Cas12a, delivery method)
+Sequence-based Cas Selector
+(Cas-system choice comes from target DNA)
       ↓
 Construction File ─────────── LabPlanner Output
 (PCR · digest · ligation       (LabSheet + LabPacket)

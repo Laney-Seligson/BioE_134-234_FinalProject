@@ -41,7 +41,7 @@ def test_ranked_guides_present_in_output(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf")
+    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
     assert "guides" in result
     assert isinstance(result["guides"], list)
     assert len(result["guides"]) > 0
@@ -52,7 +52,7 @@ def test_each_guide_has_efficiency_score(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf")
+    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
     for guide in result["guides"]:
         assert "efficiency_score" in guide
         assert "specificity_score" in guide
@@ -64,7 +64,7 @@ def test_each_guide_has_efficiency_details(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf")
+    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
     for guide in result["guides"]:
         assert "efficiency_details" in guide
         assert "specificity_details" in guide
@@ -75,7 +75,7 @@ def test_scoring_rationale_present(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf")
+    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
     assert "scoring_rationale" in result
     assert isinstance(result["scoring_rationale"], str)
     assert len(result["scoring_rationale"]) > 0
@@ -86,7 +86,7 @@ def test_guides_sorted_best_first(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf")
+    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
     scores = [g["total_score"] for g in result["guides"]]
     assert scores == sorted(scores, reverse=True)
 
@@ -96,7 +96,7 @@ def test_selected_guide_is_top_ranked(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf")
+    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
     assert result["selected_guide"]["protospacer"] == result["guides"][0]["protospacer"]
 
 
@@ -113,3 +113,40 @@ def test_missing_vector_returns_needs_user_input(workflow, monkeypatch):
     result = workflow.run(query="lacZ", vector="")
     assert result["status"] == "needs_user_input"
     assert "vector" in result["missing_fields"]
+    assert "cas_recommendation" in result
+    assert any(step["tool"] == "crispr_cas_selector" for step in result["workflow_trace"])
+
+
+def test_missing_vector_for_celegans_recommends_pdd162_after_cas_selection(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher,
+        "run",
+        lambda query, organism="Caenorhabditis elegans": {
+            **FAKE_SEQUENCE_INFO,
+            "resource": "dna-2",
+            "organism": "Caenorhabditis elegans",
+        },
+    )
+    result = workflow.run(
+        query="dna-2",
+        organism="Caenorhabditis elegans",
+        vector="",
+    )
+    assert result["status"] == "needs_user_input"
+    assert result["organism_category"] == "caenorhabditis"
+    assert "cas_recommendation" in result
+    assert result["vector_recommendations"][0]["vector_key"] == "pdd162"
+
+
+def test_confirmation_gate_happens_after_cas_selection(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+    )
+    result = workflow.run(query="lacZ", vector="ptargetf")
+    assert result["status"] == "needs_user_input"
+    assert "confirmed" in result["missing_fields"]
+    assert "cas_recommendation" in result
+    assert "recommended_system" in result
+    assert any(step["tool"] == "crispr_cas_selector" for step in result["workflow_trace"])
+    assert "guides" not in result

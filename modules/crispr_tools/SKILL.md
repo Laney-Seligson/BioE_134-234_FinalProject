@@ -178,6 +178,23 @@ Calling `crispr_run_full_workflow` when the user only asked for guides hides the
 
 ---
 
+## Multi-target requests (multiple genes)
+
+When the user names **more than one target gene** (e.g. "knock out PIR1, PIR2, and PIR3"), you MUST:
+
+1. Call `crispr_fetch_target_sequence` for **every** gene before calling any other tool.
+2. Call `crispr_cas_selector` **separately** for **each** fetched sequence — one call per gene.
+3. Aggregate the results across all genes using **majority-wins** logic:
+   - Count how many genes recommend Cas9 and how many recommend Cas12a.
+   - The nuclease recommended by the most genes wins.
+   - If tied, fall back to summing total valid guides across all targets and picking the higher count.
+   - Report the per-gene breakdown (gene name, per-gene recommendation, Cas9 count, Cas12a count) in your answer so the user can see the full picture.
+4. Only after running `crispr_cas_selector` on every target should you present a final recommendation.
+
+Do NOT run `crispr_cas_selector` on only one gene and extrapolate to the rest — each gene has a different sequence and may have very different guide counts.
+
+---
+
 ## When to stop and wait for the user
 
 These tools are decision checkpoints. After calling one **in response to a standalone request** (i.e., the user's message did NOT also ask for guide design or cloning oligos), always present the result and wait for the user's next message before continuing:

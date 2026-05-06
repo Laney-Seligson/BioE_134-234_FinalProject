@@ -592,104 +592,6 @@ def validate_gibson_step(
     }
 
 
-def validate_typeiisoligo_step(
-    step: dict,
-    part_lookup: Dict[str, dict],
-) -> dict:
-    """
-    Validate a TypeIISOligoCloning step by confirming the two oligos are
-    reverse complements of each other after stripping their sticky-end overhangs.
-
-    Tries overhang lengths 3–6 nt (covers BbsI/BsmBI/BsaI 4-nt and variants).
-    """
-    if step.get("step_type") != "TypeIISOligoCloning":
-        raise ConstructionValidationError(
-            "validate_typeiisoligo_step only accepts TypeIISOligoCloning steps."
-        )
-
-    inputs = step.get("inputs", [])
-    params = step.get("parameters", {})
-    output_name = step.get("output", "").strip()
-
-    if len(inputs) < 2:
-        raise ConstructionValidationError(
-            "TypeIISOligoCloning step requires at least 2 oligo inputs (top, bottom)."
-        )
-
-    top_seq = get_part_sequence(part_lookup, inputs[0])
-    bottom_seq = get_part_sequence(part_lookup, inputs[1])
-
-    found_overhang_len = None
-    for overhang_len in range(3, 7):
-        if len(top_seq) <= overhang_len or len(bottom_seq) <= overhang_len:
-            continue
-        if top_seq[overhang_len:] == reverse_complement(bottom_seq[overhang_len:]):
-            found_overhang_len = overhang_len
-            break
-
-    if found_overhang_len is None:
-        raise ConstructionValidationError(
-            f"Top oligo '{inputs[0]}' and bottom oligo '{inputs[1]}' are not reverse "
-            "complements of each other (tested overhang lengths 3–6 nt). "
-            "Check that both oligos target the same protospacer and vector."
-        )
-
-    return {
-        "step_number": step.get("step_number"),
-        "step_type": "TypeIISOligoCloning",
-        "output_name": output_name,
-        "is_valid": True,
-        "message": "TypeIISOligoCloning step validated: oligos are reverse complements of each other.",
-        "details": {
-            "top_overhang": top_seq[:found_overhang_len],
-            "bottom_overhang": bottom_seq[:found_overhang_len],
-            "protospacer": top_seq[found_overhang_len:],
-            "enzyme": params.get("enzyme", "unknown"),
-        },
-    }
-
-
-def validate_transform_step(
-    step: dict,
-    part_lookup: Dict[str, dict],
-    produced_sequences: Dict[str, str],
-) -> dict:
-    """Validate a Transform step: confirm the input construct exists and required
-    parameters (cells, selection) are present."""
-    inputs = step.get("inputs", [])
-    params = step.get("parameters", {})
-    output_name = step.get("output", "").strip()
-
-    if not inputs:
-        raise ConstructionValidationError("Transform step requires at least one input.")
-
-    construct_name = inputs[0]
-    if construct_name not in part_lookup and construct_name not in produced_sequences:
-        raise ConstructionValidationError(
-            f"Transform input '{construct_name}' not found in parts or produced constructs."
-        )
-
-    missing = [f for f in ("cells", "selection") if not params.get(f)]
-    if missing:
-        raise ConstructionValidationError(
-            f"Transform step is missing required parameters: {', '.join(missing)}."
-        )
-
-    return {
-        "step_number": step.get("step_number"),
-        "step_type": "Transform",
-        "output_name": output_name,
-        "is_valid": True,
-        "message": "Transform step validated: construct present, cells and selection specified.",
-        "details": {
-            "construct": construct_name,
-            "cells": params.get("cells"),
-            "selection": params.get("selection"),
-            "temperature_c": params.get("temperature_c"),
-        },
-    }
-
-
 def validate_construction_record(
     structured_construction_file: dict,
     expected_sequences: Optional[Dict[str, str]] = None,
@@ -745,26 +647,6 @@ def validate_construction_record(
                     produced_sequences=produced_sequences,
                 )
                 report["step_results"].append(step_result)
-
-            elif step_type == "TypeIISOligoCloning":
-                step_result = validate_typeiisoligo_step(
-                    step=step,
-                    part_lookup=part_lookup,
-                )
-                produced_sequences[step_result["output_name"]] = step_result["details"]["protospacer"]
-                report["step_results"].append(step_result)
-
-            elif step_type == "Transform":
-                step_result = validate_transform_step(
-                    step=step,
-                    part_lookup=part_lookup,
-                    produced_sequences=produced_sequences,
-                )
-                produced_sequences[step_result["output_name"]] = produced_sequences.get(
-                    step_result["details"]["construct"], ""
-                )
-                report["step_results"].append(step_result)
-
             else:
                 report["step_results"].append(
                     {

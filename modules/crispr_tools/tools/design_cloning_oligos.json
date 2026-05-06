@@ -139,7 +139,7 @@
     },
     {
       "input":  { "protospacer": "TACTTTACGCAGCGCGGAGT", "organism": "E. coli", "target_reference": "ecoli_rpsl" },
-      "output": { "status": "ready", "vector": "pCRISPR::rpsL", "target_verification": { "verified": true, "reference": "ecoli_rpsl" } }
+      "output": { "status": "ready", "vector": "pCRISPR", "target_verification": { "verified": true, "reference": "ecoli_rpsl" } }
     },
     {
       "input":  { "vector": "pml104", "protospacer": "GTATGTGTGTGGATTCAACAG" },

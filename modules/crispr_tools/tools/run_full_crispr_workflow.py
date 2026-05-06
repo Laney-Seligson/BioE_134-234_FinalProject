@@ -46,8 +46,8 @@ _VECTOR_RECOMMENDATIONS: dict[str, list[dict]] = {
     "ecoli": [
         {
             "vector_key": "pcrispr",
-            "vector_name": "pCRISPR::rpsL",
-            "use_case": "E. coli genome editing via two-plasmid system (pCas9 + pCRISPR). rpsL counter-selection improves recombinant recovery.",
+            "vector_name": "pCRISPR",
+            "use_case": "E. coli genome editing via two-plasmid system (pCas9 + pCRISPR). BsaI TypeIIS guide insertion.",
             "delivery": "Electroporation",
             "citation": "Jiang et al. Nat Biotechnol 2013. doi:10.1038/nbt.2508",
         },

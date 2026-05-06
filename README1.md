@@ -929,7 +929,15 @@ Gemini: Should output the shorthand construction file
   This file is the C9 JSON wrapper for the construction file generator. It defines how the MCP framework and Gemini should understand and call the construction tool, including its name, description, inputs, outputs, examples, and execution details. The wrapper tells the model that this tool can generate a full sequence-based construction file, create a structured paper-information record, or generate a shorthand workflow from paper-derived metadata, depending on the selected input mode.
 
 <b>3. validate_construction_file.py:</b>
-This file contains the Python implementation of the construction file validation tool. Its job is to check whether a proposed cloning workflow is biologically consistent, especially for PCR-based construction designs. It validates things like whether primers anneal correctly to the intended templates, whether they are oriented properly, whether a plausible amplicon can be formed, and whether the overall workflow structure is biologically reasonable. It can retrieve information from the construction file previously generated. This tool is useful after generating a construction file because it provides a second layer of error checking before the workflow is trusted for downstream use.
+This file contains the Python implementation of the construction file validation tool. Its job is to check whether a proposed cloning workflow is biologically consistent. It validates things like whether primers anneal correctly to the intended templates, whether they are oriented properly, whether a plausible amplicon can be formed, and whether the overall workflow structure is biologically reasonable. It can retrieve information from the construction file previously generated. This tool is useful after generating a construction file because it provides a second layer of error checking before the workflow is trusted for downstream use.
+
+Supported step types and what is validated:
+- **PCR**: primer annealing, orientation, and predicted amplicon length
+- **GoldenGate**: BsaI overhang compatibility for circular assembly
+- **Gibson**: overlap length and sequence compatibility at both junctions
+- **TypeIISOligoCloning** *(e.g. BbsI/BsmBI pX330-style guide cloning)*: confirms the top and bottom oligos are reverse complements of each other after stripping their sticky-end overhangs (tested at 3–6 nt), and reports the detected overhang sequences and protospacer
+- **Transform**: confirms the input construct exists and that required parameters (cells, selection) are present
+- Any other step type returns `is_valid: null` with a "not implemented" message
 
 Example prompt (happy path):
 >Note: Have the API create a construction file first. For this example, let’s assume there are 2 PCR steps and a Gibson step in the construction file. In this case, the construction file is valid.

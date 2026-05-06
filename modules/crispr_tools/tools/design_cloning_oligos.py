@@ -101,6 +101,8 @@ class VectorSpec:
 
     # GibsonAssembly-specific
     recommended_overlap_bp: int = 20
+    gibson_left_context: str = ""   # known vector sequence 5′ of guide insertion site
+    gibson_right_context: str = ""  # known vector sequence 3′ of guide insertion site
 
     # Resource / strain metadata
     backbone_resource: Optional[str] = None  # key in BACKBONE_RESOURCES
@@ -392,6 +394,10 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         scaffold_in_vector=True,
         u6_prefers_5prime_g=True,
         recommended_overlap_bp=20,
+        # U6 promoter flanking sequences at the BbsI guide insertion site
+        # (positions 251-267 in pX330 GenBank; shared with pX458).
+        gibson_left_context="ATATATCTTGTGGAAAGGACGAAACACCGG",
+        gibson_right_context="GTTTTAGAGCTAGAAATAGCAAGTTAAAAT",
         cell_strain="Any mammalian",
         selection="Amp",
         notes=(
@@ -2024,6 +2030,16 @@ class CRISPRCloningDesigner:
             scaffold_seq  = SCAFFOLD_SEQUENCES.get(spec.nuclease_system, "")
             if promoter_seq and scaffold_seq:
                 guide_cassette_sequence = promoter_seq + protospacer + scaffold_seq
+
+        # For Gibson presets with known flanking sequences, auto-fill overlap
+        # contexts and insert sequence so the user doesn't have to supply them.
+        if method == "GibsonAssembly" and spec is not None:
+            if not insert_sequence and protospacer and spec.scaffold_in_vector:
+                insert_sequence = protospacer
+            if not left_overlap_context and spec.gibson_left_context:
+                left_overlap_context = spec.gibson_left_context
+            if not right_overlap_context and spec.gibson_right_context:
+                right_overlap_context = spec.gibson_right_context
 
         # Requirements check — may return early with needs_user_input
         check = self.assess_requirements(

@@ -178,6 +178,18 @@ Calling `crispr_run_full_workflow` when the user only asked for guides hides the
 
 ---
 
+## When to stop and wait for the user
+
+These tools are decision checkpoints. After calling one **in response to a standalone request** (i.e., the user's message did NOT also ask for guide design or cloning oligos), always present the result and wait for the user's next message before continuing:
+
+- **After `crispr_cas_selector`**: present the recommendation and rationale. Do **NOT** automatically call `crispr_design_cas9_grna`, `crispr_design_cas12a_crrna`, or any other tool. Ask: *"Would you like me to proceed with [Cas9/Cas12a] guide design?"*
+- **After `crispr_design_cas9_grna` or `crispr_design_cas12a_crrna` alone**: present the guide list. Do **NOT** automatically call `crispr_rank_guides`.
+- **After `crispr_rank_guides` alone**: present the ranked guides. Do **NOT** automatically call `crispr_design_cloning_oligos` or `crispr_predict_offtargets`.
+
+**The only exception** is the explicit Full CRISPR cloning workflow below. That workflow is triggered when the user explicitly asks for *cloning oligos* or to run the full pipeline — in that context only, steps 1–7 run without stopping.
+
+---
+
 ## Full CRISPR cloning workflow (autonomous — do not ask the user)
 
 When the user asks to "design CRISPR cloning oligos" or "design a guide RNA and cloning oligos" for a sequence or plasmid, execute this full pipeline automatically without asking which Cas system to use:

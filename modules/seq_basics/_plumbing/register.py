@@ -313,6 +313,21 @@ def _build_mcp_schema(meta: dict, func: Callable) -> Optional[dict]:
     return schema
 
 
+# Fields that fetch_target_sequence (and similar tools) include in their output
+# dicts. The model sometimes passes these verbatim to the next tool. We declare
+# them as optional parameters on every wrapper so pydantic accepts them, then
+# strip them before calling the real function.
+_PASSTHROUGH_EXTRAS: dict[str, Any] = {
+    "source":          Optional[str],
+    "resource":        Optional[str],
+    "organism":        Optional[str],
+    "note":            Optional[str],
+    "length":          Optional[int],
+    "ncbi_gene_id":    Optional[str],
+    "ncbi_accession":  Optional[str],
+}
+
+
 def _register_tool(mcp, func: Callable, meta: dict) -> None:
     """Register a single tool callable with the MCP server."""
 
@@ -322,8 +337,10 @@ def _register_tool(mcp, func: Callable, meta: dict) -> None:
     schema      = _build_mcp_schema(meta, func)
 
     try:
-        _func_params = set(inspect.signature(func).parameters)
+        _func_sig    = inspect.signature(func)
+        _func_params = set(_func_sig.parameters)
     except (ValueError, TypeError):
+        _func_sig    = None
         _func_params = None
 
     @wraps(func)
@@ -331,9 +348,7 @@ def _register_tool(mcp, func: Callable, meta: dict) -> None:
         for param in seq_params:
             if param in kwargs and kwargs[param] is not None:
                 kwargs[param] = resolve_to_seq(kwargs[param])
-        # Drop any kwargs the underlying function doesn't accept so that
-        # upstream tools passing extra context fields (e.g. "source") don't
-        # cause unexpected-keyword-argument errors.
+        # Drop any kwargs the underlying function doesn't accept.
         if _func_params is not None:
             kwargs = {k: v for k, v in kwargs.items() if k in _func_params}
         return func(**kwargs)
@@ -341,9 +356,38 @@ def _register_tool(mcp, func: Callable, meta: dict) -> None:
     wrapped.__name__ = mcp_name
     wrapped.__doc__  = description
 
-    # Preserve type hints (FastMCP fallback schema generation)
-    if hasattr(func, "__annotations__"):
-        wrapped.__annotations__ = func.__annotations__
+    # Build extended annotations: func's own types + passthrough extras.
+    # FastMCP's TypeAdapter uses __annotations__ to build the pydantic model
+    # that validates incoming call arguments. Without the extras, pydantic
+    # raises "Unexpected keyword argument" when the model passes fields like
+    # "source" from fetch_target_sequence output to the next tool.
+    extended_annotations = dict(getattr(func, "__annotations__", {}))
+    for extra_name, extra_type in _PASSTHROUGH_EXTRAS.items():
+        if extra_name not in extended_annotations:
+            extended_annotations[extra_name] = extra_type
+    wrapped.__annotations__ = extended_annotations
+
+    # Build a matching __signature__ so inspect.signature() agrees with the
+    # annotations. Extra params are keyword-only with default=None.
+    if _func_sig is not None:
+        try:
+            existing = list(_func_sig.parameters.values())
+            extra_params = [
+                inspect.Parameter(
+                    name,
+                    inspect.Parameter.KEYWORD_ONLY,
+                    default=None,
+                    annotation=ann,
+                )
+                for name, ann in _PASSTHROUGH_EXTRAS.items()
+                if name not in _func_params
+            ]
+            wrapped.__signature__ = inspect.Signature(
+                existing + extra_params,
+                return_annotation=_func_sig.return_annotation,
+            )
+        except (ValueError, TypeError):
+            pass
 
     # [CHANGE] Attach explicit schema when available so Gemini gets typed params
     if schema is not None:

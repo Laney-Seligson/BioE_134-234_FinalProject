@@ -500,7 +500,13 @@ The client is ready and you can start entering prompts.
 
 <b>2. fetch_target_sequence</b>
 - What it does: 
-  - Resolves a gene name or accession to a clean DNA sequence using NCBI Entrez tools 
+  - Resolves a gene name or accession to a clean DNA sequence using NCBI Entrez tools
+  - Super similar to Karina's lookup_gene_sequences.py, just part of how my 'full_crispr_workflow' works smoothly
+  - Utilizes _utils.py 'normalize_organism' to recognize "slang" names and such 
+
+  Contains 'fetch_locus_from_ncbi' which uses esearch for the gene ID,esummary for the chromosomal coordinates, and efetch to get a fasta slice from designated region of the chromosome 
+
+  Also,'fetch_cds_from_ncbi' function makes it so we have a esearch for gene ID, elink for RefSeq mRNA accession IDs, and efetch to extract CDS from a GenBank record.  
 
 - MCP Wrapper: `fetch_target_sequence.json`
 - Pytests (`tests/unit/test_fetch_target_sequence.py`): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
@@ -537,7 +543,22 @@ The client is ready and you can start entering prompts.
 
   - National Center for Biotechnology Information. n.d. "Gene Database Help." U.S. National Library of Medicine. https://www.ncbi.nlm.nih.gov/books/NBK3841/.
 
-<b> 3. design_cas9_grna </b>
+ <b> 3. cas_selector</b>
+- What it does: 
+  - Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements 
+- MCP Wrapper: `cas_selector.json`
+- Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a, multiplexing override, empty sequence error
+- Sample Prompt: “Which Cas nuclease should I use for 3 targets in E.Coli?” 
+- Citations: 
+  - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
+
+  - Kim, Daesik, Byungkuk Min, Jungeun Kim, Seokjoong Kim, and Jin-Soo Kim. 2016. "Genome-Wide Analysis Reveals Specificities of Cpf1 Endonucleases in Human Cells." Nature Biotechnology 34 (8): 863–868. https://doi.org/10.1038/nbt.3609.
+
+  - Zetsche, Bernd, Matthias Heidenreich, Prarthana Mohanraju, Ines Fedorova, Jeroen Kneppers, Ellen M. DeGennaro, Naomi Winblad, et al. 2017. "Multiplex Gene Editing by CRISPR-Cpf1 Using a Single crRNA Array." Nature Biotechnology 35 (1): 31–34. https://doi.org/10.1038/nbt.3737.
+
+
+
+<b> 4. design_cas9_grna </b>
 - What it does: 
   - Scans a sequence for NGG PAM sites and returns up to 10 SpCas9 guide RNA candidates 
 
@@ -868,20 +889,6 @@ The client is ready and you can start entering prompts.
   - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
   - Fonfara, Ines, Hagen Richter, Majda Bratovič, Anaïs Le Rhun, and Emmanuelle Charpentier. 2016. "The CRISPR-Associated DNA-Cleaving Enzyme Cpf1 Also Processes Precursor CRISPR RNA." Nature 532 (7600): 517–521. https://doi.org/10.1038/nature17945.
 
-<b> 5. cas_selector</b>
-- What it does: 
-  - Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements 
-- MCP Wrapper: `cas_selector.json`
-- Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a, multiplexing override, empty sequence error
-- Sample Prompt: “Which Cas nuclease should I use for 3 targets in E.Coli?” 
-- Citations: 
-  - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
-
-  - Kim, Daesik, Byungkuk Min, Jungeun Kim, Seokjoong Kim, and Jin-Soo Kim. 2016. "Genome-Wide Analysis Reveals Specificities of Cpf1 Endonucleases in Human Cells." Nature Biotechnology 34 (8): 863–868. https://doi.org/10.1038/nbt.3609.
-
-  - Zetsche, Bernd, Matthias Heidenreich, Prarthana Mohanraju, Ines Fedorova, Jeroen Kneppers, Ellen M. DeGennaro, Naomi Winblad, et al. 2017. "Multiplex Gene Editing by CRISPR-Cpf1 Using a Single crRNA Array." Nature Biotechnology 35 (1): 31–34. https://doi.org/10.1038/nbt.3737.
-
-
 <b> 6. design_cloning_oligos </b>
 - What it does: 
   - Designs annealed oligos or PCR primers into a preset vector 
@@ -975,7 +982,7 @@ The client is ready and you can start entering prompts.
 
   - NovoPro Bioscience. "pX330-U6-Chimeric_BB-CBh-hSpCas9 vector (Cat. No. V005940)." https://www.novoprolabs.com/vector/Vgy3dima
 
-<b>6. Shared utilities (`modules/crispr_tools/tools/_utils.py`)</b>
+<b>7. Shared utilities (`modules/crispr_tools/tools/_utils.py`)</b>
 
 - What it does:
   - Centralizes logic that was previously duplicated or missing across multiple CRISPR tools

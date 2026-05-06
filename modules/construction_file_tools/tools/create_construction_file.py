@@ -641,12 +641,19 @@ class CreateConstructionFile:
                 )
 
         if assembly_strategy == "Gibson":
+            # Vector primers are only required when auto_design_primers=True
+            # (the tool designs them from backbone_sequence + insertion_index).
+            # When they are empty, the vector is assumed to be linearized by RE
+            # or supplied separately — this is the standard pX458 guide workflow.
             required_pairs = [
                 ("insert_forward_primer", insert_forward_primer_name, insert_forward_primer_sequence),
                 ("insert_reverse_primer", insert_reverse_primer_name, insert_reverse_primer_sequence),
-                ("vector_forward_primer", vector_forward_primer_name, vector_forward_primer_sequence),
-                ("vector_reverse_primer", vector_reverse_primer_name, vector_reverse_primer_sequence),
             ]
+            if auto_design_primers or (vector_forward_primer_name.strip() or vector_forward_primer_sequence.strip()):
+                required_pairs += [
+                    ("vector_forward_primer", vector_forward_primer_name, vector_forward_primer_sequence),
+                    ("vector_reverse_primer", vector_reverse_primer_name, vector_reverse_primer_sequence),
+                ]
             missing_fields = []
             for label, primer_name, primer_seq in required_pairs:
                 if not primer_name.strip():
@@ -868,6 +875,7 @@ class CreateConstructionFile:
         if assembly_strategy in {"GoldenGate", "Gibson"}:
             insert_pcr_product = f"{insert_name}_pcr"
             vector_pcr_product = f"{backbone_name}_pcr"
+            has_vector_primers = bool(vector_forward_primer_name.strip() and vector_reverse_primer_name.strip())
 
             operations.append(
                 {
@@ -883,26 +891,33 @@ class CreateConstructionFile:
                 }
             )
 
-            operations.append(
-                {
-                    "step_number": 2,
-                    "step_type": "PCR",
-                    "inputs": [vector_forward_primer_name, vector_reverse_primer_name, backbone_name],
-                    "parameters": {
-                        "forward_primer": vector_forward_primer_name,
-                        "reverse_primer": vector_reverse_primer_name,
-                        "template": backbone_name,
-                    },
-                    "output": vector_pcr_product,
-                }
-            )
+            # Vector PCR step only added when vector linearisation primers are
+            # provided. For RE-linearised vectors (e.g. pX458 Gibson guide
+            # insertion), the backbone enters the Gibson step directly.
+            if has_vector_primers:
+                operations.append(
+                    {
+                        "step_number": 2,
+                        "step_type": "PCR",
+                        "inputs": [vector_forward_primer_name, vector_reverse_primer_name, backbone_name],
+                        "parameters": {
+                            "forward_primer": vector_forward_primer_name,
+                            "reverse_primer": vector_reverse_primer_name,
+                            "template": backbone_name,
+                        },
+                        "output": vector_pcr_product,
+                    }
+                )
+
+            vector_input = vector_pcr_product if has_vector_primers else backbone_name
+            next_step = 3 if has_vector_primers else 2
 
             if assembly_strategy == "GoldenGate":
                 operations.append(
                     {
-                        "step_number": 3,
+                        "step_number": next_step,
                         "step_type": "GoldenGate",
-                        "inputs": [vector_pcr_product, insert_pcr_product],
+                        "inputs": [vector_input, insert_pcr_product],
                         "parameters": {"enzyme": enzyme},
                         "output": construct_name,
                     }
@@ -910,9 +925,9 @@ class CreateConstructionFile:
             else:
                 operations.append(
                     {
-                        "step_number": 3,
+                        "step_number": next_step,
                         "step_type": "Gibson",
-                        "inputs": [vector_pcr_product, insert_pcr_product],
+                        "inputs": [vector_input, insert_pcr_product],
                         "parameters": {"reagent": "GibsonMix", "overlap_bp": overlap_bp},
                         "output": construct_name,
                     }

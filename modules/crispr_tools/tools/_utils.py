@@ -6,6 +6,78 @@ Students can add additional shared utilities here.
 
 from __future__ import annotations
 
+# ---------------------------------------------------------------------------
+# Organism normalization
+# ---------------------------------------------------------------------------
+
+ORGANISM_ALIASES: dict[str, str] = {
+    # E. coli variants
+    "ecoli":                    "Escherichia coli",
+    "e.coli":                   "Escherichia coli",
+    "e. coli":                  "Escherichia coli",
+    "escherichia coli":         "Escherichia coli",
+    "bacteria":                 "Escherichia coli",
+    # Human
+    "human":                    "Homo sapiens",
+    "homo sapiens":             "Homo sapiens",
+    # Mouse
+    "mouse":                    "Mus musculus",
+    "mus musculus":             "Mus musculus",
+    # Yeast
+    "yeast":                    "Saccharomyces cerevisiae",
+    "s. cerevisiae":            "Saccharomyces cerevisiae",
+    "saccharomyces cerevisiae": "Saccharomyces cerevisiae",
+    # C. elegans
+    "worm":                     "Caenorhabditis elegans",
+    "c. elegans":               "Caenorhabditis elegans",
+    "caenorhabditis elegans":   "Caenorhabditis elegans",
+    # Fly
+    "fly":                      "Drosophila melanogaster",
+    "drosophila":               "Drosophila melanogaster",
+    "drosophila melanogaster":  "Drosophila melanogaster",
+    # Zebrafish
+    "zebrafish":                "Danio rerio",
+    "danio rerio":              "Danio rerio",
+    # Arabidopsis
+    "arabidopsis":              "Arabidopsis thaliana",
+    "arabidopsis thaliana":     "Arabidopsis thaliana",
+    # Rat
+    "rat":                      "Rattus norvegicus",
+    "rattus norvegicus":        "Rattus norvegicus",
+    # Plants
+    "tobacco":                  "Nicotiana tabacum",
+    "nicotiana tabacum":        "Nicotiana tabacum",
+    "rice":                     "Oryza sativa",
+    "oryza sativa":             "Oryza sativa",
+    "corn":                     "Zea mays",
+    "maize":                    "Zea mays",
+    "zea mays":                 "Zea mays",
+}
+
+
+def normalize_organism(name: str) -> str:
+    """Return the canonical scientific name for a common organism alias.
+
+    Unrecognised names are returned unchanged so callers never silently drop
+    a valid organism the user provided.
+    """
+    return ORGANISM_ALIASES.get(name.strip().lower(), name.strip())
+
+
+# ---------------------------------------------------------------------------
+# DNA sequence utilities
+# ---------------------------------------------------------------------------
+
+VALID_DNA: set[str] = set("ATGC")
+
+_COMPLEMENT: dict[str, str] = {"A": "T", "T": "A", "G": "C", "C": "G"}
+
+
+def reverse_complement(seq: str) -> str:
+    """Return the reverse complement of a DNA sequence."""
+    return "".join(_COMPLEMENT[b] for b in reversed(seq.upper()))
+
+
 # Standard genetic code (DNA codons -> amino acids)
 CODON_TABLE = {
     "TTT": "F", "TTC": "F", "TTA": "L", "TTG": "L",

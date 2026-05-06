@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Optional
 
 from modules.crispr_tools.tools.fetch_addgene_vector import FetchAddgeneVector as _AddgeneFetcher
+from modules.crispr_tools.tools._utils import normalize_organism, reverse_complement as _reverse_complement
 
 
 # ---------------------------------------------------------------------------
@@ -899,7 +900,6 @@ _ORGANISM_COMPAT: dict[str, list[str]] = {
 # Sequence utilities
 # ---------------------------------------------------------------------------
 
-_COMPLEMENT: dict[str, str] = {"A": "T", "T": "A", "G": "C", "C": "G"}
 _YEAST_BCLI_SWAI_SGRNA_PREFIX = "GTTTTAGAGCTAG"
 _IUPAC_AMBIGUITY = set("RYSWKMBDHVN")
 
@@ -929,9 +929,6 @@ def _normalize_resource_dna(seq: str, label: str) -> str:
         )
     return normalized
 
-
-def _reverse_complement(seq: str) -> str:
-    return "".join(_COMPLEMENT[b] for b in reversed(seq))
 
 
 def _uses_yeast_bcli_swai_cloning(spec: Optional[VectorSpec]) -> bool:
@@ -1067,7 +1064,7 @@ class CRISPRCloningDesigner:
         Return a needs_user_input dict if the vector's cell_strain is incompatible
         with target_organism, or None if compatible or organism is unrecognised.
         """
-        org_lower = target_organism.lower().strip()
+        org_lower = normalize_organism(target_organism).lower()
         strain_lower = spec.cell_strain.lower()
 
         compatible_substrings: Optional[list[str]] = None

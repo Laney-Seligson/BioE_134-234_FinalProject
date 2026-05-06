@@ -974,6 +974,23 @@ The client is ready and you can start entering prompts.
   - Addgene. "pX330-U6-Chimeric_BB-CBh-hSpCas9 (Plasmid #42230)." https://www.addgene.org/42230/
 
   - NovoPro Bioscience. "pX330-U6-Chimeric_BB-CBh-hSpCas9 vector (Cat. No. V005940)." https://www.novoprolabs.com/vector/Vgy3dima
+
+<b>6. Shared utilities (`modules/crispr_tools/tools/_utils.py`)</b>
+
+- What it does:
+  - Centralizes logic that was previously duplicated or missing across multiple CRISPR tools
+  - `normalize_organism(name)` — converts common organism aliases ("e. coli", "human", "yeast", "c. elegans", etc.) to their canonical scientific names before any NCBI Entrez call. This has caused  `fetch_target_sequence` to faili for the same organism/gene combo that `semantic_gene_search` handled correctly: the fetch tool was passing aliases like "e. coli" directly to NCBI, which rejects them.
+  - `VALID_DNA` — shared set of valid DNA bases (`ATGC`), previously duplicated in `fetch_target_sequence.py` and `run_full_crispr_workflow.py`
+  - `reverse_complement(seq)` — shared DNA reverse-complement function, previously duplicated as a module-level function in `design_cloning_oligos.py` and as an instance method in `cas_selector.py`
+  
+  There are definitely more scripts that could utilize a centralized _utils function. Can be a future goal. 
+
+- Files that now import from `_utils.py`:
+  - `fetch_target_sequence.py` — now normalizes organism before NCBI lookup (bug fix)
+  - `lookup_gene_sequence.py` — replaced local `_ORGANISM_ALIASES` dict with shared `normalize_organism()`
+  - `design_cloning_oligos.py` — replaced local `_reverse_complement` and `_COMPLEMENT`; uses `normalize_organism()` in vector compatibility check
+  - `cas_selector.py` — replaced inline `_reverse_complement` instance method
+  - `run_full_crispr_workflow.py` — replaced local `_VALID_DNA` definition
 </div>
 
 ### Laney:

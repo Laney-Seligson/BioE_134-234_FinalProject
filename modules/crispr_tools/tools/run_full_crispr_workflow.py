@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from modules.seq_basics._plumbing.resolve import list_resources
+from modules.crispr_tools.tools._utils import VALID_DNA
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +120,7 @@ _CAENORHABDITIS_KEYWORDS = {
     "caenorhabditis", "caenorhabditis elegans", "c. elegans", "celegans",
     "nematode", "worm",
 }
-_VALID_DNA = set("ATGC")
+
 
 
 def _classify_organism(organism: str) -> str:
@@ -141,7 +142,7 @@ def _classify_organism(organism: str) -> str:
 
 def _looks_like_raw_dna(query: str) -> bool:
     cleaned = "".join(query.split()).upper()
-    return bool(cleaned) and len(cleaned) >= 10 and set(cleaned) <= _VALID_DNA
+    return bool(cleaned) and len(cleaned) >= 10 and set(cleaned) <= VALID_DNA
 
 
 def _matches_local_resource(query: str) -> bool:
@@ -216,6 +217,10 @@ class RunFullCrisprWorkflow:
             an upstream gene-search tool to select query.
         gene_confirmed (bool): True only after the user explicitly confirms an
             upstream-selected gene target.
+        target_type (str): "genomic_locus" to fetch the full gene region including
+            introns and flanking sequence (default for most CRISPR experiments), or
+            "cds" to fetch only the annotated coding sequence. Prompted when absent
+            for gene-symbol queries.
         generate_docs (bool | None): Controls construction file + lab sheet
             generation. None (default) = ask the user after oligo design.
             True = generate both. False = skip both and return oligo results only.
@@ -280,6 +285,7 @@ class RunFullCrisprWorkflow:
         confirmed: bool = False,
         source_query: str = "",
         gene_confirmed: bool = False,
+        target_type: str = "",
         generate_docs: Optional[bool] = None,
     ) -> dict:
         workflow_trace: list[dict] = []
@@ -328,6 +334,7 @@ class RunFullCrisprWorkflow:
                     "confirmed": confirmed,
                     "source_query": source_query,
                     "gene_confirmed": True,
+                    **({"target_type": target_type} if target_type else {}),
                     **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
                 "notes": (
@@ -356,21 +363,56 @@ class RunFullCrisprWorkflow:
                     "confirmed": confirmed,
                     "source_query": source_query,
                     "gene_confirmed": gene_confirmed,
+                    **({"target_type": target_type} if target_type else {}),
                     **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
                 "workflow_trace": workflow_trace,
             }
 
-        sequence_info = self.sequence_fetcher.run(query=query, organism=organism)
+        is_gene_query = not _looks_like_raw_dna(query) and not _matches_local_resource(query)
+
+        if is_gene_query and not target_type.strip():
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["target_type"],
+                "query": query,
+                "organism": organism,
+                "questions": [
+                    f"Should I fetch the full genomic locus or just the coding sequence (CDS) for '{query}' in {organism}?"
+                ],
+                "options": [
+                    "genomic_locus — full gene region including introns and flanking sequence (recommended for most CRISPR experiments)",
+                    "cds — coding sequence only, mRNA-derived; use when targeting transcribed exons specifically",
+                ],
+                "continue_with": {
+                    "query": query,
+                    "organism": organism,
+                    "vector": vector,
+                    "confirmed": confirmed,
+                    "source_query": source_query,
+                    "gene_confirmed": gene_confirmed,
+                    "target_type": "<genomic_locus or cds>",
+                    **({"generate_docs": generate_docs} if generate_docs is not None else {}),
+                },
+                "workflow_trace": workflow_trace,
+            }
+
+        sequence_info = self.sequence_fetcher.run(
+            query=query,
+            organism=organism,
+            target_type=target_type or "genomic_locus",
+        )
+
         add_trace(
             1,
             "crispr_fetch_target_sequence",
-            {"query": query, "organism": organism},
+            {"query": query, "organism": organism, "target_type": target_type or "genomic_locus"},
             {
                 "source": sequence_info.get("source"),
                 "resource": sequence_info.get("resource"),
                 "organism": sequence_info.get("organism"),
                 "length": sequence_info.get("length"),
+                "target_type": sequence_info.get("target_type"),
                 "ncbi_gene_id": sequence_info.get("ncbi_gene_id"),
                 "ncbi_accession": sequence_info.get("ncbi_accession"),
             },
@@ -420,6 +462,7 @@ class RunFullCrisprWorkflow:
                     "vector": "<selected_vector>",
                     "confirmed": True,
                     "source_query": source_query,
+                    "target_type": target_type or "genomic_locus",
                     **({"gene_confirmed": True} if gene_confirmed else {}),
                     **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
@@ -460,6 +503,7 @@ class RunFullCrisprWorkflow:
                     "confirmed": True,
                     "force_vector": True,
                     "source_query": source_query,
+                    "target_type": target_type or "genomic_locus",
                     **({"gene_confirmed": True} if gene_confirmed else {}),
                     **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
@@ -496,6 +540,7 @@ class RunFullCrisprWorkflow:
                     "vector": vector,
                     "confirmed": True,
                     "source_query": source_query,
+                    "target_type": target_type or "genomic_locus",
                     **({"gene_confirmed": True} if gene_confirmed else {}),
                     **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
@@ -597,6 +642,7 @@ class RunFullCrisprWorkflow:
                     "vector": vector,
                     "confirmed": True,
                     "source_query": source_query,
+                    "target_type": target_type or "genomic_locus",
                     "generate_docs": True,
                     **({"gene_confirmed": True} if gene_confirmed else {}),
                 },

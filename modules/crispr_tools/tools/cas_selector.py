@@ -1,3 +1,6 @@
+from modules.crispr_tools.tools._utils import reverse_complement
+
+
 class CasSelector:
     """
     Description:
@@ -127,10 +130,6 @@ class CasSelector:
     def initiate(self) -> None:
         pass
 
-    def _reverse_complement(self, seq: str) -> str:
-        complement = {"A": "T", "T": "A", "G": "C", "C": "G"}
-        return "".join(complement[b] for b in reversed(seq))
-
     def _has_simple_hairpin(self, spacer: str, k: int = 4) -> bool:
         """
         Simple hairpin proxy:
@@ -201,7 +200,7 @@ class CasSelector:
         if margin_threshold < 1.0:
             raise ValueError("margin_threshold must be >= 1.0.")
 
-        rc = self._reverse_complement(seq)
+        rc = reverse_complement(seq)
         gc_content = (seq.count("G") + seq.count("C")) / len(seq)
         at_rich = gc_content < 0.45
         debug_logs = [] if debug else None

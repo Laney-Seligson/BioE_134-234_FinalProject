@@ -33,10 +33,15 @@ class CasSelector:
                  (Kim et al. 2016 Nature Biotechnology paper, DOI: 10.1038/nbt.3609)
               c. Otherwise -> Cas9 (well-established default).
 
-        AT-richness note: when gc_content < 0.45, AT-richness is reported
-        in the rationale as supporting context for a Cas12a recommendation
-        but does not override the guide-count or secondary-criteria signals.
-        (IDT Alt-R Cas12a documentation; Zetsche et al., 2015)
+        AT-richness note: when gc_content < 0.45, AT-richness is noted in the
+        rationale. When gc_content < 0.35 AND TTTV PAMs outnumber NGG PAMs,
+        two stronger adjustments apply: (a) the effective margin_threshold for
+        a Cas9 guide-count win is raised to 3.0x (the standard GC quality
+        filter underestimates usable Cas12a guides in extremely AT-rich
+        flanking sequence); (b) AT-richness with TTTV majority is added as a
+        Step 3 Cas12a criterion. Both changes reflect published validation of
+        Cas12a in AT-rich organisms such as P. falciparum.
+        (Minkah et al. 2018, Cell Host Microbe; Ghorbal et al. 2014, Nat Methods)
 
         Repair strategy is noted in the rationale but does not change the
         recommendation -- both nucleases support HDR and NHEJ.
@@ -260,13 +265,24 @@ class CasSelector:
             )
         else:
             ratio = max(cas9_valid_guides, cas12a_valid_guides) / min(cas9_valid_guides, cas12a_valid_guides)
-            if ratio >= margin_threshold:
+
+            # In extremely AT-rich sequences (GC < 35%) where TTTV PAMs already
+            # outnumber NGG PAMs, the standard GC quality filter (30-70%)
+            # systematically underestimates usable Cas12a guides because spacers
+            # downstream of TTTV sites sit in even more AT-rich flanks. Require a
+            # stronger signal (3x) before awarding Cas9 the guide-count win.
+            # (Minkah et al. 2018 Cell Host Microbe; Ghorbal et al. 2014 Nat Methods)
+            effective_threshold = margin_threshold
+            if gc_content < 0.35 and tttv_count >= ngg_count and cas9_valid_guides > cas12a_valid_guides:
+                effective_threshold = max(margin_threshold, 3.0)
+
+            if ratio >= effective_threshold:
                 if cas9_valid_guides > cas12a_valid_guides:
                     guide_decision = "Cas9"
                     guide_rationale = (
-                        f"Guide count favors Cas9: {cas9_valid_guides} valid Cas9 guides vs "
+                        f"Guide count strongly favors Cas9: {cas9_valid_guides} valid Cas9 guides vs "
                         f"{cas12a_valid_guides} valid Cas12a guides "
-                        f"(ratio {ratio:.1f}x >= threshold {margin_threshold}x; "
+                        f"(ratio {ratio:.1f}x >= threshold {effective_threshold}x; "
                         f"GC {gc_content:.0%})."
                     )
                 else:
@@ -274,14 +290,14 @@ class CasSelector:
                     guide_rationale = (
                         f"Guide count favors Cas12a: {cas12a_valid_guides} valid Cas12a guides vs "
                         f"{cas9_valid_guides} valid Cas9 guides "
-                        f"(ratio {ratio:.1f}x >= threshold {margin_threshold}x; "
+                        f"(ratio {ratio:.1f}x >= threshold {effective_threshold}x; "
                         f"GC {gc_content:.0%})."
                     )
             else:
                 guide_rationale = (
                     f"Guide counts are within margin: {cas9_valid_guides} valid Cas9 guides vs "
                     f"{cas12a_valid_guides} valid Cas12a guides "
-                    f"(ratio {ratio:.1f}x < threshold {margin_threshold}x; "
+                    f"(ratio {ratio:.1f}x < threshold {effective_threshold}x; "
                     f"GC {gc_content:.0%}); using secondary criteria."
                 )
 
@@ -295,6 +311,15 @@ class CasSelector:
                 guide_rationale + f" Multiplexing ({num_targets} targets): favors Cas12a "
                 "crRNA array from a single transcript without a separate transcription "
                 "unit per guide (Zetsche et al., 2017, Nat Biotechnol)."
+            )
+        elif at_rich and tttv_count >= ngg_count:
+            recommendation = "Cas12a"
+            rationale = (
+                guide_rationale + f" AT-rich sequence (GC {gc_content:.0%}) with more TTTV PAMs "
+                f"({tttv_count}) than NGG PAMs ({ngg_count}): Cas12a's TTTV PAM is intrinsically "
+                "more abundant in AT-rich genomes and Cas12a has been validated for editing in "
+                "organisms with extreme AT bias such as Plasmodium falciparum "
+                "(Minkah et al. 2018, Cell Host Microbe; Ghorbal et al. 2014, Nat Methods)."
             )
         elif high_specificity:
             recommendation = "Cas12a" if cas12a_valid_guides >= cas9_valid_guides else "Cas9"

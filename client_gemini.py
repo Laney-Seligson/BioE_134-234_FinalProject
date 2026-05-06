@@ -176,8 +176,16 @@ def _truncate_strings(obj, max_str):
         return obj[:max_str] + f"… ({len(obj)} chars)"
     return obj
 
+def _strip_citations(obj):
+    """Recursively remove 'citations' keys from dicts for cleaner terminal output."""
+    if isinstance(obj, dict):
+        return {k: _strip_citations(v) for k, v in obj.items() if k != "citations"}
+    if isinstance(obj, list):
+        return [_strip_citations(v) for v in obj]
+    return obj
+
 def _truncate_for_display(obj):
-    return _truncate_strings(obj, max_str=120)
+    return _truncate_strings(_strip_citations(obj), max_str=120)
 
 def _truncate_for_gemini(obj):
     """Cap string fields before sending to Gemini to avoid token limit crashes.

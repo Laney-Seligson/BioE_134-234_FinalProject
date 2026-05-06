@@ -170,6 +170,10 @@ compatibility — the oligo will be one base longer than the protospacer.
 
 Calling `crispr_run_full_workflow` when the user only asked for guides hides the intermediate results (guide list, ranking rationale) that the user needs to see.
 
+**When the user names a gene vaguely or asks for "the most researched" / "a common" gene:** search for candidates using `semantic_gene_search` or `go_term_gene_lookup`, then present the options to the user and ask them which gene to target. Do NOT pick one automatically.
+
+**When `crispr_run_full_workflow` returns `status: "needs_user_input"`:** present the `questions` field verbatim to the user and the `vector_recommendations` list (name + use_case for each). Wait for the user to choose. Do NOT select a vector from the recommendations yourself — always ask the user to choose.
+
 ---
 
 ## Full CRISPR cloning workflow (autonomous — do not ask the user)

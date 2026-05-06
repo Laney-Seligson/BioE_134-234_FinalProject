@@ -316,7 +316,7 @@ async def run_chat() -> None:
     #     print(m.name)
 
 
-    def safe_generate(*, model, contents, config, retries=3, backoff_seconds=2):
+    def safe_generate(*, model, contents, config, retries=6, backoff_seconds=2):
         """Call Gemini with automatic retry on 503 (server busy) errors."""
         for attempt in range(retries):
             try:
@@ -329,7 +329,7 @@ async def run_chat() -> None:
                 #503 UNAVAILABLE - Gemini servers are overloaded
                 msg = str(e)
                 if ("503" in msg or "UNAVAILABLE" in msg) and attempt < retries - 1:
-                    wait = backoff_seconds * (2 ** attempt)
+                    wait = min(backoff_seconds * (2 ** attempt), 30)
                     print(f"\n[Gemini busy (503). Retrying in {wait}s...]")
                     time.sleep(wait)
                     continue

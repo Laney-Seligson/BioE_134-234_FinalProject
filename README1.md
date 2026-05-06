@@ -5,6 +5,18 @@ Presentation slide: [click this](https://docs.google.com/presentation/d/1eYHWdAr
 
 
 ---
+## Table of Contents
+1. [Overview](#1-overview)
+2. [Project Structure](#2-project-structure)
+3. [How the Pipeline Works](#3-how-the-pipeline-works)
+4. [Setup](#4-setup)
+5. [Individual Scope](#5-individual-scope)
+  - [Karina](#karina)
+  - [Emory](#emory)
+  - [Laney](#laney)
+  - [Jillian](#jillian)
+6. [Demo](#6-demo-for-whole-crispr-pipeline)
+7. [Citation](#7-citation)
 
 ## 1. Overview
 
@@ -13,7 +25,7 @@ Designing CRISPR experiments typically requires coordinating multiple tools, man
 ---
 
 ## 2. Project structure
-[screenshot from presentation]
+![Pipeline Flowchart](readme_appendix/pipeline_flowchart.png)
 
 ---
 

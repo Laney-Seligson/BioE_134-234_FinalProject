@@ -161,6 +161,7 @@ from modules.crispr_tools.tools.design_cas12a_crrna import DesignCas12aCrrna
 from modules.crispr_tools.tools.design_cloning_oligos import CRISPRCloningDesigner
 from modules.crispr_tools.tools.fetch_target_sequence import FetchTargetSequence
 from modules.crispr_tools.tools.rank_guides import rank_guides
+from modules.labsheet_tools.tools.lab_sheet import LabSheet
 
 
 _CONSTRUCTION_INPUT_FIELDS = {
@@ -194,8 +195,14 @@ class RunFullCrisprWorkflow:
     """
     Description:
         End-to-end CRISPR pipeline: fetches target sequence, designs and ranks
-        guides, selects a protospacer, designs cloning oligos, and builds and
-        validates a cloning record.
+        guides, selects a protospacer, designs cloning oligos, and optionally
+        builds a construction file and lab sheet in a single call.
+
+        IMPORTANT — do not call create_construction_file, validate_construction_file,
+        or lab_sheet after this tool returns status="ready" with generate_docs=true.
+        Those outputs are already present in the result under "construction",
+        "validation", and "lab_sheet". Calling them again would duplicate work the
+        user did not ask for.
 
     Input:
         query (str): Gene name, local resource key, or raw DNA sequence.
@@ -209,10 +216,16 @@ class RunFullCrisprWorkflow:
             an upstream gene-search tool to select query.
         gene_confirmed (bool): True only after the user explicitly confirms an
             upstream-selected gene target.
+        generate_docs (bool | None): Controls construction file + lab sheet
+            generation. None (default) = ask the user after oligo design.
+            True = generate both. False = skip both and return oligo results only.
+            Once set, this value is carried forward in continue_with so the user
+            is never asked again within the same workflow run.
 
     Output:
         dict: status="ready" with sequence_info, guides, selected_guide,
-              cloning, and validation; or status="needs_user_input".
+              cloning, and (when generate_docs=true) construction, validation,
+              and lab_sheet; or status="needs_user_input".
 
     Tests:
         - Case:
@@ -228,8 +241,12 @@ class RunFullCrisprWorkflow:
             Expected Exception: ValueError
             Description: Empty query raises ValueError.
     """
-
+#initiating all the tools in the workflow so that they can be used in the run method without re-instantiating them each time
     def initiate(self) -> None:
+
+        self.cas_selector = CasSelector()
+        self.cas_selector.initiate()
+
         self.sequence_fetcher = FetchTargetSequence()
         self.sequence_fetcher.initiate()
 
@@ -248,9 +265,9 @@ class RunFullCrisprWorkflow:
         self.construction_validator = ValidateConstructionFile()
         self.construction_validator.initiate()
 
-        self.cas_selector = CasSelector()
-        self.cas_selector.initiate()
-
+        self.lab_sheet_builder = LabSheet()
+        self.lab_sheet_builder.initiate()
+# The run method executes the full workflow, with user prompts for missing or conflicting inputs.
     def run(
         self,
         query: str,
@@ -263,9 +280,10 @@ class RunFullCrisprWorkflow:
         confirmed: bool = False,
         source_query: str = "",
         gene_confirmed: bool = False,
+        generate_docs: Optional[bool] = None,
     ) -> dict:
         workflow_trace: list[dict] = []
-
+# This will make it so I can see the inputs and ouputs of each tool in this scrip
         def add_trace(step: int, tool: str, inputs: dict, output_summary: dict) -> None:
             workflow_trace.append(
                 {
@@ -275,7 +293,7 @@ class RunFullCrisprWorkflow:
                     "output_summary": output_summary,
                 }
             )
-
+# Input validation and user prompts for missing/conflicting data before running the main workflow steps.
         if not query or not query.strip():
             raise ValueError("query must not be empty.")
         if not isinstance(guide_index, int) or guide_index < 0:
@@ -286,7 +304,7 @@ class RunFullCrisprWorkflow:
             and not _looks_like_raw_dna(query)
             and not _matches_local_resource(query)
         )
-        if derived_from_upstream_search and not gene_confirmed:
+        if derived_from_upstream_search and not gene_confirmed:# If the query looks like it was derived from an upstream search (e.g. disease → gene), prompt the user to confirm that the selected gene is correct before proceeding with sequence fetching and guide design. This prevents silently using the wrong gene if the upstream search made an incorrect selection.
             return {
                 "status": "needs_user_input",
                 "missing_fields": ["gene_confirmed"],
@@ -310,6 +328,7 @@ class RunFullCrisprWorkflow:
                     "confirmed": confirmed,
                     "source_query": source_query,
                     "gene_confirmed": True,
+                    **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
                 "notes": (
                     "This confirmation applies to any gene chosen from an upstream "
@@ -337,6 +356,7 @@ class RunFullCrisprWorkflow:
                     "confirmed": confirmed,
                     "source_query": source_query,
                     "gene_confirmed": gene_confirmed,
+                    **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
                 "workflow_trace": workflow_trace,
             }
@@ -401,6 +421,7 @@ class RunFullCrisprWorkflow:
                     "confirmed": True,
                     "source_query": source_query,
                     **({"gene_confirmed": True} if gene_confirmed else {}),
+                    **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
                 "vector_recommendations": recs,
                 "workflow_trace": workflow_trace,
@@ -440,6 +461,7 @@ class RunFullCrisprWorkflow:
                     "force_vector": True,
                     "source_query": source_query,
                     **({"gene_confirmed": True} if gene_confirmed else {}),
+                    **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
                 "workflow_trace": workflow_trace,
             }
@@ -462,8 +484,7 @@ class RunFullCrisprWorkflow:
                     f"({cas_recommendation.get('cas9_valid_guides')} Cas9 guides; "
                     f"{cas_recommendation.get('cas12a_valid_guides')} Cas12a guides). "
                     f"The selected vector '{spec.name}' is compatible with {vector_system}. "
-                    "Do you want to continue with guide design, cloning oligo design, "
-                    "construction-file generation, and validation?"
+                    "Do you want to continue with guide design and cloning oligo design?"
                 ],
                 "options": [
                     "Yes, continue with confirmed=true",
@@ -476,6 +497,7 @@ class RunFullCrisprWorkflow:
                     "confirmed": True,
                     "source_query": source_query,
                     **({"gene_confirmed": True} if gene_confirmed else {}),
+                    **({"generate_docs": generate_docs} if generate_docs is not None else {}),
                 },
                 "workflow_trace": workflow_trace,
             }
@@ -548,6 +570,51 @@ class RunFullCrisprWorkflow:
                 "cloning": cloning,
             }
 
+        sequence_info_summary = {k: v for k, v in sequence_info.items() if k != "sequence"}
+        ref_len = sequence_info.get("length", "unknown")
+
+        if generate_docs is None:
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["generate_docs"],
+                "sequence_info": sequence_info_summary,
+                "guides": ranked_guides,
+                "selected_guide": selected_guide,
+                "scoring_rationale": scoring_rationale,
+                "protospacer": protospacer,
+                "cloning": cloning,
+                "questions": [
+                    "Oligo design is complete. Would you like to also generate a "
+                    "construction file and lab sheet, or return the oligo results only?"
+                ],
+                "options": [
+                    "Yes, generate both construction file and lab sheet (generate_docs=true)",
+                    "No, return oligo results only (generate_docs=false)",
+                ],
+                "continue_with": {
+                    "query": query,
+                    "organism": organism,
+                    "vector": vector,
+                    "confirmed": True,
+                    "source_query": source_query,
+                    "generate_docs": True,
+                    **({"gene_confirmed": True} if gene_confirmed else {}),
+                },
+                "workflow_trace": workflow_trace,
+            }
+
+        if not generate_docs:
+            return {
+                "status": "ready",
+                "workflow_trace": workflow_trace,
+                "sequence_info": sequence_info_summary,
+                "guides": ranked_guides,
+                "selected_guide": selected_guide,
+                "scoring_rationale": scoring_rationale,
+                "protospacer": protospacer,
+                "cloning": cloning,
+            }
+
         construction_inputs = cloning["construction_file_inputs"]
         construction_payload = {
             key: value
@@ -582,13 +649,18 @@ class RunFullCrisprWorkflow:
                 "detail_count": len(validation.get("details", [])),
             },
         )
+        lab_sheet = self.lab_sheet_builder.run(
+            construction_record=construction,
+            protospacer=protospacer,
+            nuclease=nuclease_key,
+        )
+        add_trace(
+            8,
+            "lab_sheet",
+            {"construct_name": construction.get("construct_name"), "nuclease": nuclease_key},
+            {"sections": len(lab_sheet.get("sections", []))},
+        )
 
-        ref_len = sequence_info.get("length", "unknown")
-        # Strip the raw sequence from the returned metadata — it can be hundreds
-        # of kb and will be truncated by the client before Gemini sees it.
-        # Gemini should re-fetch via crispr_fetch_target_sequence when it needs
-        # the sequence for downstream tools (e.g. crispr_verify_edit).
-        sequence_info_summary = {k: v for k, v in sequence_info.items() if k != "sequence"}
         return {
             "status": "ready",
             "workflow_trace": workflow_trace,
@@ -601,6 +673,7 @@ class RunFullCrisprWorkflow:
             "construction_file_inputs": construction_inputs,
             "construction": construction,
             "validation": validation,
+            "lab_sheet": lab_sheet,
             "disclaimers": [
                 "This tool designs a guide RNA cloning workflow, not a therapeutic plan. "
                 "Clinical or translational use requires additional safety, delivery, and regulatory considerations.",

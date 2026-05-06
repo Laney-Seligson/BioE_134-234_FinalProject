@@ -136,13 +136,21 @@ class FetchTargetSequence:
 
         if resource_key in resources:
             seq = resolve_to_seq(resource_key)
+            note = f"Resolved from local bundled resource '{resource_key}'."
+            default_organism = "Escherichia coli"
+            if organism and organism.strip().lower() != default_organism.lower():
+                note += (
+                    f" WARNING: organism '{organism}' was specified but ignored — "
+                    f"'{resource_key}' is a local resource, not a gene lookup. "
+                    "To fetch a gene from this organism, use the gene name instead."
+                )
             return {
                 "sequence": seq,
                 "source": "local_resource",
                 "resource": resource_key,
                 "organism": "",
                 "length": len(seq),
-                "note": f"Resolved from local bundled resource '{resource_key}'.",
+                "note": note,
             }
 
         # ── 3. NCBI Entrez fetch ──────────────────────────────────────────────

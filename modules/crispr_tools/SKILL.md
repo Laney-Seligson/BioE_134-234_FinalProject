@@ -163,10 +163,12 @@ compatibility — the oligo will be one base longer than the protospacer.
 
 **Use the individual tools (steps below) for ALL other requests**, including:
 - "Design Cas9 guides for X" → fetch → design_cas9_grna → rank_guides
-- "Fetch the sequence for X" → fetch only
+- "Fetch the sequence for X" → `crispr_fetch_target_sequence` only
 - "Design guides for X" → fetch → cas_selector → design_cas9_grna or design_cas12a_crrna → rank_guides
 - "Rank these guides" → rank_guides only
 - Any request that does not name a specific vector upfront
+
+**ALWAYS use `crispr_fetch_target_sequence` to retrieve gene sequences** — never `gene_sequence_lookup_tool` or `gene_locus_lookup_tool` for this purpose. Those tools are for exploratory lookups only. `crispr_fetch_target_sequence` is the correct tool for fetching a sequence that will be used in any CRISPR step.
 
 Calling `crispr_run_full_workflow` when the user only asked for guides hides the intermediate results (guide list, ranking rationale) that the user needs to see.
 
@@ -182,7 +184,7 @@ Calling `crispr_run_full_workflow` when the user only asked for guides hides the
 
 When the user names **more than one target gene** (e.g. "knock out PIR1, PIR2, and PIR3"), you MUST:
 
-1. Call `crispr_fetch_target_sequence` for **every** gene before calling any other tool.
+1. Call `crispr_fetch_target_sequence` for **every** gene before calling any other tool. Do NOT use `gene_sequence_lookup_tool` or `gene_locus_lookup_tool` — use `crispr_fetch_target_sequence` only.
 2. Call `crispr_cas_selector` **separately** for **each** fetched sequence — one call per gene.
 3. Aggregate the results across all genes using **majority-wins** logic:
    - Count how many genes recommend Cas9 and how many recommend Cas12a.

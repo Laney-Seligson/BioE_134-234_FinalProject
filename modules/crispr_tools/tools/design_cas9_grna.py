@@ -51,23 +51,35 @@ class DesignCas9Grna:
         if invalid:
             raise ValueError(f"Invalid base(s) in sequence: {sorted(invalid)}.")
 
-        results = []
-
+        all_guides = []
         for i in range(20, len(seq) - 2):
             if seq[i+1:i+3] == "GG":
-                pam = seq[i:i+3]
                 protospacer = seq[i-20:i]
-                grna_rna = (protospacer + self._sgRNA_scaffold).replace("T", "U")
-                results.append({
-                    "grna_sequence": grna_rna,
+                gc = sum(1 for b in protospacer if b in "GC") / 20
+                all_guides.append({
+                    "grna_sequence": (protospacer + self._sgRNA_scaffold).replace("T", "U"),
                     "protospacer": protospacer,
-                    "pam_site": pam,
+                    "pam_site": seq[i:i+3],
+                    "_gc": gc,
+                    "_pos": i,
                 })
 
-        if not results:
+        if not all_guides:
             raise ValueError("No NGG PAM site found in sequence.")
 
-        return results[:10]
+        # Match cas_selector's validity filter (GC 30-70%, consistent range).
+        # Sample evenly across the sequence so the 10 returned guides cover the
+        # full gene rather than clustering at the first NGG-dense region.
+        preferred = [g for g in all_guides if 0.30 <= g["_gc"] <= 0.70]
+        pool = preferred if len(preferred) >= 10 else all_guides
+
+        if len(pool) <= 10:
+            selected = pool
+        else:
+            bucket_size = len(pool) / 10
+            selected = [pool[int(i * bucket_size)] for i in range(10)]
+
+        return [{k: v for k, v in g.items() if not k.startswith("_")} for g in selected]
 
 
 _instance = DesignCas9Grna()

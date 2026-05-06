@@ -48,23 +48,35 @@ class DesignCas12aCrrna:
         if invalid:
             raise ValueError(f"Invalid base(s) in sequence: {sorted(invalid)}.")
 
-        results = []
+        all_guides = []
 
         for i in range(len(seq) - 26):
             if seq[i:i+3] == "TTT" and seq[i+3] in "ACG":
-                pam = seq[i:i+4]
                 protospacer = seq[i+4:i+27]
-                crrna_rna = (self._direct_repeat + protospacer).replace("T", "U")
-                results.append({
-                    "crrna_sequence": crrna_rna,
+                gc = sum(1 for b in protospacer if b in "GC") / 23
+                all_guides.append({
+                    "crrna_sequence": (self._direct_repeat + protospacer).replace("T", "U"),
                     "protospacer": protospacer,
-                    "pam_site": pam,
+                    "pam_site": seq[i:i+4],
+                    "_gc": gc,
+                    "_pos": i,
                 })
 
-        if not results:
+        if not all_guides:
             raise ValueError("No TTTV PAM site found in sequence.")
 
-        return results[:10]
+        # Match cas_selector's validity filter (GC 30-70%).
+        # Sample evenly across the sequence so candidates span the full gene.
+        preferred = [g for g in all_guides if 0.30 <= g["_gc"] <= 0.70]
+        pool = preferred if len(preferred) >= 10 else all_guides
+
+        if len(pool) <= 10:
+            selected = pool
+        else:
+            bucket_size = len(pool) / 10
+            selected = [pool[int(i * bucket_size)] for i in range(10)]
+
+        return [{k: v for k, v in g.items() if not k.startswith("_")} for g in selected]
 
 
 _instance = DesignCas12aCrrna()

@@ -516,27 +516,74 @@ The client is ready and you can start entering prompts.
   <summary>Click to expand sample output</summary>
 
   ```json
-  You: Fetch the sequence for recA in E.Coli
-  [Tool call] → crispr_fetch_target_sequence
-  {
-    "organism": "Escherichia coli",
-    "query": "recA"
-  }
-  [Tool result] ← crispr_fetch_target_sequence:
-  {
-    "sequence": "ATGGCTATCGACGAAAACAAACAGAAAGCGTTGGCGGCAGCACTGGGCCAGATTGAGAAACAATTTGGTAAAGGCTCCATCATGCGCCTGGGTGAAGACCGTTCCATGGATGTGGAAACC\u2026 (1062 chars)",
-    "source": "ncbi",
-    "resource": "recA",
-    "organism": "Escherichia coli",
-    "ncbi_gene_id": "947170",
-    "ncbi_accession": "NC_000913.3",
-    "length": 1062,
-    "note": "Fetched from NCBI Entrez: gene 'recA' in 'Escherichia coli'. Nucleotide record: NC_000913.3. Verify the record matches y\u2026 (151 chars)"
-  }
-  Gemini: The DNA sequence for the `recA` gene in *Escherichia coli* (NCBI Gene ID: 947170, NC_000913.3) has been retrieved:
-  `ATGGCTATCGACGAAAACAAACAGAAAGCGTTGGCGGCAGCACTGGGCCAGATTGAGAAACAATTTGGTAAAGGCTCCATCATGCGCCTGGGTGAAGACCGTTCCATGGATGTGGAAACCATCTCTACCGGTTCGCTTTCACTGGATATCGCGCTTGGGGCAGGTGGTCTGCCGATGGGCCGTATCGTCGAAATCTACGGACCGGAATCTTCCGGTAAAACCACGCTGACGCTGCAGGTGATCGCCGCAGCGCAGCGTGAAGGTAAAACCTGTGCGTTTATCGATGCTGAACACGCGCTGGACCCAATCTACGCACGTAAACTGGGCGTCGATATCGACAACCTGCTGTGCTCCCAGCCGGACACCGGCGAGCAGGCACTGGAAATCTGTGACGCCCTGGCGCGTTCTGGCGCAGTAGACGTTATCGTCGTTGACTCCGTGGCGGCACTGACGCCGAAAGCGGAAATCGAAGGCGAAATCGGCGACTCTCACATGGGCCTTGCGGCACGTATGATGAGCCAGGCGATGCGTAAGCTGGCGGGTAACCTGAAGCAGTCCAACACGCTGCTGATCTTCATCAACCAGATCCGTATGAAAATTGGTGTGATGTTCGGTAACCCGGAAACCACTACCGGTGGTAACGCGCTGAAATTCTACGCCTCTGTTCGTCTCGACATCCGTCGTATCGGCGCGGTGAAAGAGGGCGAAAACGTGGTGGGTAGCGAAACCCGCGTGAAAGTGGTGAAGAACAAAATCGCTGCGCCGTTTAAACAGGCTGAATTCCAGATCCTCTACGGCGAAGGTATCAACTTCTACGGCGAACTGGTTGACCTGGGCGTAAAAGAGAAGCTGATCGAGAAAGCAGGCGCGTGGTACAGCTACAAAGGTGAGAAGATCGGTCAGGGTAAAGCGAATGCGACTGCCTGGCTGAAAGATAACCCGGAAACCGCGAAAGAGATCGAGAAGAAAGTACGTGAGTTGCTGCTGAGCAACCCGAACTCAACGCCGGATTTCTCTGTAGATGATAGCGAAGGCGTAGCAGAAACTAACGAAGATTTTTAA`
+  You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
+
+[Tool call] → crispr_fetch_target_sequence
+{
+  "organism": "Caenorhabditis elegans",
+  "query": "sma-2"
+}
+[Tool result] ← crispr_fetch_target_sequence:
+{
+  "sequence": "GGACACAAGTTGACTGTCGCCGGGTGGAAACACATCTGTGAAGATGATTGCACAATTTGGAGAGACGGAGAGTTGAAAACAATGAGTAGACAGTTAGACGGTTGATGATGGGCTGGTGAA\u2026 (7410 chars)",
+  "source": "ncbi",
+  "resource": "sma-2",
+  "organism": "Caenorhabditis elegans",
+  "target_type": "genomic_locus",
+  "ncbi_gene_id": "176229",
+  "ncbi_accession": "NC_003281.10",
+  "length": 7410,
+  "note": "Fetched genomic locus from NCBI Entrez: gene 'sma-2' in 'Caenorhabditis elegans'. Nucleotide record: NC_003281.10. Verif\u2026 (173 chars)"
+}
+
+[Tool call] → crispr_fetch_target_sequence
+{
+  "organism": "Caenorhabditis elegans",
+  "query": "sma-3"
+}
+[Tool result] ← crispr_fetch_target_sequence:
+{
+  "sequence": "TCAAAATGAACGGATTACTGCATATGCATGGTCCAGCTGTCAAAAAGCTTTTAGGTTGGAAAATTGGAGAAGACGAAGAAAAATGGTGTGAGAAGGCTGTTGAGGCATTGGTGAAAAAAT\u2026 (2995 chars)",
+  "source": "ncbi",
+  "resource": "sma-3",
+  "organism": "Caenorhabditis elegans",
+  "target_type": "genomic_locus",
+  "ncbi_gene_id": "175955",
+  "ncbi_accession": "NC_003281.10",
+  "length": 2995,
+  "note": "Fetched genomic locus from NCBI Entrez: gene 'sma-3' in 'Caenorhabditis elegans'. Nucleotide record: NC_003281.10. Verif\u2026 (173 chars)"
+}
+
+[Tool call] → crispr_fetch_target_sequence
+{
+  "query": "sma-4",
+  "organism": "Caenorhabditis elegans"
+}
+[Tool result] ← crispr_fetch_target_sequence:
+{
+  "sequence": "TTCTCGAAAAACGTCTGAATTGGTCGAATAATGTTTCATCCAGGTATGACATCTCAGCCGTCTACTTCTAACCAAATGTATTATGATCCTTTGTATGGAGCAGAGCAAATTGTACAGGTG\u2026 (3966 chars)",
+  "source": "ncbi",
+  "resource": "sma-4",
+  "organism": "Caenorhabditis elegans",
+  "target_type": "genomic_locus",
+  "ncbi_gene_id": "175815",
+  "ncbi_accession": "NC_003281.10",
+  "length": 3966,
+  "note": "Fetched genomic locus from NCBI Entrez: gene 'sma-4' in 'Caenorhabditis elegans'. Nucleotide record: NC_003281.10. Verif\u2026 (173 chars)"
+}
+
+Gemini: I have fetched the genomic locus sequences for your target genes in *C. elegans*: **sma-2**, **sma-3**, and **sma-4**.
+
+I am ready to help you proceed with the CRISPR design workflow for these targets. Because you have multiple target genes, I will follow the multi-target workflow:
+
+1.  **System Selection**: I will run the `crispr_cas_selector` on each sequence to determine the recommended nuclease (Cas9 vs. Cas12a).
+2.  **Guide Design**: I will proceed with guide design based on that recommendation.
+3.  **Aggregation**: I will then aggregate these results to provide a unified strategy.
   ```
   </details>
+
+Future work: 
+I want this to be replaced with Karina's script for gene_sequence_lookup_tool and gene_locus_**. The only difference is that my fetch target sequence is more strict and raises an error before returning the wrong gene. Her code can deduce more information though. 
 
 - Citations: 
   - National Center for Biotechnology Information. n.d. "Entrez Programming Utilities Help (E-utilities)." U.S National Library of Medicine. https://www.ncbi.nlm.nih.gov/books/NBK25501/.

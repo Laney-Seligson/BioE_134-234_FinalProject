@@ -1,9 +1,9 @@
 {
   "id": "org.bioe234.function.crispr.fetch_target_sequence.v1",
   "name": "Fetch Target Sequence",
-  "description": "Resolves a gene name, local resource name, or raw DNA sequence into a clean DNA string ready for guide design. Resolution order: (1) raw DNA string — returned as-is; (2) local MCP resource name (e.g. 'ecoli_rpsl', 'pBR322') — read from bundled file; (3) gene name + organism — fetched live from NCBI Entrez. Use this tool at the start of any workflow where you have a gene name but not yet a sequence.",
+  "description": "Resolves a gene name, local resource name, or raw DNA sequence into a clean DNA string. Use this as the first step whenever a user asks to fetch, retrieve, or look up a gene sequence for CRISPR or any downstream analysis. Supports two target types: 'genomic_locus' (full chromosomal gene region, default) and 'cds' (annotated coding sequence only). Resolution order: (1) raw DNA string — returned as-is; (2) local MCP resource name (e.g. 'ecoli_rpsl', 'pBR322') — read from bundled file; (3) gene name + organism — fetched live from NCBI Entrez using the selected target_type.",
   "type": "function",
-  "keywords": ["NCBI", "Entrez", "gene", "sequence", "fetch", "target", "FASTA", "DNA", "resource"],
+  "keywords": ["NCBI", "Entrez", "gene", "sequence", "fetch", "retrieve", "target", "FASTA", "DNA", "resource", "CDS", "locus", "coding sequence"],
   "date_created": null,
   "date_last_modified": null,
 
@@ -11,34 +11,43 @@
     {
       "name": "query",
       "type": "string",
-      "description": "A raw DNA sequence (A/T/G/C only), a local resource name (e.g. 'ecoli_rpsl', 'pBR322'), or a gene name (e.g. 'rpsL', 'lacZ', 'recA'). The tool resolves whichever form is provided."
+      "description": "A raw DNA sequence (A/T/G/C only), a local resource name (e.g. 'ecoli_rpsl', 'pBR322'), or a gene name (e.g. 'rpsL', 'lacZ', 'ced-3'). The tool resolves whichever form is provided."
     },
     {
       "name": "organism",
       "type": "string",
-      "description": "Organism for NCBI gene search. Only used when query is a gene name. Default: 'Escherichia coli'. Examples: 'Homo sapiens', 'Mus musculus', 'Danio rerio'."
+      "description": "Organism for NCBI gene search. Only used when query is a gene name. Default: 'Escherichia coli'. Examples: 'Homo sapiens', 'Caenorhabditis elegans', 'Danio rerio'."
+    },
+    {
+      "name": "target_type",
+      "type": "string",
+      "description": "Which sequence to fetch for gene-name queries. 'genomic_locus' (default) returns the full chromosomal gene region including introns and flanking sequence — recommended for most CRISPR experiments. 'cds' returns only the annotated coding sequence from the top RefSeq mRNA record — use when targeting transcribed exons specifically."
     }
   ],
 
   "outputs": [
     {
       "type": "object",
-      "description": "A dictionary with: sequence (clean uppercase DNA string), source ('raw_input' | 'local_resource' | 'ncbi'), resource (resource key or gene name used), organism (organism queried), length (int, bp), note (provenance note). NCBI results also include ncbi_gene_id and ncbi_accession."
+      "description": "A dictionary with: sequence (clean uppercase DNA string), source ('raw_input' | 'local_resource' | 'ncbi'), resource (resource key or gene name used), organism (organism queried), target_type ('genomic_locus' | 'cds'), length (int, bp), note (provenance note). NCBI results also include ncbi_gene_id and ncbi_accession. CDS results also include product."
     }
   ],
 
   "examples": [
     {
+      "input":  { "query": "ced-3", "organism": "Caenorhabditis elegans", "target_type": "genomic_locus" },
+      "output": { "result": { "source": "ncbi", "target_type": "genomic_locus", "organism": "Caenorhabditis elegans" } }
+    },
+    {
+      "input":  { "query": "ced-3", "organism": "Caenorhabditis elegans", "target_type": "cds" },
+      "output": { "result": { "source": "ncbi", "target_type": "cds", "organism": "Caenorhabditis elegans" } }
+    },
+    {
       "input":  { "query": "ecoli_rpsl" },
       "output": { "result": { "source": "local_resource", "resource": "ecoli_rpsl", "length": 377 } }
     },
     {
-      "input":  { "query": "rpsL", "organism": "Escherichia coli" },
+      "input":  { "query": "rpsL", "organism": "Escherichia coli", "target_type": "genomic_locus" },
       "output": { "result": { "source": "ncbi", "resource": "rpsL", "organism": "Escherichia coli" } }
-    },
-    {
-      "input":  { "query": "lacZ", "organism": "Escherichia coli" },
-      "output": { "result": { "source": "ncbi", "resource": "lacZ", "organism": "Escherichia coli" } }
     },
     {
       "input":  { "query": "ATGCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGG" },

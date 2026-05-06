@@ -313,8 +313,9 @@ class PredictOfftargets:
 
         if not offtarget_sites:
             specificity_summary = (
-                f"No off-target sites found within {max_mismatches} mismatches "
-                f"({nuclease.upper()}), the guide appears highly specific for this reference."
+                f"No off-target sites detected within {max_mismatches} mismatches "
+                f"in the searched reference ({nuclease.upper()}). "
+                "Genome-wide specificity has not been assessed."
             )
         elif high_risk_count == 1 and offtarget_sites[0]["mismatches"] == 0:
             specificity_summary = (

@@ -16,7 +16,7 @@
     {
       "name": "reference",
       "type": "string",
-      "description": "Genome or plasmid sequence to scan for off-targets. Accepts a resource name, raw sequence, FASTA, or GenBank."
+      "description": "Genome or plasmid sequence to scan for off-targets. Must be an actual DNA/RNA sequence string, FASTA, GenBank, or a registered resource name. Do not pass a gene symbol or accession number."
     },
     {
       "name": "nuclease",
@@ -67,7 +67,6 @@
     "execution": "run",
     "disposal": null,
 
-    "mcp_name": "crispr_rank_guides",
-    "seq_params": ["reference"]
+    "mcp_name": "crispr_rank_guides"
   }
 }

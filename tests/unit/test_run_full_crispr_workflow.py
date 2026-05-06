@@ -41,7 +41,7 @@ def test_ranked_guides_present_in_output(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="ptargetf", confirmed=True)
     assert "guides" in result
     assert isinstance(result["guides"], list)
     assert len(result["guides"]) > 0
@@ -52,7 +52,7 @@ def test_each_guide_has_efficiency_score(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="ptargetf", confirmed=True)
     for guide in result["guides"]:
         assert "efficiency_score" in guide
         assert "specificity_score" in guide
@@ -64,7 +64,7 @@ def test_each_guide_has_efficiency_details(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="ptargetf", confirmed=True)
     for guide in result["guides"]:
         assert "efficiency_details" in guide
         assert "specificity_details" in guide
@@ -75,7 +75,7 @@ def test_scoring_rationale_present(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="ptargetf", confirmed=True)
     assert "scoring_rationale" in result
     assert isinstance(result["scoring_rationale"], str)
     assert len(result["scoring_rationale"]) > 0
@@ -86,7 +86,7 @@ def test_guides_sorted_best_first(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="ptargetf", confirmed=True)
     scores = [g["total_score"] for g in result["guides"]]
     assert scores == sorted(scores, reverse=True)
 
@@ -96,7 +96,7 @@ def test_selected_guide_is_top_ranked(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf", confirmed=True)
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="ptargetf", confirmed=True)
     assert result["selected_guide"]["protospacer"] == result["guides"][0]["protospacer"]
 
 
@@ -105,15 +105,66 @@ def test_empty_query_raises(workflow):
         workflow.run(query="", vector="ptargetf")
 
 
+def test_gene_symbol_without_organism_asks_for_organism(workflow):
+    result = workflow.run(query="CFTR", vector="px330", confirmed=True)
+    assert result["status"] == "needs_user_input"
+    assert "organism" in result["missing_fields"]
+    assert result["continue_with"]["organism"] == "<selected_organism>"
+    assert result["workflow_trace"] == []
+
+
+def test_upstream_selected_gene_requires_explicit_gene_confirmation(workflow):
+    result = workflow.run(
+        query="EGFR",
+        organism="Homo sapiens",
+        vector="px330",
+        source_query="genes in Homo sapiens associated with lung cancer",
+        confirmed=True,
+    )
+    assert result["status"] == "needs_user_input"
+    assert "gene_confirmed" in result["missing_fields"]
+    assert result["continue_with"]["query"] == "EGFR"
+    assert result["continue_with"]["source_query"] == (
+        "genes in Homo sapiens associated with lung cancer"
+    )
+    assert result["continue_with"]["gene_confirmed"] is True
+    assert result["workflow_trace"] == []
+
+
+def test_upstream_selected_gene_confirmation_then_continues(workflow, monkeypatch):
+    monkeypatch.setattr(
+        workflow.sequence_fetcher, "run",
+        lambda query, organism="Homo sapiens": {
+            **FAKE_SEQUENCE_INFO,
+            "resource": query,
+            "organism": organism,
+        },
+    )
+    result = workflow.run(
+        query="EGFR",
+        organism="Homo sapiens",
+        vector="",
+        source_query="genes in Homo sapiens associated with lung cancer",
+        gene_confirmed=True,
+    )
+    assert result["status"] == "needs_user_input"
+    assert "vector" in result["missing_fields"]
+    assert "cas_recommendation" in result
+    assert result["continue_with"]["query"] == "EGFR"
+    assert result["continue_with"]["gene_confirmed"] is True
+    assert any(step["tool"] == "crispr_cas_selector" for step in result["workflow_trace"])
+
+
 def test_missing_vector_returns_needs_user_input(workflow, monkeypatch):
     monkeypatch.setattr(
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="")
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="")
     assert result["status"] == "needs_user_input"
     assert "vector" in result["missing_fields"]
     assert "cas_recommendation" in result
+    assert result["continue_with"]["organism"] == "Escherichia coli"
     assert any(step["tool"] == "crispr_cas_selector" for step in result["workflow_trace"])
 
 
@@ -143,10 +194,11 @@ def test_confirmation_gate_happens_after_cas_selection(workflow, monkeypatch):
         workflow.sequence_fetcher, "run",
         lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
     )
-    result = workflow.run(query="lacZ", vector="ptargetf")
+    result = workflow.run(query="lacZ", organism="Escherichia coli", vector="ptargetf")
     assert result["status"] == "needs_user_input"
     assert "confirmed" in result["missing_fields"]
     assert "cas_recommendation" in result
     assert "recommended_system" in result
+    assert result["continue_with"]["organism"] == "Escherichia coli"
     assert any(step["tool"] == "crispr_cas_selector" for step in result["workflow_trace"])
     assert "guides" not in result

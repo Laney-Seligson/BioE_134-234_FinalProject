@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
+
+from modules.seq_basics._plumbing.resolve import list_resources
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +119,7 @@ _CAENORHABDITIS_KEYWORDS = {
     "caenorhabditis", "caenorhabditis elegans", "c. elegans", "celegans",
     "nematode", "worm",
 }
+_VALID_DNA = set("ATGC")
 
 
 def _classify_organism(organism: str) -> str:
@@ -132,7 +136,22 @@ def _classify_organism(organism: str) -> str:
         return "caenorhabditis"
     if any(kw in o for kw in _MAMMALIAN_KEYWORDS):
         return "mammalian"
-    return "mammalian"  # default fallback for unlisted organisms
+    return "mammalian"  # default fallback for unlisted organisms, just because the vector px330 is super common 
+
+
+def _looks_like_raw_dna(query: str) -> bool:
+    cleaned = "".join(query.split()).upper()
+    return bool(cleaned) and len(cleaned) >= 10 and set(cleaned) <= _VALID_DNA
+
+
+def _matches_local_resource(query: str) -> bool:
+    resources = list_resources()
+    q = query.strip().lower()
+    return any(key.lower() == q or Path(key).stem.lower() == q for key in resources)
+
+
+def _normalize_query_label(value: str) -> str:
+    return " ".join(value.strip().lower().split())
 
 from modules.construction_file_tools.tools.create_construction_file import CreateConstructionFile
 from modules.construction_file_tools.tools.validate_construction_file import ValidateConstructionFile
@@ -180,12 +199,16 @@ class RunFullCrisprWorkflow:
 
     Input:
         query (str): Gene name, local resource key, or raw DNA sequence.
-        organism (str): Target organism. Default: "Escherichia coli".
+        organism (str): Target organism. Required for gene-symbol queries.
         vector (str): Cloning vector key (e.g. "px330"). Prompted if absent.
         construct_name (str): Optional name for the output construct.
         guide_index (int): Rank index of guide to use. Default: 0.
         validate_strict (bool): Strict validation mode. Default: False.
         force_vector (bool): Skip Cas-system compatibility check. Default: False.
+        source_query (str): Optional original natural-language query that led
+            an upstream gene-search tool to select query.
+        gene_confirmed (bool): True only after the user explicitly confirms an
+            upstream-selected gene target.
 
     Output:
         dict: status="ready" with sequence_info, guides, selected_guide,
@@ -231,13 +254,15 @@ class RunFullCrisprWorkflow:
     def run(
         self,
         query: str,
-        organism: str = "Escherichia coli",
+        organism: str = "",
         vector: str = "",
         construct_name: Optional[str] = None,
         guide_index: int = 0,
         validate_strict: bool = False,
         force_vector: bool = False,
         confirmed: bool = False,
+        source_query: str = "",
+        gene_confirmed: bool = False,
     ) -> dict:
         workflow_trace: list[dict] = []
 
@@ -255,6 +280,66 @@ class RunFullCrisprWorkflow:
             raise ValueError("query must not be empty.")
         if not isinstance(guide_index, int) or guide_index < 0:
             raise ValueError("guide_index must be a non-negative integer.")
+        derived_from_upstream_search = (
+            bool(source_query and source_query.strip())
+            and _normalize_query_label(source_query) != _normalize_query_label(query)
+            and not _looks_like_raw_dna(query)
+            and not _matches_local_resource(query)
+        )
+        if derived_from_upstream_search and not gene_confirmed:
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["gene_confirmed"],
+                "query": query,
+                "source_query": source_query,
+                "organism": organism,
+                "questions": [
+                    (
+                        f"The upstream gene search selected '{query}' from the broader request "
+                        f"'{source_query}'. Is '{query}' the gene you want to target?"
+                    )
+                ],
+                "options": [
+                    f"Yes, target {query}",
+                    "No, show or choose a different gene",
+                ],
+                "continue_with": {
+                    "query": query,
+                    "organism": organism,
+                    "vector": vector or "<selected_vector>",
+                    "confirmed": confirmed,
+                    "source_query": source_query,
+                    "gene_confirmed": True,
+                },
+                "notes": (
+                    "This confirmation applies to any gene chosen from an upstream "
+                    "disease, phenotype, pathway, ontology, or multi-gene lookup. "
+                    "It is not specific to any one disease or organism."
+                ),
+                "workflow_trace": workflow_trace,
+            }
+        if not organism.strip() and not _looks_like_raw_dna(query) and not _matches_local_resource(query):
+            return {
+                "status": "needs_user_input",
+                "missing_fields": ["organism"],
+                "query": query,
+                "questions": [
+                    f"Which organism should I use to fetch the gene sequence for '{query}'?"
+                ],
+                "notes": (
+                    "Gene-symbol queries require an explicit organism so the workflow "
+                    "does not silently default to the wrong species."
+                ),
+                "continue_with": {
+                    "query": query,
+                    "organism": "<selected_organism>",
+                    "vector": vector,
+                    "confirmed": confirmed,
+                    "source_query": source_query,
+                    "gene_confirmed": gene_confirmed,
+                },
+                "workflow_trace": workflow_trace,
+            }
 
         sequence_info = self.sequence_fetcher.run(query=query, organism=organism)
         add_trace(
@@ -306,9 +391,17 @@ class RunFullCrisprWorkflow:
                 "recommended_system": recommended_system,
                 "questions": [
                     f"The sequence-based Cas selector recommends {recommended_system}. "
-                    f"Which vector would you like to use for {organism}? "
+                    f"Which vector would you like to use for {organism or 'this target'}? "
                     f"See vector_recommendations for organism-appropriate options."
                 ],
+                "continue_with": {
+                    "query": query,
+                    "organism": organism,
+                    "vector": "<selected_vector>",
+                    "confirmed": True,
+                    "source_query": source_query,
+                    **({"gene_confirmed": True} if gene_confirmed else {}),
+                },
                 "vector_recommendations": recs,
                 "workflow_trace": workflow_trace,
             }
@@ -339,6 +432,15 @@ class RunFullCrisprWorkflow:
                     f"Yes, continue with {spec.name} ({vector_system})",
                     f"No, switch to a {recommended_system}-compatible vector"
                 ],
+                "continue_with": {
+                    "query": query,
+                    "organism": organism,
+                    "vector": vector,
+                    "confirmed": True,
+                    "force_vector": True,
+                    "source_query": source_query,
+                    **({"gene_confirmed": True} if gene_confirmed else {}),
+                },
                 "workflow_trace": workflow_trace,
             }
 
@@ -367,9 +469,17 @@ class RunFullCrisprWorkflow:
                     "Yes, continue with confirmed=true",
                     "No, stop here or choose a different vector",
                 ],
+                "continue_with": {
+                    "query": query,
+                    "organism": organism,
+                    "vector": vector,
+                    "confirmed": True,
+                    "source_query": source_query,
+                    **({"gene_confirmed": True} if gene_confirmed else {}),
+                },
                 "workflow_trace": workflow_trace,
             }
-                    
+
         if spec.nuclease_system == "SpCas9":
             guides = self.cas9_designer.run(seq)
             guide_tool = "crispr_design_cas9_grna"
@@ -473,6 +583,7 @@ class RunFullCrisprWorkflow:
             },
         )
 
+        ref_len = sequence_info.get("length", "unknown")
         return {
             "status": "ready",
             "workflow_trace": workflow_trace,
@@ -485,6 +596,16 @@ class RunFullCrisprWorkflow:
             "construction_file_inputs": construction_inputs,
             "construction": construction,
             "validation": validation,
+            "disclaimers": [
+                "This tool designs a guide RNA cloning workflow, not a therapeutic plan. "
+                "Clinical or translational use requires additional safety, delivery, and regulatory considerations.",
+                "Guide selection is based on efficiency and off-target scoring within the fetched reference only. "
+                "For disease-specific applications (e.g. correcting a pathogenic variant), "
+                "guides should be designed to target the specific mutation site.",
+                f"Off-target prediction was performed against the fetched reference ({ref_len} bp). "
+                "Genome-wide off-target analysis is not implemented; "
+                "use a genome-wide tool (e.g. CRISPOR, Cas-OFFinder) before experimental use.",
+            ],
         }
 
 

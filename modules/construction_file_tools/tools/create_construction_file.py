@@ -1179,8 +1179,8 @@ class CreateConstructionFile:
             elif step_type == "TypeIISOligoCloning":
                 lines.append(
                     f"{'TypeIIS':<14}"
-                    f"{inputs[0] if len(inputs) > 0 else '':<14}"
-                    f"{inputs[1] if len(inputs) > 1 else '':<14}"
+                    f"{inputs[0] if len(inputs) > 0 else '':<24}"
+                    f"{inputs[1] if len(inputs) > 1 else '':<24}"
                     f"{inputs[2] if len(inputs) > 2 else '':<18}"
                     f"{parameters.get('enzyme', ''):<10}"
                     f"{output}"
@@ -1198,8 +1198,8 @@ class CreateConstructionFile:
             elif step_type == "Transform":
                 lines.append(
                     f"{'Transform':<14}"
-                    f"{inputs[0] if inputs else '':<22}"
-                    f"{parameters.get('cells', ''):<12}"
+                    f"{inputs[0] if inputs else '':<26}"
+                    f"{parameters.get('cells', ''):<16}"
                     f"{parameters.get('selection', ''):<10}"
                     f"{str(parameters.get('temperature_c', '')):<8}"
                     f"{output}"

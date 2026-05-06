@@ -1,7 +1,7 @@
 {
   "id": "org.bioe234.function.crispr.run_full_crispr_workflow.v1",
   "name": "Run Full CRISPR Workflow",
-  "description": "Runs a full CRISPR workflow for the explicit query provided: resolves a target sequence from raw DNA, local resource, or gene name plus organism; runs Cas-system selection; designs guides for the selected vector's nuclease system; selects one protospacer; designs cloning oligos for a chosen vector; creates a sequence_build construction file; and validates the resulting construction inputs. Do not infer or silently choose a gene from prior multi-gene results. If multiple genes were returned upstream, ask which gene to use or call this workflow separately for each requested gene.",
+  "description": "Runs a full CRISPR workflow for the explicit query provided: resolves a target sequence from raw DNA, local resource, or gene name plus organism; runs Cas-system selection; designs guides for the selected vector's nuclease system; selects one protospacer; designs cloning oligos for a chosen vector; creates a sequence_build construction file; and validates the resulting construction inputs. Do not infer or silently choose a gene from prior disease, phenotype, pathway, ontology, or multi-gene results. If a gene was selected by an upstream search, pass the original request as source_query; the tool will ask the user to confirm the selected gene unless gene_confirmed=true.",
   "type": "function",
   "keywords": [
     "CRISPR",
@@ -23,7 +23,7 @@
     {
       "name": "organism",
       "type": "string",
-      "description": "Organism name used when query must be fetched from NCBI. Default: Escherichia coli."
+      "description": "Organism name used when query must be fetched from NCBI. Required for gene-symbol queries; raw DNA and local resources do not require it."
     },
     {
       "name": "vector",
@@ -54,6 +54,16 @@
       "name": "confirmed",
       "type": "boolean",
       "description": "If true, continue after sequence fetch, Cas-system selection, vector compatibility check, and the user confirmation step. Default: false."
+    },
+    {
+      "name": "source_query",
+      "type": "string",
+      "description": "Optional original natural-language disease, phenotype, pathway, ontology, or multi-gene request that led an upstream tool to select query. If supplied and different from query, the workflow pauses for gene confirmation before fetching sequence."
+    },
+    {
+      "name": "gene_confirmed",
+      "type": "boolean",
+      "description": "Set true only after the user explicitly confirms that the upstream-selected query gene is the desired target. Direct user-provided gene names do not require this field."
     }
   ],
   "outputs": [
@@ -87,6 +97,18 @@
         "cloning": { "top_oligo": "...", "bottom_oligo": "..." }
       },
       "notes": "For multi-gene upstream results, run once per selected gene or ask the user which gene to use."
+    },
+    {
+      "input": {
+        "query": "EGFR",
+        "organism": "Homo sapiens",
+        "source_query": "genes in Homo sapiens associated with lung cancer"
+      },
+      "output": {
+        "status": "needs_user_input",
+        "missing_fields": ["gene_confirmed"]
+      },
+      "notes": "Use source_query for any gene selected from an upstream disease, phenotype, pathway, ontology, or gene-list search, even if only one candidate gene was returned."
     }
   ],
   "execution_details": {

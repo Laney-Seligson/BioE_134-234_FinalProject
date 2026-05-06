@@ -89,6 +89,13 @@ class TestOrganismCompatibility:
         r = design_cloning_oligos(vector="px330", protospacer=PROTOSPACER)
         assert r.get("status") != "needs_user_input" or "vector" not in r.get("missing_fields", [])
 
+    def test_px330_uses_real_backbone_sequence(self):
+        r = design_cloning_oligos(vector="px330", protospacer=PROTOSPACER)
+        inputs = r["construction_file_inputs"]
+        assert inputs["backbone_name"] == "px330"
+        assert inputs["backbone_sequence"] != "N"
+        assert len(inputs["backbone_sequence"]) == 8484
+
 
 # ---------------------------------------------------------------------------
 # Auto-cassette assembly (pTargetF RestrictionLigation)

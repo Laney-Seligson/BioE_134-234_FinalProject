@@ -79,10 +79,12 @@ The client is ready and you can start entering prompts.
   - design cloning oligos 
   - build and validate construction file using Laney’s Scripts 
   - **confirmation gate:** after fetching the target sequence and running `cas_selector`, returns `needs_user_input` so the user can review the sequence-based nuclease recommendation and chosen vector before guide design / cloning / validation — pass `confirmed=True` to proceed
+  - **organism safety:** gene-symbol queries require an explicit organism; the workflow no longer silently defaults a confirmation call to *E. coli* if the user previously selected a human/worm/etc. target
+  - **upstream gene-selection safety:** if a gene was selected from a broader disease, phenotype, pathway, ontology, or multi-gene lookup, pass the original request as `source_query`; the workflow returns `needs_user_input` for `gene_confirmed` before sequence fetch. This applies even when the upstream lookup found only one candidate gene, so it is a general guard rather than a cystic-fibrosis-specific rule.
   - **multi-gene disambiguation:** requires using the explicit query provided; if multiple genes were returned upstream it asks which gene to use (or runs separately for each) rather than silently choosing one. The ADE2-biased example in the JSON wrapper was replaced with `GENE_SYMBOL_SELECTED_BY_USER`.
 
 - MCP Wrapper: `run_full_crispr_workflow.json`
-- Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, workflow confirmation gate, empty query error, per-guide score fields
+- Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
 
 <b>2. fetch_target_sequence</b>
@@ -761,8 +763,9 @@ The client is ready and you can start entering prompts.
     - TypeIIS (BbsI / BsmBI / BsaI annealed-oligo sticky-end ligation)
     - RestrictionLigation
     - Gibson
-    - Golden Gate cloning 
+  - Golden Gate cloning 
   - **Addgene API fallback:** preset vectors are handled locally; if `vector` is a numeric Addgene plasmid ID (e.g. `"42230"` or `"addgene:67639"`), the tool attempts to fetch plasmid metadata from the Addgene Developers API. Requires `ADDGENE_API_KEY` in `.env`. Dynamic results include citations in the same `{ "label", "reference", "claim" }` format as other tools. If no API key is available, use a preset vector or `vector="custom"`. This feature does not have and will not have its own JSON wrapper — it is handled entirely within `design_cloning_oligos`.
+  - **pX330 backbone:** `px330` now uses a local 8484 bp GenBank backbone resource instead of the previous `"N"` placeholder. Addgene #42230 is cited for the plasmid record and NovoPro V005940 is cited as the public GenBank sequence source.
   - if organism/vector info is missing → returns `needs_user_input` with human-readable questions instead of an error
 
 - MCP Wrapper: `design_cloning_oligos.json`
@@ -793,7 +796,12 @@ The client is ready and you can start entering prompts.
       {
         "label": "Addgene #42230",
         "reference": "https://www.addgene.org/42230/",
-        "claim": "pX330 plasmid repository record"
+        "claim": "pX330 plasmid repository record: pUC ori backbone; Ampicillin 100 ug/mL; Stbl3; 37C; high copy"
+      },
+      {
+        "label": "NovoPro V005940 GenBank map",
+        "reference": "https://www.novoprolabs.com/vector/Vgy3dima",
+        "claim": "Public 8484 bp pX330-U6-Chimeric_BB-CBh-hSpCas9 GenBank sequence used as local backbone resource"
       },
       {
         "label": "Ran et al. Nat Protoc 2013",
@@ -813,8 +821,8 @@ The client is ready and you can start entering prompts.
       "construct_name": "px330_araB_edit",
       "cloning_method": "TypeIISOligoCloning",
       "assembly_strategy": "TypeIISOligoCloning",
-      "backbone_name": "pX330",
-      "backbone_sequence": "N",
+      "backbone_name": "px330",
+      "backbone_sequence": "GAGGGCCTATTTCCCATGATTCCTTCATATTTGCATATACGATACAAGGCTGTTAGAGAGATAATTGGAATTAATTTGACTGTAAAC... (8484 bp)",
       "insert_name": "px330_annealed_guide_insert",
       "insert_sequence": "GCAGTGATTCTGTGCGAGCTTTG",
       "insert_forward_primer_name": "",
@@ -864,6 +872,10 @@ The client is ready and you can start entering prompts.
   - Engler, Carola, Ramona Kandzia, and Sylvestre Marillonnet. 2008. "A One Pot, One Step, Precision Cloning Method with High Throughput Capability." PLOS ONE 3 (11): e3647. https://doi.org/10.1371/journal.pone.0003647.
 
   - Laughery, Marian F., Taylor Hunter, Angela Brown, Jake Hoopes, Tiffany Ostbye, Trevor Shumaker, and John J. Wyrick. 2015. "New Vectors for Simple and Streamlined CRISPR-Cas9 Editing in *Saccharomyces cerevisiae*." Yeast 32 (12): 711–720. https://doi.org/10.1002/yea.3098.
+
+  - Addgene. "pX330-U6-Chimeric_BB-CBh-hSpCas9 (Plasmid #42230)." https://www.addgene.org/42230/
+
+  - NovoPro Bioscience. "pX330-U6-Chimeric_BB-CBh-hSpCas9 vector (Cat. No. V005940)." https://www.novoprolabs.com/vector/Vgy3dima
 </div>
 
 ### Laney:

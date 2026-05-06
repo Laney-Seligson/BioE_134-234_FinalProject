@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-
+from modules.seq_basics._plumbing.resolve import resolve_to_seq
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.citations import cites, format_citations
 
@@ -170,6 +170,17 @@ class RankGuides:
             raise ValueError("guides must not be empty.")
         if not reference or not reference.strip():
             raise ValueError("reference must not be empty.")
+
+        try:
+            reference = resolve_to_seq(reference)
+        except ValueError as e:
+            return {
+                "error": (
+                    f"Could not resolve 'reference' to a DNA sequence: {e}. "
+                    "Pass the actual DNA/RNA sequence, a FASTA string, a GenBank string, "
+                    "or a registered resource name — not a gene symbol or accession number."
+                )
+            }
 
         # Accept either a list of dicts (from design tools) or a list of plain strings
         guides = [{"protospacer": g} if isinstance(g, str) else g for g in guides]

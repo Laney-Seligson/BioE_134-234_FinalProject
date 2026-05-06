@@ -115,6 +115,11 @@ class VectorSpec:
 # ---------------------------------------------------------------------------
 
 BACKBONE_RESOURCES: dict[str, Path] = {
+    # pX330 sequence source: NovoPro pX330-U6-Chimeric_BB-CBh-hSpCas9
+    # GenBank Map (.gb), 8484 bp, Cat. No. V005940.
+    # Plasmid identity and wet-lab metadata are cross-checked against
+    # Addgene plasmid #42230 (pX330-U6-Chimeric_BB-CBh-hSpCas9).
+    "px330":         BUNDLED_DATA_DIR / "pX330-U6-Chimeric_BB-CBh-hSpCas9.gb",
     "pET28a":        BUNDLED_DATA_DIR / "pET28a.gb",
     "pBR322":        BUNDLED_DATA_DIR / "pBR322.gb",
     "pCRISPR_rpsL":  BUNDLED_DATA_DIR / "pCRISPR_rpsL.gbk",
@@ -146,12 +151,17 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         top_overhang="CACC",
         bottom_overhang="AAAC",
         u6_prefers_5prime_g=True,
+        backbone_resource="px330",
         cell_strain="Any mammalian",
         selection="Amp",
         notes=(
             "All-in-one SpCas9 + sgRNA vector.  BbsI digest leaves CACC/AAAC "
             "overhangs.  5′G is prepended when absent because U6 transcription "
-            "efficiency is higher when the +1 position is a guanosine."
+            "efficiency is higher when the +1 position is a guanosine. Addgene "
+            "#42230 lists pX330 as a mammalian CRISPR plasmid with pUC ori "
+            "backbone, Ampicillin resistance, Stbl3 growth at 37°C, and high "
+            "copy number. The local backbone sequence is the public NovoPro "
+            "GenBank map for pX330-U6-Chimeric_BB-CBh-hSpCas9."
         ),
         citations=(
             Citation("Cong et al. Science 2013",
@@ -162,7 +172,10 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
                      "BbsI CACC/AAAC annealed-oligo cloning protocol"),
             Citation("Addgene #42230",
                      "https://www.addgene.org/42230/",
-                     "pX330 plasmid repository record"),
+                     "pX330 plasmid repository record: pUC ori backbone; Ampicillin 100 μg/mL; Stbl3; 37°C; high copy"),
+            Citation("NovoPro V005940 GenBank map",
+                     "https://www.novoprolabs.com/vector/Vgy3dima",
+                     "Public 8484 bp pX330-U6-Chimeric_BB-CBh-hSpCas9 GenBank sequence used as local backbone resource"),
         ),
     ),
 
@@ -877,6 +890,7 @@ _ORGANISM_COMPAT: dict[str, list[str]] = {
 
 _COMPLEMENT: dict[str, str] = {"A": "T", "T": "A", "G": "C", "C": "G"}
 _YEAST_BCLI_SWAI_SGRNA_PREFIX = "GTTTTAGAGCTAG"
+_IUPAC_AMBIGUITY = set("RYSWKMBDHVN")
 
 
 def _validate_dna(seq: str, label: str) -> str:
@@ -889,6 +903,20 @@ def _validate_dna(seq: str, label: str) -> str:
             f"Invalid base(s) in {label}: {invalid}. Only A, T, G, C are accepted."
         )
     return seq
+
+
+def _normalize_resource_dna(seq: str, label: str) -> str:
+    """Normalize backbone resource sequences; ambiguous IUPAC bases become N."""
+    seq = seq.upper().strip()
+    if not seq:
+        raise ValueError(f"{label} must not be empty.")
+    normalized = "".join("N" if base in _IUPAC_AMBIGUITY else base for base in seq)
+    invalid = sorted(set(normalized) - set("ATGCN"))
+    if invalid:
+        raise ValueError(
+            f"Invalid base(s) in {label}: {invalid}. Only A, T, G, C, N and IUPAC ambiguity codes are accepted in backbone resources."
+        )
+    return normalized
 
 
 def _reverse_complement(seq: str) -> str:
@@ -916,7 +944,7 @@ def _read_sequence_file(path: Path) -> str:
             for line in text.splitlines()
             if line.strip() and not line.startswith(">")
         )
-        return _validate_dna(seq, path.name)
+        return _normalize_resource_dna(seq, path.name)
 
     if path.suffix.lower() in {".gb", ".gbk", ".genbank"}:
         in_origin, parts = False, []
@@ -928,7 +956,7 @@ def _read_sequence_file(path: Path) -> str:
                 break
             if in_origin:
                 parts.extend(c for c in line if c.isalpha())
-        return _validate_dna("".join(parts), path.name)
+        return _normalize_resource_dna("".join(parts), path.name)
 
     raise ValueError(f"Unsupported sequence file type: {path.suffix}")
 

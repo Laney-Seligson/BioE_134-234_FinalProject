@@ -84,6 +84,15 @@ For all workflows:
 - insert_name
 - insert_sequence
 
+For TypeIISOligoCloning (BbsI / BsmBI / BsaI annealed-oligo ligation):
+- top_oligo_name
+- top_oligo_sequence
+- bottom_oligo_name       ← REQUIRED — do not omit
+- bottom_oligo_sequence   ← REQUIRED — do not omit
+- enzyme
+
+**When calling `create_construction_file` after `crispr_design_cloning_oligos`:** pass ALL fields from the tool's `construction_file_inputs` dict verbatim — do not reconstruct or cherry-pick individual fields. Missing any field (especially `bottom_oligo_name` / `bottom_oligo_sequence` for TypeIISOligoCloning) will cause a hard error.
+
 For GoldenGate:
 - insert_forward_primer_name
 - insert_forward_primer_sequence

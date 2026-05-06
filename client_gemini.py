@@ -251,7 +251,7 @@ async def _run_tool_loop(
             tool_args = dict(fc.args or {})
  
             print(f"\n[Tool call] → {tool_name}")
-            print(json.dumps(tool_args, indent=2))
+            print(json.dumps(_truncate_for_display(tool_args), indent=2))
  
             try:
                 tool_result = await mcp.call_tool(tool_name, tool_args)

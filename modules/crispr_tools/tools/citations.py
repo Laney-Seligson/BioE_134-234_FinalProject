@@ -4,7 +4,7 @@ Jillian (rank_guides, predict_offtargets, predict_editing_efficiency,
 colony_calculator, interpret_ice_tide, verify_edit).
 
 Matches the Citation/format_citations pattern established in
-design_cloning_oligos.py (Laney's tool) so the citation shape is
+design_cloning_oligos.py so the citation shape is
 consistent across the whole project:
 
     {"label": "...", "reference": "...", "claim": "..."}

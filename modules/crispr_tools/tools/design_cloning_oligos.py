@@ -400,6 +400,11 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         gibson_right_context="GTTTTAGAGCTAGAAATAGCAAGTTAAAAT",
         cell_strain="Any mammalian",
         selection="Amp",
+        # Flanking sequences extracted from the pX330 U6 promoter region (shared
+        # with pX458). Left = 30 bp of U6 immediately before the guide insertion
+        # site; right = 30 bp of chimeric scaffold immediately after.
+        gibson_left_context="ATATATCTTGTGGAAAGGACGAAACACCGG",
+        gibson_right_context="GTTTTAGAGCTAGAAATAGCAAGTTAAAAT",
         notes=(
             "pX458 can accept a guide insert by Gibson assembly if the insert "
             "carries overlaps matching the sequences flanking the linearisation "

@@ -473,14 +473,10 @@ The client is ready and you can start entering prompts.
 - What it does: 
   - Fetch a target sequence from the NCBI GenBank file for the gene chosen 
   - design guide RNA using the first 10 found in the fetched sequence
-  - rank guide RNAs and find the single best one to use out of the 10 
+  - rank guide RNAs with rank_guides, authored by Jillian, and find the single best one to use out of the 10 
   - design cloning oligos 
-  - build and validate construction file using Laney’s Scripts 
-  - **confirmation gate:** after fetching the target sequence and running `cas_selector`, returns `needs_user_input` so the user can review the sequence-based nuclease recommendation and chosen vector before guide design / cloning / validation — pass `confirmed=True` to proceed
-  - **organism safety:** gene-symbol queries require an explicit organism; the workflow no longer silently defaults a confirmation call to *E. coli* if the user previously selected a human/worm/etc. target
-  - **upstream gene-selection safety:** if a gene was selected from a broader disease, phenotype, pathway, ontology, or multi-gene lookup, pass the original request as `source_query`; the workflow returns `needs_user_input` for `gene_confirmed` before sequence fetch. This applies even when the upstream lookup found only one candidate gene, so it is a general guard rather than a cystic-fibrosis-specific rule.
-  - **multi-gene disambiguation:** requires using the explicit query provided; if multiple genes were returned upstream it asks which gene to use (or runs separately for each) rather than silently choosing one. The ADE2-biased example in the JSON wrapper was replaced with `GENE_SYMBOL_SELECTED_BY_USER`.
-
+  - build and validate construction file scripts authored by Laney
+ 
 - MCP Wrapper: `run_full_crispr_workflow.json`
 - Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
@@ -537,9 +533,9 @@ The client is ready and you can start entering prompts.
 
   ```json
   After calling previous tools →
-  [Tool result] ← crispr_rank_guides:
+  [Tool result] ← crispr_design_cas9_grna:
   {
-    "ranked_guides": [
+    "guides": [
       {
         "grna_sequence": "GACCAUGAUUACGGAUUCACGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
         "protospacer": "GACCATGATTACGGATTCAC",
@@ -751,18 +747,6 @@ The client is ready and you can start entering prompts.
       "total_score": 3
     },
     "scoring_rationale": "Best guide 'GACCATGATTACGGATTCAC' scored 3 (efficiency 2, specificity 1). GC content: 45%. Off-target sites: 0 total (0 \u2026 (136 chars)",
-    "citations": [
-      {
-        "label": "Doench et al. 2016, Nat Biotechnol 34:184-191",
-        "reference": "https://doi.org/10.1038/nbt.3437",
-        "claim": "Rule Set 2: position-specific nucleotide weights, GC content optimum 40-65%, NGGT > NGGA PAM context, and CFD off-target\u2026 (147 chars)"
-      },
-      {
-        "label": "Hsu et al. 2013, Nat Biotechnol 31:827-832",
-        "reference": "https://doi.org/10.1038/nbt.2647",
-        "claim": "SpCas9 seed region is positions 1-12 from the PAM-proximal end; mismatches in the seed reduce cutting much more than PAM\u2026 (189 chars)"
-      }
-    ]
   }
   Gemini: I have designed and ranked CRISPR-Cas9 gRNAs targeting the *lacZ* gene in *E. coli*.
   The top-ranked guide is:
@@ -906,33 +890,6 @@ The client is ready and you can start entering prompts.
     "cloning_method": "TypeIISOligoCloning",
     "vector": "pX330",
     "enzyme": "BbsI",
-    "citations": [
-      {
-        "label": "Cong et al. Science 2013",
-        "reference": "https://doi.org/10.1126/science.1231143",
-        "claim": "Introduced pX330 for mammalian CRISPR-Cas9 editing"
-      },
-      {
-        "label": "Ran et al. Nat Protoc 2013",
-        "reference": "https://doi.org/10.1038/nprot.2013.143",
-        "claim": "BbsI CACC/AAAC annealed-oligo cloning protocol"
-      },
-      {
-        "label": "Addgene #42230",
-        "reference": "https://www.addgene.org/42230/",
-        "claim": "pX330 plasmid repository record: pUC ori backbone; Ampicillin 100 ug/mL; Stbl3; 37C; high copy"
-      },
-      {
-        "label": "NovoPro V005940 GenBank map",
-        "reference": "https://www.novoprolabs.com/vector/Vgy3dima",
-        "claim": "Public 8484 bp pX330-U6-Chimeric_BB-CBh-hSpCas9 GenBank sequence used as local backbone resource"
-      },
-      {
-        "label": "Ran et al. Nat Protoc 2013",
-        "reference": "https://doi.org/10.1038/nprot.2013.143",
-        "claim": "General annealed-oligo Type IIS guide cloning protocol"
-      }
-    ],
     "top_overhang": "CACC",
     "bottom_overhang": "AAAC",
     "top_oligo_name": "px330_guide_top",

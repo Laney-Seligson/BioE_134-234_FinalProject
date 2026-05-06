@@ -203,13 +203,24 @@ def _fetch_from_ncbi(gene_name: str, organism: str) -> tuple[str, str, str]:
     Fetching only the gene region (via seq_start/seq_stop) avoids pulling the
     entire chromosome, which could be millions of bp.
     """
-    # Step 1: gene ID
-    search_resp = _ncbi_get(
-        f"{_ENTREZ_BASE}/esearch.fcgi",
-        {"db": "gene", "term": f"{gene_name}[Gene] AND {organism}[Organism]",
-         "retmode": "json"},
-    )
-    gene_ids = search_resp.json()["esearchresult"]["idlist"]
+    # Step 1: gene ID — try progressively broader searches until one hits.
+    # Some organisms (e.g. P. falciparum) use locus-tag IDs as official symbols;
+    # common gene names are stored in alias/description fields, not [Gene].
+    search_strategies = [
+        f"{gene_name}[Gene] AND {organism}[Organism]",
+        f"{gene_name}[Gene/Protein Name] AND {organism}[Organism]",
+        f"{gene_name}[All Fields] AND {organism}[Organism]",
+    ]
+    gene_ids = []
+    for term in search_strategies:
+        search_resp = _ncbi_get(
+            f"{_ENTREZ_BASE}/esearch.fcgi",
+            {"db": "gene", "term": term, "retmode": "json"},
+        )
+        gene_ids = search_resp.json()["esearchresult"]["idlist"]
+        if gene_ids:
+            break
+
     if not gene_ids:
         raise ValueError(
             f"Gene '{gene_name}' not found in NCBI for organism '{organism}'. "

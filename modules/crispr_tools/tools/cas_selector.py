@@ -167,7 +167,6 @@ class CasSelector:
         cas12a_spacer_len: int = 23,
         margin_threshold: float = 1.5,
         debug: bool = False,
-        **kwargs,
     ) -> dict:
         if system is not None:
             if system not in ("Cas9", "Cas12a"):

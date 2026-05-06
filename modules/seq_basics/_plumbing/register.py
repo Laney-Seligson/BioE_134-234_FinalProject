@@ -321,11 +321,21 @@ def _register_tool(mcp, func: Callable, meta: dict) -> None:
     description = meta.get("description", getattr(func, "__doc__", "") or "")
     schema      = _build_mcp_schema(meta, func)
 
+    try:
+        _func_params = set(inspect.signature(func).parameters)
+    except (ValueError, TypeError):
+        _func_params = None
+
     @wraps(func)
     def wrapped(**kwargs):
         for param in seq_params:
             if param in kwargs and kwargs[param] is not None:
                 kwargs[param] = resolve_to_seq(kwargs[param])
+        # Drop any kwargs the underlying function doesn't accept so that
+        # upstream tools passing extra context fields (e.g. "source") don't
+        # cause unexpected-keyword-argument errors.
+        if _func_params is not None:
+            kwargs = {k: v for k, v in kwargs.items() if k in _func_params}
         return func(**kwargs)
 
     wrapped.__name__ = mcp_name

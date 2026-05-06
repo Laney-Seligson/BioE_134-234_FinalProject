@@ -29,6 +29,12 @@
       "type": "number",
       "description": "Minimum ratio by which one nuclease must exceed the other's valid guide count for the count difference to drive the recommendation. Must be >= 1.0. Default 1.5 means one nuclease needs at least 50% more valid guides (e.g. 40 vs 36 is a tie; 40 vs 20 is a clear win). When counts fall within this margin, secondary criteria (multiplexing, specificity, default Cas9) decide.",
       "default": 1.5
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "description": "Optional provenance label (e.g. from fetch_target_sequence). Accepted for compatibility but not used by this tool.",
+      "default": null
     }
   ],
 

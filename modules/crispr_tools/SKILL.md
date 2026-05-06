@@ -174,6 +174,8 @@ Calling `crispr_run_full_workflow` when the user only asked for guides hides the
 
 **When `crispr_run_full_workflow` returns `status: "needs_user_input"`:** present the `questions` field verbatim to the user and the `vector_recommendations` list (name + use_case for each). Wait for the user to choose. Do NOT select a vector from the recommendations yourself — always ask the user to choose.
 
+**The workflow result does NOT include the raw target sequence** — it is stripped to avoid truncation artifacts. If a downstream tool (e.g. `crispr_verify_edit`) needs the reference sequence, call `crispr_fetch_target_sequence` again with the same query and organism from `sequence_info`.
+
 ---
 
 ## Full CRISPR cloning workflow (autonomous — do not ask the user)

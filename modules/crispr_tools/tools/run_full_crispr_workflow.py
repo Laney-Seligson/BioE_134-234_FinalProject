@@ -584,10 +584,15 @@ class RunFullCrisprWorkflow:
         )
 
         ref_len = sequence_info.get("length", "unknown")
+        # Strip the raw sequence from the returned metadata — it can be hundreds
+        # of kb and will be truncated by the client before Gemini sees it.
+        # Gemini should re-fetch via crispr_fetch_target_sequence when it needs
+        # the sequence for downstream tools (e.g. crispr_verify_edit).
+        sequence_info_summary = {k: v for k, v in sequence_info.items() if k != "sequence"}
         return {
             "status": "ready",
             "workflow_trace": workflow_trace,
-            "sequence_info": sequence_info,
+            "sequence_info": sequence_info_summary,
             "guides": ranked_guides,
             "selected_guide": selected_guide,
             "scoring_rationale": scoring_rationale,

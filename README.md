@@ -1057,7 +1057,7 @@ This file contains the Python implementation of the paper information loader. In
 This file is the JSON wrapper for the paper information loader. It defines how Gemini can call the tool by providing a paper_id, and it tells the framework where the corresponding Python implementation lives. The purpose of this wrapper is to expose curated paper metadata as a callable MCP tool so that other tools, such as shorthand workflow generation, can use literature-derived information in a structured and reproducible way.
 </div>
 
-#### Jillian: 
+### Jillian: 
 <div style="margin-left: 20px;">
 <b>1. predict_offtargets </b>
 - What it does:

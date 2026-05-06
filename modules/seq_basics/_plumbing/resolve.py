@@ -70,6 +70,16 @@ def resolve_to_seq(input_value: str) -> str:
     if input_value.startswith(">"):
         return _parse_fasta_string(input_value)
 
+    # 3.5. Strip "label:sequence" prefix (e.g. "unc-22:ATCG...")
+    # If the part before the first colon contains non-sequence characters it
+    # must be a gene/locus name, not sequence data — discard it.
+    if ":" in input_value:
+        prefix, _, remainder = input_value.partition(":")
+        remainder = remainder.strip()
+        prefix_cleaned = re.sub(r"[\s\d]+", "", prefix).upper()
+        if remainder and (set(prefix_cleaned) - VALID_SEQUENCE_CHARS):
+            return _clean_sequence(remainder)
+
     # 4. Assume it's a raw sequence string - clean it
     return _clean_sequence(input_value)
 

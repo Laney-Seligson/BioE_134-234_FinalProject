@@ -55,7 +55,8 @@ class FetchTargetSequence:
 
     Input:
         query (str): Raw DNA sequence, local resource name, or gene name.
-        organism (str): Organism for NCBI lookup. Default: "Escherichia coli".
+        organism (str): Organism for NCBI lookup. Required for gene-name queries;
+            leave blank only for raw DNA or local resource lookups.
         target_type (str): "genomic_locus" or "cds". Default: "genomic_locus".
 
     Output:
@@ -88,7 +89,7 @@ class FetchTargetSequence:
     def run(
         self,
         query: str,
-        organism: str = "Escherichia coli",
+        organism: str = "",
         target_type: str = "genomic_locus",
     ) -> dict:
         query = query.strip()
@@ -138,6 +139,12 @@ class FetchTargetSequence:
             }
 
         # ── 3. NCBI Entrez fetch ──────────────────────────────────────────────
+        if not organism or not organism.strip():
+            raise ValueError(
+                f"organism is required to look up gene '{query}' in NCBI. "
+                "Please specify the organism (e.g. 'Caenorhabditis elegans', "
+                "'Homo sapiens', 'Escherichia coli')."
+            )
         organism = normalize_organism(organism)
         _configure_biopython_entrez()
 

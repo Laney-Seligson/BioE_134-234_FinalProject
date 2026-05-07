@@ -156,6 +156,33 @@ def test_upstream_selected_gene_requires_explicit_gene_confirmation(workflow):
     assert result["workflow_trace"] == []
 
 
+def test_one_gene_query_still_requires_gene_confirmation(workflow):
+    # "one gene" in the source query must not bypass the gene_confirmed gate.
+    # The MCP should never auto-select a single gene just because the user
+    # said "one" — it must still pause and show the list for confirmation.
+    for source_query in [
+        "one gene that controls estrogen regulation in Homo sapiens",
+        "find one gene involved in apoptosis",
+        "pick one gene for me",
+    ]:
+        result = workflow.run(
+            query="ESR1",
+            organism="Homo sapiens",
+            vector="px330",
+            source_query=source_query,
+            confirmed=True,
+        )
+        assert result["status"] == "needs_user_input", (
+            f"Expected needs_user_input for source_query={source_query!r}"
+        )
+        assert "gene_confirmed" in result["missing_fields"], (
+            f"Expected gene_confirmed gate for source_query={source_query!r}"
+        )
+        assert result["workflow_trace"] == [], (
+            "Workflow should not advance past gene confirmation"
+        )
+
+
 def test_upstream_selected_gene_confirmation_then_continues(workflow, monkeypatch):
     monkeypatch.setattr(
         workflow.sequence_fetcher, "run",

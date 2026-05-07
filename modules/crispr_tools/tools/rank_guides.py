@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import re
+
 from modules.seq_basics._plumbing.resolve import resolve_to_seq
 from modules.crispr_tools.tools.predict_offtargets import predict_offtargets
 from modules.crispr_tools.tools.citations import cites, format_citations
+from modules.crispr_tools.tools._utils import VALID_DNA
 
 _SUPPORTED_NUCLEASES = {"cas9", "cas12a"}
 
@@ -171,14 +174,40 @@ class RankGuides:
         if not reference or not reference.strip():
             raise ValueError("reference must not be empty.")
 
+        # Catch truncated display strings like "ATGCTGAA... (2139 chars)"
+        if re.search(r'\.\.\.\s*\([\d,]+\s*chars?\)', reference):
+            return {
+                "error": (
+                    "reference is a truncated display string, not a DNA sequence. "
+                    "Pass the full sequence: use sequence_info['sequence'] from the "
+                    "crispr_fetch_target_sequence result, not a shortened summary."
+                )
+            }
+
+        # Catch gene names passed as reference (e.g. "BRCA1", "lacZ")
+        stripped = re.sub(r'[\s\d]+', '', reference).upper()
+        if stripped and not (
+            reference.strip().startswith(">")
+            or reference.strip().startswith("LOCUS")
+            or set(stripped) <= set("ATUCGRSYKWMN")
+        ):
+            return {
+                "error": (
+                    f"reference '{reference.strip()}' does not look like a DNA sequence. "
+                    "Pass sequence_info['sequence'] from crispr_fetch_target_sequence — "
+                    "not a gene name, accession number, or organism."
+                )
+            }
+
         try:
             reference = resolve_to_seq(reference)
         except ValueError as e:
             return {
                 "error": (
                     f"Could not resolve 'reference' to a DNA sequence: {e}. "
-                    "Pass the actual DNA/RNA sequence, a FASTA string, a GenBank string, "
-                    "or a registered resource name — not a gene symbol or accession number."
+                    "Pass the full sequence from sequence_info['sequence'] "
+                    "(as returned by crispr_fetch_target_sequence) — "
+                    "not a gene name, truncated summary, or accession number."
                 )
             }
 

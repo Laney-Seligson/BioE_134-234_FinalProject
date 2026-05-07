@@ -176,11 +176,19 @@ def _guide_flags(protospacer: str) -> str:
 
 
 def rank_guides(guides: list) -> list:
-    """Score and return guides sorted best-first."""
+    """Score and return guides sorted best-first (efficiency only, no off-target prediction).
+
+    For full scoring with off-target specificity, use crispr_rank_guides and pass
+    the complete reference sequence from sequence_info['sequence'] — not the gene name.
+    """
     ranked = []
 
     for g in guides:
         p = g["protospacer"]
+        if not p or not set(p.upper()) <= VALID_DNA:
+            raise ValueError(
+                f"Invalid protospacer '{p}': must contain only A, T, G, C bases."
+            )
         score = _score_guide(p, g.get("pam_site", ""))
         gc_pct = round((p.count("G") + p.count("C")) / len(p) * 100, 1)
 

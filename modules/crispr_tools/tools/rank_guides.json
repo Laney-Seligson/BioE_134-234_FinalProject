@@ -16,7 +16,7 @@
     {
       "name": "reference",
       "type": "string",
-      "description": "Genome or plasmid sequence to scan for off-targets. Must be an actual DNA/RNA sequence string, FASTA, GenBank, or a registered resource name. Do not pass a gene symbol or accession number."
+      "description": "Full DNA sequence to scan for off-targets. Use the 'sequence' field from a crispr_fetch_target_sequence result: pass sequence_info['sequence'], not the gene name (e.g. 'BRCA1'), the resource name, or a truncated summary string (e.g. 'ATGCTGAA... (2139 chars)'). The value must be the complete raw sequence string."
     },
     {
       "name": "nuclease",

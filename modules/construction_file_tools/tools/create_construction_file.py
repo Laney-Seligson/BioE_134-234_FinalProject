@@ -99,6 +99,8 @@ class CreateConstructionFile:
         top_oligo_sequence: str = "",
         bottom_oligo_name: str = "",
         bottom_oligo_sequence: str = "",
+        top_overhang: str = "",
+        bottom_overhang: str = "",
         enzyme: str = "",
         cell_strain: str = "",
         selection: str = "",
@@ -303,6 +305,8 @@ class CreateConstructionFile:
             "parts": validated_parts,
             "operations": validated_operations,
             "notes": notes,
+            **({"top_overhang": top_overhang} if top_overhang else {}),
+            **({"bottom_overhang": bottom_overhang} if bottom_overhang else {}),
         }
 
         return {

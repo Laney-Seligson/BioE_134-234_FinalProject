@@ -1532,6 +1532,8 @@ class CRISPRCloningDesigner:
             "top_oligo_sequence": top_oligo,
             "bottom_oligo_name": bot_name,
             "bottom_oligo_sequence": bot_oligo,
+            "top_overhang": top_oh,
+            "bottom_overhang": bot_oh,
             "vector_forward_primer_name": "",
             "vector_forward_primer_sequence": "",
             "vector_reverse_primer_name": "",

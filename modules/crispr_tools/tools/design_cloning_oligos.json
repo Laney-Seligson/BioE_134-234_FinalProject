@@ -1,9 +1,9 @@
 {
   "id": "org.bioe234.function.crispr.design_cloning_oligos.v2",
   "name": "CRISPR Cloning Workflow Designer",
-  "description": "Guided wet-lab simulation tool for three CRISPR guide-cloning workflows: TypeIISOligoCloning (BbsI/BsmBI/BsaI annealed-oligo ligation, plus the pML104/pML107 BclI-SwaI annealed-oligo cassette), RestrictionLigation (e.g. SpeI for pTargetF), and GibsonAssembly (overlap-based seamless assembly). If all required inputs are present the tool designs oligos/primers and returns results (status='ready'). If inputs are missing it returns a structured 'needs_user_input' response with human-readable questions instead of an error. Known vectors: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322, pml104 (yeast S. cerevisiae, BclI-SwaI annealed-oligo cloning), pml107 (yeast S. cerevisiae, BclI-SwaI annealed-oligo cloning). For yeast targets use pml104 or pml107. Pass vector='custom' to design with any other vector.",
+  "description": "Guided wet-lab simulation tool for CRISPR guide RNA and CRISPR RNA cloning workflows: TypeIISOligoCloning (BbsI/BsmBI/BsaI annealed-oligo ligation, plus the pML104/pML107 BclI-SwaI annealed-oligo cassette), RestrictionLigation (e.g. SpeI for pTargetF), and GibsonAssembly (overlap-based seamless assembly). Supports both Cas9-style guide RNA designs and Cas12a-style crRNA designs when the selected vector matches the nuclease system. If all required inputs are present the tool designs oligos/primers and returns results (status='ready'). If inputs are missing or the vector system is unclear, it returns a structured 'needs_user_input' response with human-readable questions instead of guessing. Known vectors include px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pml104/pml107 for yeast, pdd162 for C. elegans Cas9, and Cas12a crRNA presets such as prc11_lbcpf1 and bpk4446_fncas12a. Pass vector='custom' to design with any other vector.",
   "type": "function",
-  "keywords": ["CRISPR", "cloning", "oligo", "protospacer", "BbsI", "BsmBI", "BsaI", "SpeI", "Gibson", "pX330", "lentiCRISPR", "pDR274", "pCRISPR", "pTargetF", "guide RNA", "sgRNA", "construction file", "local reference", "Type IIS"],
+  "keywords": ["CRISPR", "cloning", "oligo", "protospacer", "BbsI", "BsmBI", "BsaI", "SpeI", "Gibson", "pX330", "lentiCRISPR", "pDR274", "pCRISPR", "pTargetF", "pDD162", "guide RNA", "crRNA", "sgRNA", "construction file", "local reference", "Type IIS"],
   "date_created": null,
   "date_last_modified": null,
 
@@ -11,7 +11,7 @@
     {
       "name": "vector",
       "type": "string",
-      "description": "Vector name. Known presets: px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pet28a, pbr322, pml104, pml107. For S. cerevisiae (yeast) use pml104 or pml107. Pass 'custom' to design with a vector not in this list. If omitted and organism/target_reference is supplied, a default is chosen automatically (ecoli_rpsl → pcrispr)."
+      "description": "Vector name. Known presets include px330, lenticrispr_v2, pdr274, pcrispr, ptargetf, px458_gibson, pml104, pml107, pdd162, prc11_lbcpf1, and bpk4446_fncas12a. For S. cerevisiae (yeast) use pml104 or pml107. For C. elegans Cas9 guide cloning use pdd162. For Cas12a crRNA cloning, use a Cas12a-compatible vector preset or pass 'custom' with the vector-specific details. If omitted and organism/target_reference is supplied, a default is chosen automatically (ecoli_rpsl → pcrispr)."
     },
     {
       "name": "cloning_method",
@@ -46,12 +46,12 @@
     {
       "name": "scaffold_in_vector",
       "type": "boolean",
-      "description": "Whether the sgRNA scaffold is already encoded in the vector. Required for vector='custom' with TypeIISOligoCloning."
+      "description": "Whether the guide scaffold or CRISPR RNA direct repeat is already encoded in the vector. Required for vector='custom' with TypeIISOligoCloning."
     },
     {
       "name": "promoter",
       "type": "string",
-      "description": "Promoter driving guide RNA expression (e.g. U6, H1, T7, J23119). Required for vector='custom' with TypeIISOligoCloning."
+      "description": "Promoter driving guide RNA or CRISPR RNA expression (e.g. U6, H1, T7, J23119). Required for vector='custom' with TypeIISOligoCloning."
     },
     {
       "name": "u6_prefers_5prime_g",
@@ -61,7 +61,7 @@
     {
       "name": "guide_cassette_sequence",
       "type": "string",
-      "description": "Full guide cassette DNA sequence (promoter + spacer + scaffold if scaffold is not in vector). Required for RestrictionLigation. A/T/G/C only."
+      "description": "Full guide cassette DNA sequence (promoter + spacer + guide scaffold or CRISPR RNA direct repeat if not already in vector). Required for RestrictionLigation. A/T/G/C only."
     },
     {
       "name": "restriction_site_sequence",

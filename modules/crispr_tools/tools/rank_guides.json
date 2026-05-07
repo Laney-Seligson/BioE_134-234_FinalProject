@@ -1,9 +1,9 @@
 {
   "id": "org.bioe234.function.crispr.rank_guides.v1",
   "name": "CRISPR Guide Ranker",
-  "description": "Ranks a list of CRISPR gRNA candidates by combined on-target efficiency (Doench 2016 rules: GC content 40-70%, no poly-T run, G at PAM-proximal position for Cas9) and off-target safety. Specificity is treated as a safety filter: guides get +1 only if they have no HIGH-risk predicted off-targets. MEDIUM-risk and total off-target counts are reported and used as tie-breakers, not scored with arbitrary count cutoffs. Replaces the default 'pick guides[0]' behavior in pipelines with evidence-based guide selection and returns a plain-English rationale for the top pick.",
+  "description": "Ranks a list of CRISPR guide RNA or crRNA candidates by combined on-target efficiency (GC content, no poly-T run, and a Cas9-specific PAM-proximal G bonus when nuclease='cas9') and off-target safety. Specificity is treated as a safety filter: guides get +1 only if they have no HIGH-risk predicted off-targets. MEDIUM-risk and total off-target counts are reported and used as tie-breakers, not scored with arbitrary count cutoffs. Replaces the default 'pick guides[0]' behavior in pipelines with evidence-based guide selection and returns a plain-English rationale for the top pick.",
   "type": "function",
-  "keywords": ["CRISPR", "gRNA", "ranking", "scoring", "Doench", "efficiency", "specificity", "guide selection", "Cas9", "Cas12a"],
+  "keywords": ["CRISPR", "guide RNA", "gRNA", "crRNA", "ranking", "scoring", "Doench", "efficiency", "specificity", "guide selection", "Cas9", "Cas12a"],
   "date_created": "2026-04-24",
   "date_last_modified": "2026-04-24",
 

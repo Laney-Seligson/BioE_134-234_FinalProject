@@ -1248,16 +1248,16 @@ class CRISPRCloningDesigner:
         if resolved_scaffold is None:
             missing.append("scaffold_in_vector")
             questions.append(
-                "Is the sgRNA scaffold already encoded in the vector? "
+                "Is the guide scaffold or CRISPR RNA direct repeat already encoded in the vector? "
                 "(True for most guide-cloning vectors; False if you are cloning "
-                "the entire guide + scaffold as the insert)"
+                "the entire guide RNA/crRNA cassette as the insert)"
             )
 
         resolved_promoter = promoter or (spec.promoter if spec else None)
         if resolved_promoter is None:
             missing.append("promoter")
             questions.append(
-                "What promoter does your vector use to drive the guide RNA? "
+                "What promoter does your vector use to drive the guide RNA or CRISPR RNA? "
                 "(e.g. U6, H1, T7 — affects whether a 5′G is needed)"
             )
 
@@ -1268,7 +1268,7 @@ class CRISPRCloningDesigner:
             missing.append("u6_prefers_5prime_g")
             questions.append(
                 "Should a 5′G be prepended when the protospacer does not already "
-                "start with G? (recommended for U6-driven guides; not needed for T7)"
+                "start with G? (often used for U6/H1-driven guide RNA or CRISPR RNA expression; not needed for T7)"
             )
         if missing: 
             return _needs_user_input(
@@ -1292,8 +1292,8 @@ class CRISPRCloningDesigner:
             missing.append("guide_cassette_sequence")
             questions.append(
                 "What is the full guide cassette sequence to clone? "
-                "This should include the promoter, spacer, and sgRNA scaffold "
-                "if the scaffold is not already in the vector. "
+                "This should include the promoter, spacer, and guide scaffold or "
+                "CRISPR RNA direct repeat if those elements are not already in the vector. "
                 "(A/T/G/C only)"
             )
 
@@ -1517,7 +1517,6 @@ class CRISPRCloningDesigner:
 
         construction_file_inputs = {
             "construct_name": final_name,
-            "cloning_method": "TypeIISOligoCloning",
             "assembly_strategy": "TypeIISOligoCloning",
             "backbone_name": backbone_name,
             "backbone_sequence": backbone_seq,
@@ -1541,7 +1540,7 @@ class CRISPRCloningDesigner:
             "cell_strain": spec.cell_strain if spec else "",
             "selection": spec.selection if spec else "",
             "temperature_c": 37,
-            "notes": " ".join(notes) + " This insert is an sgRNA protospacer oligo (annealed oligo cloning), not a gene or multi-fragment insert.",
+            "notes": " ".join(notes) + " This insert is a guide RNA/crRNA protospacer oligo (annealed oligo cloning), not a gene or multi-fragment insert.",
         }
 
         all_citations = (spec.citations if spec else ()) + WORKFLOW_CITATIONS["TypeIISOligoCloning"]
@@ -1631,7 +1630,6 @@ class CRISPRCloningDesigner:
 
         construction_file_inputs = {
             "construct_name": final_name,
-            "cloning_method": "RestrictionLigation",
             "assembly_strategy": "RestrictionLigation",
             "backbone_name": backbone_name,
             "backbone_sequence": backbone_seq,
@@ -1745,7 +1743,6 @@ class CRISPRCloningDesigner:
 
         construction_file_inputs = {
             "construct_name": final_name,
-            "cloning_method": "GibsonAssembly",
             "assembly_strategy": "Gibson",
             "backbone_name": backbone_name,
             "backbone_sequence": backbone_seq,
@@ -1899,7 +1896,6 @@ class CRISPRCloningDesigner:
 
         construction_file_inputs = {
             "construct_name":                 final_name,
-            "cloning_method":                 "GoldenGateAssembly",
             "assembly_strategy":              "GoldenGate",
             "backbone_name":                  backbone_name,
             "backbone_sequence":              backbone_seq,

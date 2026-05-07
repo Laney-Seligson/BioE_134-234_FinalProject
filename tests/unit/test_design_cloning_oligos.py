@@ -291,6 +291,15 @@ def test_pcrispr_ecoli_oligo_output():
     assert result["construction_file_inputs"]["selection"] == "Kan"
 
 
+def test_construction_file_inputs_omit_cloning_method():
+    result = design_cloning_oligos(
+        protospacer="TACTTTACGCAGCGCGGAGT",
+        vector="pcrispr",
+        target_organism="E. coli",
+    )
+    assert "cloning_method" not in result["construction_file_inputs"]
+
+
 def test_pcrispr_zebrafish_returns_needs_user_input():
     result = design_cloning_oligos(
         protospacer="CCGGATGCTCCTCAGCTCTG",

@@ -91,7 +91,7 @@ For TypeIISOligoCloning (BbsI / BsmBI / BsaI annealed-oligo ligation):
 - bottom_oligo_sequence   ← REQUIRED — do not omit
 - enzyme
 
-**When calling `create_construction_file` after `crispr_design_cloning_oligos`:** pass ALL fields from the tool's `construction_file_inputs` dict verbatim — do not reconstruct or cherry-pick individual fields. Missing any field (especially `bottom_oligo_name` / `bottom_oligo_sequence` for TypeIISOligoCloning) will cause a hard error.
+**When calling `create_construction_file` after `crispr_design_cloning_oligos`:** pass ALL fields from the tool's `construction_file_inputs` dict verbatim — do not reconstruct or cherry-pick individual fields. This dict is already shaped for `create_construction_file` and intentionally omits `cloning_method`, which is part of the CRISPR tool result but not an accepted construction-file argument. Missing any field (especially `bottom_oligo_name` / `bottom_oligo_sequence` for TypeIISOligoCloning) will cause a hard error.
 
 For GoldenGate:
 - insert_forward_primer_name

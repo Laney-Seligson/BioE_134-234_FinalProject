@@ -11,7 +11,7 @@
     {
       "name": "seq",
       "type": "string",
-      "description": "DNA target sequence to scan for the first NGG PAM site. Accepts a resource name (e.g. 'ecoli_rpsl'), a raw sequence string, FASTA content, or GenBank content. The framework resolves the format automatically."
+      "description": "Full DNA target sequence to scan for NGG PAM sites. Use sequence_info['sequence'] from crispr_fetch_target_sequence — not a gene name, not a truncated display string (e.g. 'ATGCTGAA... (2139 chars)'). Also accepts a registered resource name, raw sequence string, FASTA, or GenBank content."
     }
   ],
 

@@ -1,3 +1,6 @@
+import re as _re
+
+
 class DesignCas9Grna:
     """
     Description:
@@ -42,6 +45,13 @@ class DesignCas9Grna:
         self._sgRNA_scaffold = "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGC"
 
     def run(self, seq: str) -> list:
+        if _re.search(r'\.\.\.\s*\([\d,]+\s*chars?\)', seq):
+            raise ValueError(
+                "seq is a truncated display string, not a DNA sequence. "
+                "Pass the full sequence from sequence_info['sequence'] as returned "
+                "by crispr_fetch_target_sequence."
+            )
+
         seq = seq.upper()
 
         if not seq:

@@ -1,3 +1,6 @@
+import re as _re
+
+
 class DesignCas12aCrrna:
     """
     Description:
@@ -39,6 +42,13 @@ class DesignCas12aCrrna:
         self._direct_repeat = "AATTTCTACTAAGTGTAGAT"
 
     def run(self, seq: str) -> list:
+        if _re.search(r'\.\.\.\s*\([\d,]+\s*chars?\)', seq):
+            raise ValueError(
+                "seq is a truncated display string, not a DNA sequence. "
+                "Pass the full sequence from sequence_info['sequence'] as returned "
+                "by crispr_fetch_target_sequence."
+            )
+
         seq = seq.upper()
 
         if not seq:

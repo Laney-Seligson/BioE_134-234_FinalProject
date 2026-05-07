@@ -2838,4 +2838,4 @@ cas9_plasmid_mammalian, cas9_rnp_mammalian, cas12a_ecoli, hdr_mammalian, hdr_eco
 </div>
 
 ## 6. Demo for whole CRISPR pipeline
-[Insert video link]
+https://youtu.be/QgIpJ8BjLJQ 

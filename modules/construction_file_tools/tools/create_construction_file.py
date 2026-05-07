@@ -191,9 +191,17 @@ class CreateConstructionFile:
             raise ValueError(f"assembly_strategy must be one of {sorted(self.allowed_strategies)}.")
 
         if assembly_strategy == "TypeIISOligoCloning":
-            # This workflow clones annealed top/bottom oligos directly into a
-            # Type IIS-digested backbone, so it does not require an insert PCR
-            # template or insert_sequence.
+            # TypeIISOligoCloning: annealed top/bottom oligos are ligated directly
+            # into a Type IIS restriction enzyme-digested backbone — no PCR insert
+            # or insert_sequence is needed.
+            # Ref: Addgene, Cloning of Oligos for sgRNA/shRNA (Zhang Lab, Sept 2015)
+            #      — standard protocol for BbsI/BsmBI annealed-oligo ligation into Cas9 vectors
+            # Ref: NEB FAQ, "Which restriction enzymes are used in Golden Gate assembly?"
+            #      https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly
+            #      — BbsI, BsmBI, BsaI all cut outside recognition site leaving 4-nt overhangs
+            # Ref: Hu et al. 2020, The Crop Journal 8(3):403-407
+            #      https://doi.org/10.1016/j.cj.2019.06.007
+            #      — Cas12a crRNA oligo cloning via BbsI/BsmBI into array vectors
             if not insert_name.strip():
                 insert_name = "guide_oligo_pair"
             insert_sequence = insert_sequence or ""
@@ -666,6 +674,12 @@ class CreateConstructionFile:
                 )
 
         if assembly_strategy == "TypeIISOligoCloning":
+            # Both oligos and enzyme are required: the top strand carries the
+            # 5'-CACC overhang and the protospacer, the bottom strand carries the
+            # AAAC complement and its reverse complement — they anneal to form
+            # sticky ends matching the Type IIS cut site in the backbone.
+            # Ref: Addgene, Cloning of Oligos for sgRNA/shRNA (Zhang Lab, Sept 2015)
+            # Ref: NEB FAQ, https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly
             missing_fields = []
             if not top_oligo_name.strip():
                 missing_fields.append("top_oligo_name")
@@ -961,6 +975,11 @@ class CreateConstructionFile:
             )
 
         elif assembly_strategy == "TypeIISOligoCloning":
+            # Single-step: digest backbone with Type IIS enzyme, then ligate
+            # annealed oligo pair in one pot. The overhangs are vector-specific
+            # (e.g. CACC/AAAC for pX330; ACCG/AAAC for pML104).
+            # Ref: Addgene, Cloning of Oligos for sgRNA/shRNA (Zhang Lab, Sept 2015)
+            # Ref: Hu et al. 2020, https://doi.org/10.1016/j.cj.2019.06.007
             operations.append(
                 {
                     "step_number": 1,
@@ -1064,6 +1083,10 @@ class CreateConstructionFile:
                 )
 
         elif step_type == "TypeIISOligoCloning":
+            # Expects exactly 3 inputs: top_oligo, bottom_oligo, backbone.
+            # Enzyme required — BbsI and BsmBI are the most common choices for
+            # sgRNA/crRNA cloning into Cas9/Cas12a expression vectors.
+            # Ref: NEB FAQ, https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly
             if len(inputs) != 3:
                 raise ValueError(
                     f"TypeIISOligoCloning step {step_number} should have top oligo, bottom oligo, and backbone inputs."

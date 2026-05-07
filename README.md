@@ -488,11 +488,26 @@ The client is ready and you can start entering prompts.
 <b>1. run_full_crispr_workflow </b>
 
 - What it does: 
+  - NEEDS gene and Organism name to successfully call tool 
   - Fetch a target sequence from the NCBI GenBank file for the gene chosen 
-  - design guide RNA using the first 10 found in the fetched sequence
-  - rank guide RNAs with rank_guides, authored by Jillian, and find the single best one to use out of the 10 
+  - design guide or crispr RNA sequence using the 10 found in the fetched sequence, meant to cover the gene broadly from PAM-based windowns across the whole sequence 
+  - rank guide and crispr RNAs with 'rank_guides.py', authored by Jillian and I, and find the single best one to use out of the 10 
+  - off-target prediction and on-target efficiency is calculated with tools such as '_predict_editing_efficiency.py' and 'predict_offtargets.py' 
   - design cloning oligos 
-  - build and validate construction file scripts authored by Laney
+  - prepares construction file inputs 
+
+The MCP will then stop and ask if the user wants to make a constuction file or lab sheet then Laney and Jillian's tools are ran. 
+
+**Example shown at bottom in appendix** 
+
+Possible Unhappy Paths: 
+(these are the most common cases, and not really inconvienent at all)
+- A user may just say "Run full crispr workflow on genes that cause cystic fibrosis in homo sapiens." 
+- If user gives a disease of a gene, semantic tools will try to identify a good target gene
+ - The gene is not known, so semantic tools are called to narrow that down 
+- After the gene is figured out, sometimes the MCP will forget what organism its working with and ask again 
+- Vectors are not always known by the user and the MCP may supply vector recommendations depending on the query, or wait for user input, this pertains to design_cloning_oligos 
+- Construction file regions that are unknown will silently print as incomplete or as "N" and the user needs to be aware of those errors. 
  
 - MCP Wrapper: `run_full_crispr_workflow.json`
 - Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
@@ -602,13 +617,19 @@ I am ready to help you proceed with the CRISPR design workflow for these targets
 
  <b> 3. cas_selector</b>
 - What it does: 
-- Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements 
+- Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements by scanning WHOLE LOCUS from fetch_target_sequence or CDS if necessary 
+For Multiplexing: 
+Results will be aggregated if there are multiple genomic locuses by majority rules! 
+
+> **Note on AT-rich genomes:** Cas12a may provide broader targeting coverage in AT-rich genomes because TTTV PAMs can become more abundant than NGG PAMs — but this is a heuristic based on PAM density, not a universal biological rule. The selector uses guide count ratios, not GC alone, to make the recommendation (Zetsche et al. 2015; Kim et al. 2016).
+
+Possible Unhappy Paths: 
+If a person is not specific with the gene name, semantic tools will be called along with fetch sequence. The user will then have to go through a series of questions to find genes of interest. 
+
 - MCP Wrapper: `cas_selector.json`
-- Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a, multiplexing override, empty sequence error
-- Sample Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
+- Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
 
-If a person is not specific with the gene name, semantic tools will be called along with fetch sequence. The user will then have to go through a series of questions to find genes of interest. Results will be aggregated if there are multiple genes by majority rules! 
-
+- Sample Happy Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
 - Output: 
   <details>
   <summary>Click to expand sample output</summary>
@@ -707,11 +728,17 @@ Since we have established that Cas12a is the best choice for this multi-gene edi
 
 <b> 4. design_cas9_grna </b>
 - What it does: 
-  - Scans a sequence for NGG PAM sites and returns up to 10 SpCas9 guide RNA candidates 
+  - Enumerates SpCas9 guide RNA candidates from NGG PAM sites across the sequence; candidate scoring applies GC content (40–65% optimum) and poly-T checks as heuristics derived from Doench et al. 2016 Rule Set 2 — downstream `rank_guides` applies the full scoring model
+  -It does this with a prompt that is directly about designing guides if nuclease, genes and organism are known. 
+  -For multiplexing, say on 3 different genes, each gene has to go through 1 individual workflow. 
+
+  Possible Unhappy Paths: 
+  -If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
+  -If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
 
 - MCP Wrapper: `design_cas9_grna.json`
 - Pytests (`tests/unit/test_design_cas9_grna.py`): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
-- Sample Prompt: “Design Cas9 guides for the lacZ locus.” 
+- Sample Happy Prompt: “Design Cas9 guides for the lacZ locus.” 
 
 - Output: 
   <details>
@@ -948,13 +975,21 @@ Since we have established that Cas12a is the best choice for this multi-gene edi
 
   - Hsu, Patrick D., David A. Scott, Joshua A. Weinstein, F. Ann Ran, Silvana Konermann, Vineeta Agarwala, Yinqing Li, et al. 2013. "DNA Targeting Specificity of RNA-Guided Cas9 Nucleases." Nature Biotechnology 31 (9): 827–832. https://doi.org/10.1038/nbt.2647.
 
-<b> 4. design_cas12a_crrna </b>
+  - Doench, John G., Nicolo Fusi, Meagan Sullender, Mudra Hegde, Emma W. Vaimberg, Katherine F. Donovan, Ian Smith, et al. 2016. "Optimized sgRNA Design to Maximize Activity and Minimize Off-Target Effects of CRISPR-Cas9." Nature Biotechnology 34 (2): 184–191. https://doi.org/10.1038/nbt.3437. *(GC content optimum 40–65%, poly-T termination penalty, PAM-proximal position weights used in candidate scoring)*
+
+<b> 5. design_cas12a_crrna </b>
 - What it does: 
   - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates 
+  -For multiplexing, say on 3 different genes, each gene has to go through seperate workflows. 
+
+  Possible Unhappy Paths: 
+  -If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
+  -If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
+   
 
 - MCP Wrapper: `design_cas12a_crrna.json`
 - Pytests (`tests/unit/test_design_cas12a_crrna.py`): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
-- Sample Prompt: “Give me Cas12a guides for the araB locus.”
+- Sample Happy Prompt: “Give me Cas12a guides for the araB locus.”
 - Output: 
   <details>
   <summary>Click to expand sample output</summary>
@@ -1036,21 +1071,31 @@ Since we have established that Cas12a is the best choice for this multi-gene edi
 - Citations:
   - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
   - Fonfara, Ines, Hagen Richter, Majda Bratovič, Anaïs Le Rhun, and Emmanuelle Charpentier. 2016. "The CRISPR-Associated DNA-Cleaving Enzyme Cpf1 Also Processes Precursor CRISPR RNA." Nature 532 (7600): 517–521. https://doi.org/10.1038/nature17945.
+  - Kim, Hoon Cho, Sunghyeok Ye, Daesik Kim, Young-Chang Cho, Ju-Hyun Lee, and Jin-Soo Kim. 2018. "In Vivo High-Throughput Profiling of CRISPR-Cpf1 Activity." Nature Methods 15 (1): 10–12. https://doi.org/10.1038/nbt.4061. *(Position-specific nucleotide preferences for Cas12a on-target activity; informs crRNA candidate scoring)*
+  - Hu, Xianrong, Kejian Wang, Yiping Tong, et al. 2020. "Technological Advances in CRISPR-Cas-Based Plant Genome Editing." The Crop Journal 8 (3): 403–407. https://doi.org/10.1016/j.cj.2019.06.007. *(Cas12a crRNA array cloning strategy using BbsI/BsmBI into pML104/pML107 vectors)*
 
 <b> 6. design_cloning_oligos </b>
 - What it does: 
+  - Takes Vector, along with information form design guide scripts and 
   - Designs annealed oligos or PCR primers into a preset vector 
-    - TypeIIS (BbsI / BsmBI / BsaI annealed-oligo sticky-end ligation)
-    - RestrictionLigation
-    - Gibson
-  - Golden Gate cloning 
+  - TypeIIS (BbsI / BsmBI / BsaI annealed-oligo sticky-end ligation) — Type IIS enzymes cut outside their recognition sequence, leaving vector-specific 4-nt sticky ends (e.g. CACC/AAAC for BbsI in pX330). These overhangs are determined by the vector backbone, not user design (Ran et al. 2013; Addgene Zhang Lab cloning protocol, Sept 2015).
+  - RestrictionLigation
+  - Gibson
+  - Golden Gate cloning (Engler et al. 2008)
+
+> **Vector provenance:** Preset vectors (pX330, pML104, pML107, pDD162, pRC11, BPK4446) were derived from published vector maps and Addgene repository records. pX330 overhangs and protocol follow Ran et al. 2013. pML104/pML107 follow Addgene depositor records. Cas12a-specific vectors follow Hu et al. 2020.
+
+Possible Unhappy Paths: 
+  -When left without vector, the MCP will ask for information such as 
+
+  Future Work/ Not Super established:  
+  - Add more vectors to Dictionary presets 
   - **Addgene API fallback:** preset vectors are handled locally; if `vector` is a numeric Addgene plasmid ID (e.g. `"42230"` or `"addgene:67639"`), the tool attempts to fetch plasmid metadata from the Addgene Developers API. Requires `ADDGENE_API_KEY` in `.env`. Dynamic results include citations in the same `{ "label", "reference", "claim" }` format as other tools. If no API key is available, use a preset vector or `vector="custom"`. This feature does not have and will not have its own JSON wrapper — it is handled entirely within `design_cloning_oligos`.
-  - **pX330 backbone:** `px330` now uses a local 8484 bp GenBank backbone resource instead of the previous `"N"` placeholder. Addgene #42230 is cited for the plasmid record and NovoPro V005940 is cited as the public GenBank sequence source.
   - if organism/vector info is missing → returns `needs_user_input` with human-readable questions instead of an error
 
 - MCP Wrapper: `design_cloning_oligos.json`
 - Pytests (`tests/unit/test_design_cloning_oligos.py`): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
-- Sample Prompt: “Design oligos to clone this protospacer into px330.” 
+- Sample Happy Prompt: “Design oligos to clone this protospacer into px330.” 
 - Output: 
   <details>
   <summary>Click to expand sample output</summary>
@@ -1072,6 +1117,7 @@ Since we have established that Cas12a is the best choice for this multi-gene edi
     "final_protospacer": "GCAGTGATTCTGTGCGAGCTTTG",
     "construction_file_inputs": {
       "construct_name": "px330_araB_edit",
+      "cloning_method": "TypeIISOligoCloning",
       "assembly_strategy": "TypeIISOligoCloning",
       "backbone_name": "px330",
       "backbone_sequence": "GAGGGCCTATTTCCCATGATTCCTTCATATTTGCATATACGATACAAGGCTGTTAGAGAGATAATTGGAATTAATTTGACTGTAAAC... (8484 bp)",
@@ -1112,32 +1158,8 @@ Since we have established that Cas12a is the best choice for this multi-gene edi
   ```
   </details>
 
-- Sample Unhappy Prompt: "Design oligos to clone this E. coli protospacer into px330."
-- Why this is unhappy: `px330` is a mammalian vector, so the tool should not design cloning oligos for an *E. coli* target without asking the user to choose a compatible vector.
-- Output:
-  <details>
-  <summary>Click to expand unhappy-path sample output</summary>
-
-  ```json
-  [Tool result] ← crispr_design_cloning_oligos:
-  {
-    "status": "needs_user_input",
-    "cloning_method": "TypeIISOligoCloning",
-    "vector": "pX330",
-    "missing_fields": [
-      "vector"
-    ],
-    "questions": [
-      "Vector 'pX330' is designed for 'Any mammalian', but the target organism is 'Escherichia coli'. Compatible preset vectors for Escherichia coli: pcrispr, ptargetf."
-    ],
-    "notes": "Organism mismatch: vector cell_strain='Any mammalian' vs target_organism='Escherichia coli'. To skip this check, pass vector='custom'."
-  }
-  Gemini: I cannot safely design pX330 cloning oligos for an *E. coli* target because pX330 is a mammalian CRISPR vector. Please choose a compatible bacterial vector such as `pcrispr` or `ptargetf`, or provide a custom vector if you want to override the compatibility check.
-  ```
-  </details>
-
 - Citations: 
-  - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. "Genome Engineering Using the CRISPR-Cas9 System." Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143.
+  - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. "Genome Engineering Using the CRISPR-Cas9 System." Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; CACC/AAAC overhang logic for annealed-oligo ligation)*
 
   - Sanjana, Neville E., Ophir Shalem, and Feng Zhang. 2014. "Improved Vectors and Genome-Wide Libraries for CRISPR Screening." Nature Methods 11 (8): 783–784. https://doi.org/10.1038/nmeth.3047.
 
@@ -1145,13 +1167,19 @@ Since we have established that Cas12a is the best choice for this multi-gene edi
 
   - Gibson, Daniel G., Lei Young, Ray-Yuan Chuang, J. Craig Venter, Clyde A. Hutchison III, and Hamilton O. Smith. 2009. "Enzymatic Assembly of DNA Molecules up to Several Hundred Kilobases." Nature Methods 6 (5): 343–345. https://doi.org/10.1038/nmeth.1318.
 
-  - Engler, Carola, Ramona Kandzia, and Sylvestre Marillonnet. 2008. "A One Pot, One Step, Precision Cloning Method with High Throughput Capability." PLOS ONE 3 (11): e3647. https://doi.org/10.1371/journal.pone.0003647.
+  - Engler, Carola, Ramona Kandzia, and Sylvestre Marillonnet. 2008. "A One Pot, One Step, Precision Cloning Method with High Throughput Capability." PLOS ONE 3 (11): e3647. https://doi.org/10.1371/journal.pone.0003647. *(Golden Gate Assembly; BsaI and Type IIS enzyme logic)*
 
   - Laughery, Marian F., Taylor Hunter, Angela Brown, Jake Hoopes, Tiffany Ostbye, Trevor Shumaker, and John J. Wyrick. 2015. "New Vectors for Simple and Streamlined CRISPR-Cas9 Editing in *Saccharomyces cerevisiae*." Yeast 32 (12): 711–720. https://doi.org/10.1002/yea.3098.
+
+  - Addgene. "Cloning of Oligos for sgRNA/shRNA." Zhang Lab protocol, September 2015. *(Standard BbsI/BsmBI annealed-oligo ligation workflow for CRISPR guide cloning; basis for TypeIISOligoCloning overhang conventions)*
 
   - Addgene. "pX330-U6-Chimeric_BB-CBh-hSpCas9 (Plasmid #42230)." https://www.addgene.org/42230/
 
   - NovoPro Bioscience. "pX330-U6-Chimeric_BB-CBh-hSpCas9 vector (Cat. No. V005940)." https://www.novoprolabs.com/vector/Vgy3dima
+
+  - Hu, Xianrong, Kejian Wang, Yiping Tong, et al. 2020. "Technological Advances in CRISPR-Cas-Based Plant Genome Editing." The Crop Journal 8 (3): 403–407. https://doi.org/10.1016/j.cj.2019.06.007. *(Cas12a crRNA cloning into pML104/pML107 vectors using BbsI/BsmBI)*
+
+  - New England Biolabs. "Which Restriction Enzymes Are Used in Golden Gate Assembly?" NEB FAQ. https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly. *(BbsI, BsmBI, BsaI cut outside recognition site leaving 4-nt overhangs; basis for TypeIIS enzyme selection)*
 
 <b>7. Shared utilities (`modules/crispr_tools/tools/_utils.py`)</b>
 
@@ -2152,6 +2180,7 @@ This file is the JSON wrapper for the paper information loader. It defines how G
       "final_protospacer": "ACAGTTGGTATATTAGGAGG",
       "construction_file_inputs": {
         "construct_name": "ADE2_edit_pml104",
+        "cloning_method": "TypeIISOligoCloning",
         "assembly_strategy": "TypeIISOligoCloning",
         "backbone_name": "pML104",
         "backbone_sequence": "N",
@@ -2178,6 +2207,7 @@ This file is the JSON wrapper for the paper information loader. It defines how G
     },
     "construction_file_inputs": {
       "construct_name": "ADE2_edit_pml104",
+      "cloning_method": "TypeIISOligoCloning",
       "assembly_strategy": "TypeIISOligoCloning",
       "backbone_name": "pML104",
       "backbone_sequence": "N",

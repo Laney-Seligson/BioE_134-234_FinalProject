@@ -648,6 +648,15 @@ def validate_construction_record(
                 )
                 report["step_results"].append(step_result)
             else:
+                # TypeIISOligoCloning, Transform, RestrictionLigation, and
+                # DirectSynthesis steps are structurally validated by
+                # _validate_operations but do not have sequence-level
+                # biological validation here in version 1.
+                # TypeIISOligoCloning structural rules:
+                #   - top/bottom oligos anneal to form 4-nt overhangs matching
+                #     the Type IIS cut site (e.g. CACC/AAAC for BbsI in pX330)
+                # Ref: Addgene, Cloning of Oligos for sgRNA/shRNA (Zhang Lab, Sept 2015)
+                # Ref: NEB FAQ, https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly
                 report["step_results"].append(
                     {
                         "step_number": step.get("step_number"),
@@ -793,6 +802,10 @@ class ValidateConstructionFile:
         vector_forward_primer_sequence: str = "",
         vector_reverse_primer_name: str = "",
         vector_reverse_primer_sequence: str = "",
+        # TypeIISOligoCloning: top/bottom annealed oligos replace the PCR insert.
+        # Ref: Addgene, Cloning of Oligos for sgRNA/shRNA (Zhang Lab, Sept 2015)
+        # Ref: Hu et al. 2020, The Crop Journal 8(3):403-407, https://doi.org/10.1016/j.cj.2019.06.007
+        # Ref: NEB FAQ, https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly
         top_oligo_name: str = "",
         top_oligo_sequence: str = "",
         bottom_oligo_name: str = "",

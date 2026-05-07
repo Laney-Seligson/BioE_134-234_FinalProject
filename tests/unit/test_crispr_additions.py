@@ -186,7 +186,7 @@ class TestNewVectorPresets:
         assert VECTOR_SPECS["pml104"].cloning_method == "TypeIISOligoCloning"
 
     def test_pml104_enzyme(self):
-        assert VECTOR_SPECS["pml104"].enzyme == "BsaI"
+        assert VECTOR_SPECS["pml104"].enzyme == "BclI-SwaI"
 
     def test_pml104_cell_strain_is_yeast(self):
         assert "Saccharomyces" in VECTOR_SPECS["pml104"].cell_strain
@@ -194,14 +194,16 @@ class TestNewVectorPresets:
     def test_pml104_has_citations(self):
         assert len(VECTOR_SPECS["pml104"].citations) > 0
 
-    def test_pml104_missing_overhangs_ask_for_them(self):
+    def test_pml104_preset_overhang_returns_ready(self):
+        # pml104 has a fixed GATC overhang in VectorSpec — should not ask the user
         r = design_cloning_oligos(
             vector="pml104",
             protospacer=PROTOSPACER,
             target_organism="yeast",
         )
-        assert r["status"] == "needs_user_input"
-        assert "top_overhang" in r["missing_fields"]
+        assert r["status"] == "ready"
+        assert r["top_overhang"] == "GATC"
+        assert r["bottom_overhang"] == ""
 
     # pDD162 — C. elegans
     def test_pdd162_in_registry(self):
@@ -313,6 +315,13 @@ FAKE_SEQUENCE_INFO = {
 }
 
 
+def _mock_fetcher_ecoli(info: dict):
+    """sequence_fetcher.run stub that accepts the target_type kwarg added in a0157b2."""
+    def _run(query, organism="Escherichia coli", target_type="genomic_locus"):
+        return info
+    return _run
+
+
 class TestFullWorkflowRankGuides:
 
     @pytest.fixture
@@ -322,59 +331,59 @@ class TestFullWorkflowRankGuides:
         return wf
 
     def test_ranked_guides_present_in_output(self, workflow, monkeypatch):
-        monkeypatch.setattr(
-            workflow.sequence_fetcher, "run",
-            lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+        monkeypatch.setattr(workflow.sequence_fetcher, "run", _mock_fetcher_ecoli(FAKE_SEQUENCE_INFO))
+        result = workflow.run(
+            query="lacZ", vector="ptargetf",
+            organism="Escherichia coli", confirmed=True, target_type="genomic_locus",
         )
-        result = workflow.run(query="lacZ", vector="ptargetf")
         assert "guides" in result
         assert isinstance(result["guides"], list)
         assert len(result["guides"]) > 0
 
     def test_each_guide_has_efficiency_score(self, workflow, monkeypatch):
-        monkeypatch.setattr(
-            workflow.sequence_fetcher, "run",
-            lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+        monkeypatch.setattr(workflow.sequence_fetcher, "run", _mock_fetcher_ecoli(FAKE_SEQUENCE_INFO))
+        result = workflow.run(
+            query="lacZ", vector="ptargetf",
+            organism="Escherichia coli", confirmed=True, target_type="genomic_locus",
         )
-        result = workflow.run(query="lacZ", vector="ptargetf")
         for guide in result["guides"]:
             assert "efficiency_score" in guide
             assert "specificity_score" in guide
             assert "total_score" in guide
 
     def test_each_guide_has_efficiency_details(self, workflow, monkeypatch):
-        monkeypatch.setattr(
-            workflow.sequence_fetcher, "run",
-            lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+        monkeypatch.setattr(workflow.sequence_fetcher, "run", _mock_fetcher_ecoli(FAKE_SEQUENCE_INFO))
+        result = workflow.run(
+            query="lacZ", vector="ptargetf",
+            organism="Escherichia coli", confirmed=True, target_type="genomic_locus",
         )
-        result = workflow.run(query="lacZ", vector="ptargetf")
         for guide in result["guides"]:
             assert "efficiency_details" in guide
             assert "specificity_details" in guide
 
     def test_scoring_rationale_present(self, workflow, monkeypatch):
-        monkeypatch.setattr(
-            workflow.sequence_fetcher, "run",
-            lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+        monkeypatch.setattr(workflow.sequence_fetcher, "run", _mock_fetcher_ecoli(FAKE_SEQUENCE_INFO))
+        result = workflow.run(
+            query="lacZ", vector="ptargetf",
+            organism="Escherichia coli", confirmed=True, target_type="genomic_locus",
         )
-        result = workflow.run(query="lacZ", vector="ptargetf")
         assert "scoring_rationale" in result
         assert isinstance(result["scoring_rationale"], str)
         assert len(result["scoring_rationale"]) > 0
 
     def test_guides_sorted_best_first(self, workflow, monkeypatch):
-        monkeypatch.setattr(
-            workflow.sequence_fetcher, "run",
-            lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+        monkeypatch.setattr(workflow.sequence_fetcher, "run", _mock_fetcher_ecoli(FAKE_SEQUENCE_INFO))
+        result = workflow.run(
+            query="lacZ", vector="ptargetf",
+            organism="Escherichia coli", confirmed=True, target_type="genomic_locus",
         )
-        result = workflow.run(query="lacZ", vector="ptargetf")
         scores = [g["total_score"] for g in result["guides"]]
         assert scores == sorted(scores, reverse=True)
 
     def test_selected_guide_is_top_ranked(self, workflow, monkeypatch):
-        monkeypatch.setattr(
-            workflow.sequence_fetcher, "run",
-            lambda query, organism="Escherichia coli": FAKE_SEQUENCE_INFO,
+        monkeypatch.setattr(workflow.sequence_fetcher, "run", _mock_fetcher_ecoli(FAKE_SEQUENCE_INFO))
+        result = workflow.run(
+            query="lacZ", vector="ptargetf",
+            organism="Escherichia coli", confirmed=True, target_type="genomic_locus",
         )
-        result = workflow.run(query="lacZ", vector="ptargetf")
         assert result["selected_guide"]["protospacer"] == result["guides"][0]["protospacer"]

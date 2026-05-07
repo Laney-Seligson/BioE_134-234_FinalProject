@@ -694,10 +694,10 @@ You: What Cas system would I use to edit sma-2, sma-3 and sma-4 in C.elegans all
 Gemini: For editing all three genes (*sma-2*, *sma-3*, and *sma-4*) simultaneously in *C. elegans*, **Cas12a** is the recommended system.
 
 ### Recommendation Rationale
-I analyzed the genomic sequences for each target individually, and in all three cases, Cas12a was selected as the optimal system based on the following:
+I analyzed the genomic sequences for each target individually, and in all three cases, Cas12a was recommended by the selector tool based on the following:
 
 *   **Sequence Composition:** *C. elegans* genomes and these genes specifically have high AT-content (GC content ~32–35%). Cas12a recognizes a **TTTV** PAM, which is significantly more abundant and easier to target in AT-rich regions compared to Cas9's **NGG** PAM.
-*   **Multiplexing Efficiency:** Cas12a is widely recognized for superior multiplexing capabilities. Since you intend to edit three genes simultaneously, Cas12a allows you to use a single crRNA array to express all guides efficiently from one transcript, a process that is often less efficient with the standard Cas9 guide architecture.
+*   **Multiplexing Efficiency:** Cas12a may offer broader multiplexing coverage via crRNA arrays (Zetsche et al. 2017). Since you intend to edit three genes simultaneously, Cas12a allows you to use a single crRNA array to express all guides from one transcript — a practical advantage for multi-locus editing, though efficiency can vary by context.
 
 ### Per-Gene Breakdown
 
@@ -708,7 +708,7 @@ I analyzed the genomic sequences for each target individually, and in all three 
 | **sma-4** | **Cas12a** | AT-rich sequence (35% GC); TTTV/NGG PAMs well-distributed for Cas12a targeting. |
 
 ### Next Steps
-Since we have established that Cas12a is the best choice for this multi-gene edit, would you like me to proceed with:
+Since the selector recommends Cas12a for this multi-gene edit, would you like me to proceed with:
 
 1.  **Designing Cas12a crRNA guides** for each of these targets?
 2.  **Ranking these guides** based on efficiency and specificity?
@@ -728,7 +728,7 @@ Since we have established that Cas12a is the best choice for this multi-gene edi
 
 <b> 4. design_cas9_grna </b>
 - What it does: 
-  - Enumerates SpCas9 guide RNA candidates from NGG PAM sites across the sequence; candidate scoring applies GC content (40–65% optimum) and poly-T checks as heuristics derived from Doench et al. 2016 Rule Set 2 — downstream `rank_guides` applies the full scoring model
+  - Enumerates SpCas9 guide RNA candidates from NGG PAM sites across the sequence; candidate scoring applies GC content (40–65% optimum) and poly-T checks as heuristics derived from Doench et al. 2016 Rule Set 2 — downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
   -It does this with a prompt that is directly about designing guides if nuclease, genes and organism are known. 
   -For multiplexing, say on 3 different genes, each gene has to go through 1 individual workflow. 
 

@@ -178,8 +178,40 @@ class TestNewVectorPresets:
     def test_pml107_in_registry(self):
         assert "pml107" in VECTOR_SPECS
 
+    def test_pml107_enzyme_is_bcli_swai(self):
+        assert VECTOR_SPECS["pml107"].enzyme == "BclI-SwaI"
+
     def test_pml107_marker_is_leu2(self):
         assert "LEU2" in VECTOR_SPECS["pml107"].selection
+
+    def test_pml107_preset_overhang_returns_ready(self):
+        r = design_cloning_oligos(
+            vector="pml107", protospacer=PROTOSPACER, target_organism="yeast"
+        )
+        assert r["status"] == "ready"
+        assert r["top_overhang"] == "GATC"
+        assert r["bottom_overhang"] == ""
+
+    def test_pml107_oligos_match_pml104_structure(self):
+        # pml107 is pml104 with LEU2 instead of URA3 — oligo design must be identical
+        r104 = design_cloning_oligos(vector="pml104", protospacer=PROTOSPACER, target_organism="yeast")
+        r107 = design_cloning_oligos(vector="pml107", protospacer=PROTOSPACER, target_organism="yeast")
+        assert r104["top_oligo"] == r107["top_oligo"]
+        assert r104["bottom_oligo"] == r107["bottom_oligo"]
+
+    def test_pml104_dam_sensitivity_note_present(self):
+        # BclI is Dam-methylation-sensitive; the warning must appear so users know
+        # to use a Dam- strain — losing this note is a silent wet-lab error
+        assert "Dam" in VECTOR_SPECS["pml104"].notes
+
+    def test_pml107_dam_sensitivity_note_present(self):
+        assert "Dam" in VECTOR_SPECS["pml107"].notes
+
+    def test_pml104_does_not_prepend_g(self):
+        # SNR52 does not require a 5-prime G; prepending one would add an
+        # unwanted base to the guide
+        r = design_cloning_oligos(vector="pml104", protospacer=PROTOSPACER, target_organism="yeast")
+        assert r["top_oligo"].startswith("GATC" + PROTOSPACER[0])
 
     def test_pdd162_in_registry(self):
         assert "pdd162" in VECTOR_SPECS

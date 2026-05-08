@@ -1723,17 +1723,24 @@ class LabSheet:
                     thread, verify_edit_result, nuclease, delivery,
                 )
             )
-        elif protospacer:
-            # No verification_reference was provided, but we know there's a
-            # protospacer in this design (CRISPR workflow). Emit a placeholder
-            # so the user knows that post-edit genomic Sanger is the next
-            # step after their plasmid is confirmed — and how to get specific
-            # primers when they're ready.
-            sections.append(
-                _format_edit_verification_placeholder(
-                    thread, protospacer, nuclease,
-                )
+        else:
+            # Detect any CRISPR signal in the construction record so we
+            # always emit the placeholder for CRISPR workflows, not just
+            # ones where auto-extraction found a clean 20-nt protospacer.
+            # RestrictionLigation workflows embed the protospacer inside a
+            # larger guide cassette PCR product (name contains "guide" but
+            # not "insert"), so the regex above doesn't catch them.
+            crispr_signals = ("guide", "crispr", "cas9", "cas12", "ptarget", "px330")
+            looks_crispr = bool(protospacer) or any(
+                any(sig in (p.get("name") or "").lower() for sig in crispr_signals)
+                for p in (construction_record.get("parts") or [])
             )
+            if looks_crispr:
+                sections.append(
+                    _format_edit_verification_placeholder(
+                        thread, protospacer or "(see your guide design output)", nuclease,
+                    )
+                )
 
         if include_notes and notes:
             sections.append(f"note:\n{notes}")

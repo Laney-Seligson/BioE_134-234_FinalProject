@@ -300,10 +300,12 @@ def _print_help() -> None:
 async def run_chat() -> None:
     load_dotenv()
 
-    # gemini-2.5-flash-lite: most permissive free-tier model right now —
-    # higher RPM than the preview models, lower 503 rate, and crucially
-    # NOT limit:0 like gemini-2.0-flash for new accounts.
-    model = "gemini-2.5-flash-lite"
+    # gemini-3.1-flash-lite-preview: this is the only model that reliably
+    # works on Jillian's free-tier API key. Other Gemini models (2.0-flash,
+    # 2.5-flash, 2.5-flash-lite) all hit limit:0 quota errors on this
+    # account. Don't change without testing — see git history.
+    model = "gemini-3.1-flash-lite-preview"
+    print(f"\n[USING MODEL: {model}]\n")  # confirm at startup
 
     # Alternatives — try these if the default is rate-limited or 503-ing.
     # Note: some "stable" models like gemini-2.0-flash have free-tier

@@ -159,10 +159,23 @@ from modules.construction_file_tools.tools.validate_construction_file import Val
 from modules.crispr_tools.tools.design_cas9_grna import DesignCas9Grna
 from modules.crispr_tools.tools.cas_selector import CasSelector
 from modules.crispr_tools.tools.design_cas12a_crrna import DesignCas12aCrrna
-from modules.crispr_tools.tools.design_cloning_oligos import CRISPRCloningDesigner
+from modules.crispr_tools.tools.design_cloning_oligos import CRISPRCloningDesigner, VECTOR_SPECS
 from modules.crispr_tools.tools.fetch_target_sequence import FetchTargetSequence
 from modules.crispr_tools.tools.rank_guides import rank_guides
 from modules.labsheet_tools.tools.lab_sheet import LabSheet
+
+
+# Map display names and common long-form aliases → registry keys so that inputs
+# like "pX330-U6-Chimeric_BB-CBh-hSpCas9" resolve to "px330".
+_VECTOR_NAME_TO_KEY: dict[str, str] = {
+    key.lower(): key for key in VECTOR_SPECS
+} | {
+    spec.name.lower(): key for key, spec in VECTOR_SPECS.items()
+}
+
+def _normalize_vector_key(vector: str) -> str:
+    """Return the registry key for a vector, tolerating display-name variants."""
+    return _VECTOR_NAME_TO_KEY.get(vector.strip().lower(), vector.strip())
 
 
 _CONSTRUCTION_INPUT_FIELDS = {
@@ -470,6 +483,7 @@ class RunFullCrisprWorkflow:
                 "workflow_trace": workflow_trace,
             }
 
+        vector = _normalize_vector_key(vector)
         spec = self.oligo_designer.resolve_vector(vector)
         if spec is None:
             raise ValueError(

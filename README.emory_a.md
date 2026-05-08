@@ -1,63 +1,56 @@
 ![CRISPR](https://img.shields.io/badge/CRISPR-Workflow-F527F2?style=for-the-badge)
 
 
-## Emory: ###
-My tools can help a person in education of CRISPR tools, and to design a protocol for wet-lab edits. Reasoning behind every tool comes from literature, such as vectors and primer design logic. User gives tool a gene, the tool fetches the genomic locus or the coding sequence from said gene ---> a cas nuclease is decided using a heurstic I created, the winner is the nuclease with a greater amount of good quality guides present. The logic backing a "good guide" is also cited. From the sequence, 10 guide sequences are presented and one is chosen to use in the construction file, and edit. Then we finally have variables that make up a construction file, in a library, and those are fed into my teammates tools for creating a construction file and lab sheet to perform the experiment with my generated variables decided in this workflow. 
+## Emory Adelman — CRISPR Toolchain
+
+My tools support CRISPR education and wet-lab protocol design. Every design decision — vector selection, guide scoring, primer logic — is backed by literature citations. The workflow begins when the user provides a gene name: the tool fetches the genomic locus or coding sequence from NCBI, selects a Cas nuclease using a heuristic I developed (the nuclease with more high-quality PAM-compatible guides wins), designs and ranks up to 10 guide sequences, then passes the best guide and all cloning variables to teammates' tools for construction file and lab sheet generation.
       
 
 
 
-<div style="margin-left: 20px;">
-<b>1. run_full_crispr_workflow </b>
+## 1. run_full_crispr_workflow
 
 - What it does: 
   - NEEDS gene and Organism name to successfully call tool 
   - Fetch a target sequence from the NCBI GenBank file for the gene chosen 
-  - design guide or crispr RNA sequence using the 10 found in the fetched sequence, meant to cover the gene broadly from PAM-based windowns across the whole sequence 
+  - design guide or crRNA sequence using the 10 found in the fetched sequence, meant to cover the gene broadly from PAM-based windows across the whole sequence 
   - rank guide and crispr RNAs with 'rank_guides.py', authored by Jillian and I, and find the single best one to use out of the 10 
   - off-target prediction and on-target efficiency is calculated with tools such as '_predict_editing_efficiency.py' and 'predict_offtargets.py' 
   - design cloning oligos 
   - prepares construction file inputs 
 
-The MCP will then stop and ask if the user wants to make a constuction file or lab sheet then Laney and Jillian's tools are ran. 
+The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called.
 
 **Example shown at bottom in appendix, this output is very long** 
 
-Possible Unhappy Paths: 
-(these are the most common cases, and not really inconvienent at all)
-- A user may just say "Run full crispr workflow on genes that cause cystic fibrosis in homo sapiens." 
-- If user gives a disease of a gene, semantic tools will try to identify a good target gene
-- The gene is not known, so semantic tools are called to narrow that down 
-- After the gene is figured out, sometimes the MCP will forget what organism its working with and ask again 
-- Vectors are not always known by the user and the MCP may supply vector recommendations depending on the query, or wait for user input, this pertains to design_cloning_oligos 
-- Construction file regions that are unknown will silently print as incomplete or as "N" and the user needs to be aware of those errors. 
+Possible Unhappy Paths:
+- A user may say "Run full CRISPR workflow on genes that cause cystic fibrosis in Homo sapiens." If only a disease name is given, semantic tools are called to identify a target gene before the workflow proceeds.
+- After gene resolution, the organism is occasionally re-prompted if it was inferred rather than explicitly stated.
+- Vectors are not always known; the MCP supplies organism-appropriate recommendations or waits for user input before calling `design_cloning_oligos`.
+- Construction file regions that cannot be determined are printed as incomplete or `"N"` — users should review those fields before submitting to wet lab.
  
 - MCP Wrapper: `run_full_crispr_workflow.json`
 - Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
 
-<b>2. fetch_target_sequence</b>
+## 2. fetch_target_sequence
 - What it does: 
   - Resolves a gene name or accession to a clean DNA sequence using NCBI Entrez tools
-  - Super similar to Karina's lookup_gene_sequences.py, just part of how my 'full_crispr_workflow' works smoothly
-  - Utilizes _utils.py 'normalize_organism' to recognize "slang" names and such 
+  - Closely related to Karina's `lookup_gene_sequences.py`; integrated directly into `run_full_crispr_workflow` for seamless end-to-end operation
+  - Uses `_utils.normalize_organism()` to canonicalize common organism aliases (e.g. "e. coli" → "Escherichia coli") before any NCBI call
 
   Contains 'fetch_locus_from_ncbi' which uses esearch for the gene ID,esummary for the chromosomal coordinates, and efetch to get a fasta slice from designated region of the chromosome 
 
   Also,'fetch_cds_from_ncbi' function makes it so we have a esearch for gene ID, elink for RefSeq mRNA accession IDs, and efetch to extract CDS from a GenBank record.  
   
   
-  Future work: 
+  Future work:
 
-  This tool freaks out and uses the semantic search tools she made if an organism is not specified or the gene is written in too complicated of a format. 
-
-  I want this to be replaced with Karina's script for gene_sequence_lookup_tool and gene_locus_**. 
-  
-  Those semantic tools The only difference is that my fetch target sequence is more strict and raises an error before returning the wrong gene. Her code can deduce more information though. 
+  If the organism is unspecified or the gene name is ambiguous, the tool raises an error and defers to Karina's semantic search tools. A planned improvement is to replace this tool entirely with Karina's `gene_sequence_lookup_tool` and `gene_locus_*` scripts, which can infer more context. The key difference is that the current tool is stricter — it raises an error rather than returning a possibly incorrect gene — while Karina's tools can deduce more from natural language input.
   
   - MCP Wrapper: `fetch_target_sequence.json`
   - Pytests (`tests/unit/test_fetch_target_sequence.py`): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
-  ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
+---✨
   - Sample Happy Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
   
   Notice that all genes are formatted simply and that the organism is stated. This is usually the way this tool works best. 
@@ -138,11 +131,10 @@ Possible Unhappy Paths:
   
     - National Center for Biotechnology Information. n.d. "Gene Database Help." U.S. National Library of Medicine. https://www.ncbi.nlm.nih.gov/books/NBK3841/.
   
-   <b> 3. cas_selector</b>
+## 3. cas_selector
   - What it does: 
-  - Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements by scanning WHOLE LOCUS from fetch_target_sequence or CDS if necessary 
-  For Multiplexing: 
-  Results will be aggregated if there are multiple genomic locuses by majority rules! 
+  - Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements by scanning the full genomic locus (or CDS if specified) from `fetch_target_sequence`
+  - For multiplexing: results across multiple genomic loci are aggregated by majority vote
   
   > **Note on AT-rich genomes:** Cas12a may provide broader targeting coverage in AT-rich genomes because TTTV PAMs can become more abundant than NGG PAMs — but this is a heuristic based on PAM density, not a universal biological rule. The selector uses guide count ratios, not GC alone, to make the recommendation (Zetsche et al. 2015; Kim et al. 2016).
   
@@ -151,11 +143,12 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `cas_selector.json`
   - Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
-  ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
+---✨
   - Sample Happy Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
   - Output: 
     <details>
     <summary>Click to expand sample output</summary>
+
         ```json 
         You: What Cas system would I use to edit sma-2, sma-3 and sma-4 in C.elegans all at once?
         
@@ -249,7 +242,7 @@ Possible Unhappy Paths:
   
   
   
-  <b> 4. design_cas9_grna </b>
+## 4. design_cas9_grna
   - What it does: 
     - Enumerates SpCas9 guide RNA candidates from NGG PAM sites across the sequence; candidate scoring applies GC content (40–65% optimum) and poly-T checks as heuristics derived from Doench et al. 2016 Rule Set 2 — downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
     - It does this with a prompt that is directly about designing guides if nuclease, genes and organism are known. 
@@ -261,7 +254,7 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `design_cas9_grna.json`
   - Pytests (`tests/unit/test_design_cas9_grna.py`): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
-  ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
+---✨
   - Sample Happy Prompt: “Design Cas9 guides for the lacZ locus.” 
   
   - Output: 
@@ -501,10 +494,10 @@ Possible Unhappy Paths:
   
     - Doench, John G., Nicolo Fusi, Meagan Sullender, Mudra Hegde, Emma W. Vaimberg, Katherine F. Donovan, Ian Smith, et al. 2016. "Optimized sgRNA Design to Maximize Activity and Minimize Off-Target Effects of CRISPR-Cas9." Nature Biotechnology 34 (2): 184–191. https://doi.org/10.1038/nbt.3437. *(GC content optimum 40–65%, poly-T termination penalty, PAM-proximal position weights used in candidate scoring)*
   
-  <b> 5. design_cas12a_crrna </b>
+## 5. design_cas12a_crrna
   - What it does: 
     - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates 
-    -For multiplexing, say on 3 different genes, each gene has to go through seperate workflows. 
+    - For multiplexing across multiple genes, each gene goes through a separate workflow.
   
     Possible Unhappy Paths: 
     If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
@@ -513,7 +506,7 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `design_cas12a_crrna.json`
   - Pytests (`tests/unit/test_design_cas12a_crrna.py`): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
-  ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
+---✨
   - Sample Happy Prompt: “Give me Cas12a guides for the araB locus.”
   - Output: 
     <details>
@@ -600,9 +593,10 @@ Possible Unhappy Paths:
     - Kim, Hoon Cho, Sunghyeok Ye, Daesik Kim, Young-Chang Cho, Ju-Hyun Lee, and Jin-Soo Kim. 2018. "In Vivo High-Throughput Profiling of CRISPR-Cpf1 Activity." Nature Methods 15 (1): 10–12. https://doi.org/10.1038/nbt.4061. *(Position-specific nucleotide preferences for Cas12a on-target activity; informs crRNA candidate scoring)*
     - Hu, Xianrong, Kejian Wang, Yiping Tong, et al. 2020. "Technological Advances in CRISPR-Cas-Based Plant Genome Editing." The Crop Journal 8 (3): 403–407. https://doi.org/10.1016/j.cj.2019.06.007. *(Cas12a crRNA array cloning strategy using BbsI/BsmBI into pML104/pML107 vectors)*
   
-  <b> 6. design_cloning_oligos </b>
-  - What it does: 
-    - Takes Vector, along with information form design guide scripts and 
+## 6. design_cloning_oligos
+
+- What it does:
+    - Takes the vector and guide information from the guide design tools and
     - Designs annealed oligos or PCR primers into a preset vector 
     - TypeIIS (BbsI / BsmBI / BsaI annealed-oligo sticky-end ligation) — Type IIS enzymes cut outside their recognition sequence, leaving vector-specific 4-nt sticky ends (e.g. CACC/AAAC for BbsI in pX330). These overhangs are determined by the vector backbone, not user design (Ran et al. 2013; Addgene Zhang Lab cloning protocol, Sept 2015).
     - RestrictionLigation
@@ -621,7 +615,7 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `design_cloning_oligos.json`
   - Pytests (`tests/unit/test_design_cloning_oligos.py`): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
-  ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
+---✨
   - Sample Happy Prompt: “Design oligos to clone this protospacer into px330.” 
   - Output: 
     <details>
@@ -708,12 +702,12 @@ Possible Unhappy Paths:
   
     - New England Biolabs. "Which Restriction Enzymes Are Used in Golden Gate Assembly?" NEB FAQ. https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly. *(BbsI, BsmBI, BsaI cut outside recognition site leaving 4-nt overhangs; basis for TypeIIS enzyme selection)*
   
-  <b>7. Shared utilities (`modules/crispr_tools/tools/_utils.py`)</b>
+  ## 7. Shared utilities (`modules/crispr_tools/tools/_utils.py`)
   
   - What it does:
     
     - Centralizes logic that was previously duplicated or missing across multiple CRISPR tools
-    - `normalize_organism(name)` — converts common organism aliases ("e. coli", "human", "yeast", "c. elegans", etc.) to their canonical scientific names before any NCBI Entrez call. This has caused  `fetch_target_sequence` to faili for the same organism/gene combo that `semantic_gene_search` handled correctly: the fetch tool was passing aliases like "e. coli" directly to NCBI, which rejects them.
+    - `normalize_organism(name)` — converts common organism aliases ("e. coli", "human", "yeast", "c. elegans", etc.) to their canonical scientific names before any NCBI Entrez call. This fixed a bug where `fetch_target_sequence` failed for the same organism/gene combinations that `semantic_gene_search` handled correctly: the fetch tool was passing aliases like "e. coli" directly to NCBI, which rejects them.
     - `VALID_DNA` — shared set of valid DNA bases (`ATGC`), previously duplicated in `fetch_target_sequence.py` and `run_full_crispr_workflow.py`
     - `reverse_complement(seq)` — shared DNA reverse-complement function, previously duplicated as a module-level function in `design_cloning_oligos.py` and as an instance method in `cas_selector.py`
     
@@ -726,4 +720,3 @@ Possible Unhappy Paths:
     - `design_cloning_oligos.py` — replaced local `_reverse_complement` and `_COMPLEMENT`; uses `normalize_organism()` in vector compatibility check
     - `cas_selector.py` — replaced inline `_reverse_complement` instance method
     - `run_full_crispr_workflow.py` — replaced local `_VALID_DNA` definition
-  </div>

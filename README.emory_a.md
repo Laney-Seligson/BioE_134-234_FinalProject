@@ -712,7 +712,7 @@ Possible Unhappy Paths:
   
     - New England Biolabs. "Which Restriction Enzymes Are Used in Golden Gate Assembly?" NEB FAQ. https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly. *(BbsI, BsmBI, BsaI cut outside recognition site leaving 4-nt overhangs; basis for TypeIIS enzyme selection)*
   
-  ## 7.[_utils.py](modules/crispr_tools/tools/_utils.py)
+  ## 7.[_utils.py](modules/crispr_tools/tools/_utils.py) NOT callable by MCP, only for support 
   
   - What it does:
     

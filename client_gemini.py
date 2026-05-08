@@ -300,10 +300,13 @@ def _print_help() -> None:
 async def run_chat() -> None:
     load_dotenv()
 
-    # 2026 Google's best model but limited to 20 calls/day (according to Gemini, not able to confirm)
-    model = "gemini-3.1-flash-lite-preview"
+    # gemini-2.0-flash: stable production model, higher free-tier RPM than
+    # the preview models, more reliable for live demos. Use this by default.
+    model = "gemini-2.0-flash"
 
-    # can also use; smarter but 20 calls/day; use sparingly
+    # Preview alternatives (often hit 503/rate-limit during high traffic):
+    # model = "gemini-3.1-flash-lite-preview"  # Google's newest preview
+    # model = "gemini-2.5-flash"               # smarter, lower RPM
     # model = "gemini-2.5-flash-preview"
 
     # The client will pick up GEMINI_API_KEY (or GOOGLE_API_KEY) from a .env file.
@@ -316,8 +319,12 @@ async def run_chat() -> None:
     #     print(m.name)
 
 
-    def safe_generate(*, model, contents, config, retries=6, backoff_seconds=2):
-        """Call Gemini with automatic retry on 503 (server busy) errors."""
+    def safe_generate(*, model, contents, config, retries=3, backoff_seconds=2):
+        """Call Gemini with automatic retry on 503 (server busy) errors.
+
+        retries=3 with max 8s backoff = at most ~14s waiting before raising
+        the original error so the user can retry the prompt. Higher retry
+        counts just burn time during a sustained outage."""
         for attempt in range(retries):
             try:
                 return gemini.models.generate_content(
@@ -329,7 +336,7 @@ async def run_chat() -> None:
                 #503 UNAVAILABLE - Gemini servers are overloaded
                 msg = str(e)
                 if ("503" in msg or "UNAVAILABLE" in msg) and attempt < retries - 1:
-                    wait = min(backoff_seconds * (2 ** attempt), 30)
+                    wait = min(backoff_seconds * (2 ** attempt), 8)
                     print(f"\n[Gemini busy (503). Retrying in {wait}s...]")
                     time.sleep(wait)
                     continue
@@ -344,6 +351,7 @@ async def run_chat() -> None:
                         match = re.search(r"retry[^\d]*(\d+(?:\.\d+)?)\s*s", msg, re.IGNORECASE)
                         wait = float(match.group(1)) + 1 if match else backoff_seconds * (2 ** attempt)
                         wait = max(wait, 2)  # always wait at least 2 seconds
+                        wait = min(wait, 8)  # cap at 8s to fail fast
                         print(f"\n[Rate limit hit (429). Retrying in {wait:.0f}s...]")
                         time.sleep(wait)
                         continue

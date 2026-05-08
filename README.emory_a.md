@@ -12,7 +12,7 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
 
 - What it does: 
   - NEEDS gene and Organism name to successfully call tool 
-  - Fetch a target sequence from the NCBI GenBank file for the gene chosen 
+  - Fetches a target sequence, genomic locus or cds from the NCBI GenBank file for the gene chosen 
   - design guide or crRNA sequence using the 10 found in the fetched sequence, meant to cover the gene broadly from PAM-based windows across the whole sequence 
   - rank guide and crispr RNAs with 'rank_guides.py', authored by Jillian and I, and find the single best one to use out of the 10 
   - off-target prediction and on-target efficiency is calculated with tools such as '_predict_editing_efficiency.py' and 'predict_offtargets.py' 
@@ -36,7 +36,7 @@ Possible Unhappy Paths:
 ## 2. fetch_target_sequence
 - What it does: 
   - Resolves a gene name or accession to a clean DNA sequence using NCBI Entrez tools
-  - Closely related to Karina's `lookup_gene_sequences.py`; integrated directly into `run_full_crispr_workflow` for seamless end-to-end operation
+  - Closely related to Karina's gene lookup tool integrated directly into `run_full_crispr_workflow` for semi- seamless end-to-end operation
   - Uses `_utils.normalize_organism()` to canonicalize common organism aliases (e.g. "e. coli" → "Escherichia coli") before any NCBI call
 
   Contains 'fetch_locus_from_ncbi' which uses esearch for the gene ID,esummary for the chromosomal coordinates, and efetch to get a fasta slice from designated region of the chromosome 

@@ -60,8 +60,8 @@ Possible Unhappy Paths:
   Notice that all genes are formatted simply and that the organism is stated. This is usually the way this tool works best. 
   
   - Output: 
-    <details>
-    <summary>Click to expand sample output</summary>
+  <details>
+  <summary>Click to expand sample output</summary>
     
   ```json
   You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             

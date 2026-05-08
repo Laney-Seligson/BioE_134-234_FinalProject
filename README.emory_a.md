@@ -1,3 +1,4 @@
+![CRISPR](https://img.shields.io/badge/CRISPR-Workflow-F527F2?style=for-the-badge)
 ## Emory: ###
 My tools can help a person in education of CRISPR tools, and to design a protocol for wet-lab edits. Reasoning behind every tool comes from literature, such as vectors and primer design logic. User gives tool a gene, the tool fetches the genomic locus or the coding sequence from said gene ---> a cas nuclease is decided using a heurstic I created, the winner is the nuclease with a greater amount of good quality guides present. The logic backing a "good guide" is also cited. From the sequence, 10 guide sequences are presented and one is chosen to use in the construction file, and edit. Then we finally have variables that make up a construction file, in a library, and those are fed into my teammates tools for creating a construction file and lab sheet to perform the experiment with my generated variables decided in this workflow. 
       

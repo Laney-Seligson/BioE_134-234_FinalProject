@@ -948,6 +948,30 @@ def _format_crispr_delivery_section(op: dict, thread: str) -> str:
     ]).rstrip()
 
 
+def _format_edit_verification_placeholder(
+    thread: str, protospacer: str, nuclease: str
+) -> str:
+    """Always-emit placeholder for the post-edit GENOMIC verification
+    step when the design phase identified a protospacer but the caller
+    didn't supply a genomic reference. Points the user at crispr_verify_edit
+    so they can design specific primers when they're ready to verify."""
+    return "\n".join([
+        f"{thread}: EditVerification (post-edit genomic Sanger) — placeholder",
+        "",
+        "After your CRISPR edit succeeds, verify the genomic edit:",
+        "  1. Extract genomic DNA from edited cells.",
+        "  2. PCR-amplify the genomic locus around the cut site (~300-500 bp window).",
+        "  3. Sanger-sequence the PCR product with one of the flanking primers.",
+        "  4. Upload the .ab1 trace + amplicon sequence to Synthego ICE or TIDE.",
+        "  5. Run crispr_interpret_ice_tide on the editing % + R-squared from ICE/TIDE.",
+        "",
+        f"To get specific verification primers for this guide ({protospacer}, {nuclease}),",
+        "run crispr_verify_edit with the genomic reference for your locus. Without a",
+        "genomic reference, this section is a placeholder — primer design needs the",
+        "actual sequence around the edit site.",
+    ])
+
+
 def _format_edit_verification_section(
     thread: str,
     ve: dict,
@@ -1697,6 +1721,17 @@ class LabSheet:
             sections.append(
                 _format_edit_verification_section(
                     thread, verify_edit_result, nuclease, delivery,
+                )
+            )
+        elif protospacer:
+            # No verification_reference was provided, but we know there's a
+            # protospacer in this design (CRISPR workflow). Emit a placeholder
+            # so the user knows that post-edit genomic Sanger is the next
+            # step after their plasmid is confirmed — and how to get specific
+            # primers when they're ready.
+            sections.append(
+                _format_edit_verification_placeholder(
+                    thread, protospacer, nuclease,
                 )
             )
 

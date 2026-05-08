@@ -494,8 +494,8 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
   - NEEDS gene and Organism name to successfully call tool 
   - Fetches a target sequence, genomic locus or cds from the NCBI GenBank file for the gene chosen 
   - design guide or crRNA sequence using the 10 found in the fetched sequence, meant to cover the gene broadly from PAM-based windows across the whole sequence 
-  - rank guide and crispr RNAs with 'rank_guides.py', authored by Jillian and I, and find the single best one to use out of the 10 
-  - off-target prediction and on-target efficiency is calculated with tools such as '_predict_editing_efficiency.py' and 'predict_offtargets.py' 
+  - rank guide and crispr RNAs with [rank_guides.py](modules/crispr_tools/tools/rank_guides.py), authored by Jillian and I, and find the single best one to use out of the 10 
+  - off-target prediction and on-target efficiency is calculated with tools such as [predict_editing_efficiency.py](modules/crispr_tools/tools/predict_editing_efficiency.py) and [predict_offtargets.py](modules/crispr_tools/tools/predict_offtargets.py) 
   - design cloning oligos 
   - prepares construction file inputs 
 
@@ -509,8 +509,8 @@ Possible Unhappy Paths:
 - Vectors are not always known; the MCP supplies organism-appropriate recommendations or waits for user input before calling `design_cloning_oligos`.
 - Construction file regions that cannot be determined are printed as incomplete or `"N"` — users should review those fields before submitting to wet lab.
  
-- MCP Wrapper: `run_full_crispr_workflow.json`
-- Pytests (`tests/unit/test_run_full_crispr_workflow.py`): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
+- MCP Wrapper: [run_full_crispr_workflow.json](modules/crispr_tools/tools/run_full_crispr_workflow.json)
+- Pytests ([tests/unit/test_run_full_crispr_workflow.py](tests/unit/test_run_full_crispr_workflow.py)): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
 
 ## 2. fetch_target_sequence
@@ -528,8 +528,8 @@ Possible Unhappy Paths:
 
   If the organism is unspecified or the gene name is ambiguous, the tool raises an error and defers to Karina's semantic search tools. A planned improvement is to replace this tool entirely with Karina's `gene_sequence_lookup_tool` and `gene_locus_*` scripts, which can infer more context. The key difference is that the current tool is stricter — it raises an error rather than returning a possibly incorrect gene — while Karina's tools can deduce more from natural language input.
   
-  - MCP Wrapper: `fetch_target_sequence.json`
-  - Pytests (`tests/unit/test_fetch_target_sequence.py`): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
+  - MCP Wrapper: [fetch_target_sequence.json](modules/crispr_tools/tools/fetch_target_sequence.json)
+  - Pytests ([tests/unit/test_fetch_target_sequence.py](tests/unit/test_fetch_target_sequence.py)): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
 ---
   - Sample Happy Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
   
@@ -623,8 +623,8 @@ Possible Unhappy Paths:
   Possible Unhappy Paths: 
   If a person is not specific with the gene name, semantic tools will be called along with fetch sequence. The user will then have to go through a series of questions to find genes of interest. 
   
-  - MCP Wrapper: `cas_selector.json`
-  - Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
+  - MCP Wrapper: [cas_selector.json](modules/crispr_tools/tools/cas_selector.json)
+  - Pytests ([tests/unit/test_cas_selector.py](tests/unit/test_cas_selector.py)): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
 ---
   - Sample Happy Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
   - Output:
@@ -733,11 +733,11 @@ Possible Unhappy Paths:
     - For multiplexing, say on 3 different genes, each gene has to go through 1 individual workflow. 
   
     Possible Unhappy Paths: 
-    If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
+    If genes and organism are known: [fetch_target_sequence.py](modules/crispr_tools/tools/fetch_target_sequence.py) and `cas_selector` are used before designing guides. 
     If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
   
-  - MCP Wrapper: `design_cas9_grna.json`
-  - Pytests (`tests/unit/test_design_cas9_grna.py`): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
+  - MCP Wrapper: [design_cas9_grna.json](modules/crispr_tools/tools/design_cas9_grna.json)
+  - Pytests ([tests/unit/test_design_cas9_grna.py](tests/unit/test_design_cas9_grna.py)): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
 ---
   - Sample Happy Prompt: “Design Cas9 guides for the lacZ locus.” 
   
@@ -986,12 +986,12 @@ Possible Unhappy Paths:
     - For multiplexing across multiple genes, each gene goes through a separate workflow.
   
     Possible Unhappy Paths: 
-    If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
+    If genes and organism are known: [fetch_target_sequence.py](modules/crispr_tools/tools/fetch_target_sequence.py) and `cas_selector` are used before designing guides. 
     If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
      
   
-  - MCP Wrapper: `design_cas12a_crrna.json`
-  - Pytests (`tests/unit/test_design_cas12a_crrna.py`): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
+  - MCP Wrapper: [design_cas12a_crrna.json](modules/crispr_tools/tools/design_cas12a_crrna.json)
+  - Pytests ([tests/unit/test_design_cas12a_crrna.py](tests/unit/test_design_cas12a_crrna.py)): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
 ---
   - Sample Happy Prompt: “Give me Cas12a guides for the araB locus.”
   - Output:
@@ -1101,8 +1101,8 @@ Possible Unhappy Paths:
     - **Addgene API fallback:** preset vectors are handled locally; if `vector` is a numeric Addgene plasmid ID (e.g. `"42230"` or `"addgene:67639"`), the tool attempts to fetch plasmid metadata from the Addgene Developers API. Requires `ADDGENE_API_KEY` in `.env`. Dynamic results include citations in the same `{ "label", "reference", "claim" }` format as other tools. If no API key is available, use a preset vector or `vector="custom"`. This feature does not have and will not have its own JSON wrapper — it is handled entirely within `design_cloning_oligos`.
     - if organism/vector info is missing → returns `needs_user_input` with human-readable questions instead of an error
   
-  - MCP Wrapper: `design_cloning_oligos.json`
-  - Pytests (`tests/unit/test_design_cloning_oligos.py`): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
+  - MCP Wrapper: [design_cloning_oligos.json](modules/crispr_tools/tools/design_cloning_oligos.json)
+  - Pytests ([tests/unit/test_design_cloning_oligos.py](tests/unit/test_design_cloning_oligos.py)): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
 ---
   - Sample Happy Prompt: “Design oligos to clone this protospacer into px330.” 
   - Output:
@@ -1192,24 +1192,24 @@ Possible Unhappy Paths:
   
     - New England Biolabs. "Which Restriction Enzymes Are Used in Golden Gate Assembly?" NEB FAQ. https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly. *(BbsI, BsmBI, BsaI cut outside recognition site leaving 4-nt overhangs; basis for TypeIIS enzyme selection)*
   
-  ## 7. Shared utilities (`modules/crispr_tools/tools/_utils.py`)
+  ## 7. Shared utilities ([modules/crispr_tools/tools/_utils.py](modules/crispr_tools/tools/_utils.py))
   
   - What it does:
     
     - Centralizes logic that was previously duplicated or missing across multiple CRISPR tools
     - `normalize_organism(name)` — converts common organism aliases ("e. coli", "human", "yeast", "c. elegans", etc.) to their canonical scientific names before any NCBI Entrez call. This fixed a bug where `fetch_target_sequence` failed for the same organism/gene combinations that `semantic_gene_search` handled correctly: the fetch tool was passing aliases like "e. coli" directly to NCBI, which rejects them.
-    - `VALID_DNA` — shared set of valid DNA bases (`ATGC`), previously duplicated in `fetch_target_sequence.py` and `run_full_crispr_workflow.py`
-    - `reverse_complement(seq)` — shared DNA reverse-complement function, previously duplicated as a module-level function in `design_cloning_oligos.py` and as an instance method in `cas_selector.py`
+    - `VALID_DNA` — shared set of valid DNA bases (`ATGC`), previously duplicated in [fetch_target_sequence.py](modules/crispr_tools/tools/fetch_target_sequence.py) and [run_full_crispr_workflow.py](modules/crispr_tools/tools/run_full_crispr_workflow.py)
+    - `reverse_complement(seq)` — shared DNA reverse-complement function, previously duplicated as a module-level function in [design_cloning_oligos.py](modules/crispr_tools/tools/design_cloning_oligos.py) and as an instance method in [cas_selector.py](modules/crispr_tools/tools/cas_selector.py)
     
     There are definitely more scripts that could utilize a centralized _utils function. Can be a future goal. 
   
-  - Files that now import from `_utils.py`:
+  - Files that now import from [_utils.py](modules/crispr_tools/tools/_utils.py):
     
-    - `fetch_target_sequence.py` — now normalizes organism before NCBI lookup (bug fix)
-    - `lookup_gene_sequence.py` — replaced local `_ORGANISM_ALIASES` dict with shared `normalize_organism()`
-    - `design_cloning_oligos.py` — replaced local `_reverse_complement` and `_COMPLEMENT`; uses `normalize_organism()` in vector compatibility check
-    - `cas_selector.py` — replaced inline `_reverse_complement` instance method
-    - `run_full_crispr_workflow.py` — replaced local `_VALID_DNA` definition
+    - [fetch_target_sequence.py](modules/crispr_tools/tools/fetch_target_sequence.py) — now normalizes organism before NCBI lookup (bug fix)
+    - [lookup_gene_sequence.py](modules/crispr_tools/tools/lookup_gene_sequence.py) — replaced local `_ORGANISM_ALIASES` dict with shared `normalize_organism()`
+    - [design_cloning_oligos.py](modules/crispr_tools/tools/design_cloning_oligos.py) — replaced local `_reverse_complement` and `_COMPLEMENT`; uses `normalize_organism()` in vector compatibility check
+    - [cas_selector.py](modules/crispr_tools/tools/cas_selector.py) — replaced inline `_reverse_complement` instance method
+    - [run_full_crispr_workflow.py](modules/crispr_tools/tools/run_full_crispr_workflow.py) — replaced local `_VALID_DNA` definition
 ### Laney:
 <div style="margin-left: 20px;">
 <b> 1. create_construction_file.py:</b> 

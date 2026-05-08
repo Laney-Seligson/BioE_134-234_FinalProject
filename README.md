@@ -501,7 +501,7 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
 
 The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called.
 
-**Example shown at bottom in appendix, this output is very long** 
+**Example shown in demo video!, this output is very long** 
 
 Possible Unhappy Paths:
 - A user may say "Run full CRISPR workflow on genes that cause cystic fibrosis in Homo sapiens." If only a disease name is given, semantic tools are called to identify a target gene before the workflow proceeds.

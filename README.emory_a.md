@@ -254,8 +254,8 @@ Possible Unhappy Paths:
     - For multiplexing, say on 3 different genes, each gene has to go through 1 individual workflow. 
   
     Possible Unhappy Paths: 
-    - If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
-    - If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
+    If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
+    If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
   
   - MCP Wrapper: `design_cas9_grna.json`
   - Pytests (`tests/unit/test_design_cas9_grna.py`): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
@@ -505,8 +505,8 @@ Possible Unhappy Paths:
     -For multiplexing, say on 3 different genes, each gene has to go through seperate workflows. 
   
     Possible Unhappy Paths: 
-    -If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
-    -If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
+    If genes and organism are known: 'crispr_fetch_target_sequence.py' and 'cas_selector' are used before designing guides. 
+    If only the cas nuclease is known then we have to start from the semantic tools that belong to Karina. 
      
   
   - MCP Wrapper: `design_cas12a_crrna.json`
@@ -610,7 +610,7 @@ Possible Unhappy Paths:
   > **Vector provenance:** Preset vectors (pX330, pML104, pML107, pDD162, pRC11, BPK4446) were derived from published vector maps and Addgene repository records. pX330 overhangs and protocol follow Ran et al. 2013. pML104/pML107 follow Addgene depositor records. Cas12a-specific vectors follow Hu et al. 2020.
   
   Possible Unhappy Paths: 
-    -When left without vector, the MCP will ask for information such as 
+    When left without vector, the MCP will ask for information such as 
   
     Future Work/ Not Super established:  
     - Add more vectors to Dictionary presets 
@@ -709,6 +709,7 @@ Possible Unhappy Paths:
   <b>7. Shared utilities (`modules/crispr_tools/tools/_utils.py`)</b>
   
   - What it does:
+    
     - Centralizes logic that was previously duplicated or missing across multiple CRISPR tools
     - `normalize_organism(name)` — converts common organism aliases ("e. coli", "human", "yeast", "c. elegans", etc.) to their canonical scientific names before any NCBI Entrez call. This has caused  `fetch_target_sequence` to faili for the same organism/gene combo that `semantic_gene_search` handled correctly: the fetch tool was passing aliases like "e. coli" directly to NCBI, which rejects them.
     - `VALID_DNA` — shared set of valid DNA bases (`ATGC`), previously duplicated in `fetch_target_sequence.py` and `run_full_crispr_workflow.py`
@@ -717,6 +718,7 @@ Possible Unhappy Paths:
     There are definitely more scripts that could utilize a centralized _utils function. Can be a future goal. 
   
   - Files that now import from `_utils.py`:
+    
     - `fetch_target_sequence.py` — now normalizes organism before NCBI lookup (bug fix)
     - `lookup_gene_sequence.py` — replaced local `_ORGANISM_ALIASES` dict with shared `normalize_organism()`
     - `design_cloning_oligos.py` — replaced local `_reverse_complement` and `_COMPLEMENT`; uses `normalize_organism()` in vector compatibility check

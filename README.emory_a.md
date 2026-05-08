@@ -58,8 +58,8 @@ Possible Unhappy Paths:
   - Output:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-  <details>
-  <summary> Click to expand sample output</summary>
+<details>
+<summary>Click to expand sample output</summary>
         
       ```json
       You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
@@ -125,7 +125,7 @@ Possible Unhappy Paths:
       2.  **Guide Design**: I will proceed with guide design based on that recommendation.
       3.  **Aggregation**: I will then aggregate these results to provide a unified strategy.
       ```
-  </details>
+</details>
   
   
   - Citations: 
@@ -150,8 +150,8 @@ Possible Unhappy Paths:
   - Output:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-    <details>
-    <summary> Click to expand sample output</summary>
+<details>
+<summary>Click to expand sample output</summary>
 
         ```json 
         You: What Cas system would I use to edit sma-2, sma-3 and sma-4 in C.elegans all at once?
@@ -235,7 +235,7 @@ Possible Unhappy Paths:
         3.  **Assisting with the cloning strategy** for a Cas12a multiplexing vector?
         
         ```
-  </details>
+</details>
   
   - Citations: 
     - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
@@ -264,8 +264,8 @@ Possible Unhappy Paths:
   - Output:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-    <details>
-    <summary> Click to expand sample output</summary>
+<details>
+<summary>Click to expand sample output</summary>
   
     ```json
     After calling previous tools →
@@ -491,7 +491,7 @@ Possible Unhappy Paths:
     **Rationale:** This guide has a GC content of 45%, contains no poly-T runs (which would cause premature termination), and has zero predicted off-target sites in the *E. coli* genome, making it highly specific.
     Would you like to design cloning oligos for a specific vector (e.g., pTargetF, or a custom one) using this guide, or would you like me to check the editing efficiency prediction?
     ```
-    </details>
+</details>
   
   - Citations: 
     - Jinek, Martin, Krzysztof Chylinski, Ines Fonfara, Michael Hauer, Jennifer A. Doudna, and Emmanuelle Charpentier. 2012. "A Programmable Dual-RNA–Guided DNA Endonuclease in Adaptive Bacterial Immunity." Science 337 (6096): 816–821. https://doi.org/10.1126/science.1225829.
@@ -517,8 +517,8 @@ Possible Unhappy Paths:
   - Output:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-    <details>
-    <summary> Click to expand sample output</summary>
+<details>
+<summary>Click to expand sample output</summary>
   
         ```json
         After calling previous tools →
@@ -593,7 +593,7 @@ Possible Unhappy Paths:
         These crRNAs include the LbCas12a direct repeat sequence (`AAUUUCUACUAAGUGUAGAU`) at the 5' end. 
         If you would like to proceed, I can help you select the best candidates based on specificity, design cloning oligos for your vector, or provide an editing efficiency prediction for a specific guide. How would          you like to continue?
         ```
-        </details>
+</details>
     
   - Citations:
     - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
@@ -628,8 +628,8 @@ Possible Unhappy Paths:
   - Output:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-    <details>
-    <summary> Click to expand sample output</summary>
+<details>
+<summary>Click to expand sample output</summary>
     
         ```json
         [Tool result] ← crispr_design_cloning_oligos:
@@ -687,7 +687,7 @@ Possible Unhappy Paths:
         **(c) both**, or
         **(d) neither**?
         ```
-    </details>
+</details>
   
   - Citations: 
     - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. "Genome Engineering Using the CRISPR-Cas9 System." Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; CACC/AAAC overhang logic for annealed-oligo ligation)*

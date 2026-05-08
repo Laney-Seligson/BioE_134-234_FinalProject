@@ -50,14 +50,16 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `fetch_target_sequence.json`
   - Pytests (`tests/unit/test_fetch_target_sequence.py`): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
----✨
+---
   - Sample Happy Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
   
   Notice that all genes are formatted simply and that the organism is stated. This is usually the way this tool works best. 
 
-  - Output: 
+  - Output:
+
+  ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
   <details>
-  <summary>Click to expand sample output</summary>
+  <summary>📂 Click to expand sample output</summary>
         
       ```json
       You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
@@ -143,11 +145,13 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `cas_selector.json`
   - Pytests (`tests/unit/test_cas_selector.py`): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
----✨
+---
   - Sample Happy Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
-  - Output: 
+  - Output:
+
+  ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>Click to expand sample output</summary>
+    <summary>📂 Click to expand sample output</summary>
 
         ```json 
         You: What Cas system would I use to edit sma-2, sma-3 and sma-4 in C.elegans all at once?
@@ -254,12 +258,14 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `design_cas9_grna.json`
   - Pytests (`tests/unit/test_design_cas9_grna.py`): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
----✨
+---
   - Sample Happy Prompt: “Design Cas9 guides for the lacZ locus.” 
   
-  - Output: 
+  - Output:
+
+  ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>Click to expand sample output</summary>
+    <summary>📂 Click to expand sample output</summary>
   
     ```json
     After calling previous tools →
@@ -506,11 +512,13 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `design_cas12a_crrna.json`
   - Pytests (`tests/unit/test_design_cas12a_crrna.py`): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
----✨
+---
   - Sample Happy Prompt: “Give me Cas12a guides for the araB locus.”
-  - Output: 
+  - Output:
+
+  ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>Click to expand sample output</summary>
+    <summary>📂 Click to expand sample output</summary>
   
         ```json
         After calling previous tools →
@@ -615,11 +623,13 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: `design_cloning_oligos.json`
   - Pytests (`tests/unit/test_design_cloning_oligos.py`): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
----✨
+---
   - Sample Happy Prompt: “Design oligos to clone this protospacer into px330.” 
-  - Output: 
+  - Output:
+
+  ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>Click to expand sample output</summary>
+    <summary>📂 Click to expand sample output</summary>
     
         ```json
         [Tool result] ← crispr_design_cloning_oligos:

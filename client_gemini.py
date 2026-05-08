@@ -325,12 +325,14 @@ async def run_chat() -> None:
     #     print(m.name)
 
 
-    def safe_generate(*, model, contents, config, retries=3, backoff_seconds=2):
-        """Call Gemini with automatic retry on 503 (server busy) errors.
+    def safe_generate(*, model, contents, config, retries=4, backoff_seconds=2):
+        """Call Gemini with automatic retry on 503 (busy) and 429 (rate-limit).
 
-        retries=3 with max 8s backoff = at most ~14s waiting before raising
-        the original error so the user can retry the prompt. Higher retry
-        counts just burn time during a sustained outage."""
+        For 429 with an explicit retry-after hint (e.g. "Please retry in 49s"),
+        honor the API's suggestion up to 70s. The previous 8s cap was wrong:
+        per-minute token quotas need a full ~60s to reset, and capping the
+        wait short of that just burns retries on guaranteed-fail attempts."""
+        import re
         for attempt in range(retries):
             try:
                 return gemini.models.generate_content(
@@ -352,13 +354,15 @@ async def run_chat() -> None:
                 msg = str(e)
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                     if attempt < retries - 1:
-                        # Try to parse the suggested retry delay from the error message
-                        import re
+                        # Honor Google's suggested retry delay when present —
+                        # it's almost always the per-minute quota cooldown
+                        # (~30-60s). Cap at 70s so a single bad call can't
+                        # block the demo for minutes.
                         match = re.search(r"retry[^\d]*(\d+(?:\.\d+)?)\s*s", msg, re.IGNORECASE)
                         wait = float(match.group(1)) + 1 if match else backoff_seconds * (2 ** attempt)
-                        wait = max(wait, 2)  # always wait at least 2 seconds
-                        wait = min(wait, 8)  # cap at 8s to fail fast
-                        print(f"\n[Rate limit hit (429). Retrying in {wait:.0f}s...]")
+                        wait = max(wait, 2)
+                        wait = min(wait, 70)
+                        print(f"\n[Rate limit hit (429). Waiting {wait:.0f}s for quota reset...]")
                         time.sleep(wait)
                         continue
                 raise

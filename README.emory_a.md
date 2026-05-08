@@ -15,7 +15,7 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
   - Fetches a target sequence, genomic locus or cds from the NCBI GenBank file for the gene chosen 
   - design guide or crRNA sequence using the 10 found in the fetched sequence, meant to cover the gene broadly from PAM-based windows across the whole sequence 
   - rank guide and crispr RNAs with [rank_guides.py](modules/crispr_tools/tools/rank_guides.py), authored by Jillian and I, and find the single best one to use out of the 10 
-  - off-target prediction and on-target efficiency is calculated with tools such as [predict_editing_efficiency.py](modules/crispr_tools/tools/predict_editing_efficiency.py) and [predict_offtargets.py](modules/crispr_tools/tools/predict_offtargets.py) 
+  - off-target prediction is calculated with [predict_offtargets.py](modules/crispr_tools/tools/predict_offtargets.py) 
   - design cloning oligos 
   - prepares construction file inputs 
 
@@ -502,7 +502,8 @@ Possible Unhappy Paths:
   
 ## 5. [design_cas12a_crrna.py](modules/crispr_tools/tools/design_cas12a_crrna.py)
   - What it does: 
-    - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates 
+    - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates
+    - downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
     - For multiplexing across multiple genes, each gene goes through a separate workflow.
   
     Possible Unhappy Paths: 
@@ -712,7 +713,7 @@ Possible Unhappy Paths:
   
     - New England Biolabs. "Which Restriction Enzymes Are Used in Golden Gate Assembly?" NEB FAQ. https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly. *(BbsI, BsmBI, BsaI cut outside recognition site leaving 4-nt overhangs; basis for TypeIIS enzyme selection)*
   
-  ## 7.[_utils.py](modules/crispr_tools/tools/_utils.py)
+  ## 7.[_utils.py](modules/crispr_tools/tools/_utils.py) ( NOT callable by MCP, only for support, no test files ) 
   
   - What it does:
     

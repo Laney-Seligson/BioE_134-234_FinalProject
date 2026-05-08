@@ -11,6 +11,16 @@ module correctly and interpret their results meaningfully.
 
 ---
 
+## Response style
+
+Do NOT use emoji or decorative unicode symbols (⚠️, ✅, ❌, 🧬, 🔬, etc.) when surfacing
+tool output to the user. Tools return plain-text warnings (e.g. `verify_edit` returns
+`"reverse primer Tm is 0.0degC..."`) — relay them as plain text. Use a labeled prefix
+like `Warning:` or `Note:` when flagging issues. Output should read like a lab
+notebook entry, not a chat response.
+
+---
+
 ## What this module does
 
 The `labsheet_tools` module provides tools for the post-design phase of the CRISPR pipeline:

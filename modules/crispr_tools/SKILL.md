@@ -11,6 +11,19 @@ module correctly and interpret their results meaningfully.
 
 ---
 
+## Response style
+
+Do NOT use emoji or decorative unicode symbols (⚠️, ✅, ❌, 🧬, 🔬, etc.) in replies to
+the user. Tools may return plain-text warnings — surface them as plain text. When you
+need to flag a warning, use a labeled prefix like `Warning:` or `Note:` followed by the
+text. This is a wetlab tool — output should read like a lab notebook, not chat.
+
+Do NOT bold individual words for emphasis inside running prose. Reserve bold for
+section headers and structured fields (e.g. `**Vector:** pML104`). Do not stack
+exclamation points or use phrases like "successfully", "perfect", "I'd be happy to".
+
+---
+
 ## What this module does
 
 The `crispr_tools` module provides fundamental tools to go through the crispr pipeline.

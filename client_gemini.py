@@ -300,10 +300,19 @@ def _print_help() -> None:
 async def run_chat() -> None:
     load_dotenv()
 
-    # 2026 Google's best model but limited to 20 calls/day (according to Gemini, not able to confirm)
+    # gemini-3.1-flash-lite-preview: this is the only model that reliably
+    # works on Jillian's free-tier API key. Other Gemini models (2.0-flash,
+    # 2.5-flash, 2.5-flash-lite) all hit limit:0 quota errors on this
+    # account. Don't change without testing — see git history.
     model = "gemini-3.1-flash-lite-preview"
+    print(f"\n[USING MODEL: {model}]\n")  # confirm at startup
 
-    # can also use; smarter but 20 calls/day; use sparingly
+    # Alternatives — try these if the default is rate-limited or 503-ing.
+    # Note: some "stable" models like gemini-2.0-flash have free-tier
+    # quota = 0 for new accounts; only the preview / lite models reliably
+    # work without billing enabled.
+    # model = "gemini-3.1-flash-lite-preview"  # Google's newest preview
+    # model = "gemini-2.5-flash"               # smarter, lower RPM
     # model = "gemini-2.5-flash-preview"
 
     # The client will pick up GEMINI_API_KEY (or GOOGLE_API_KEY) from a .env file.
@@ -316,8 +325,14 @@ async def run_chat() -> None:
     #     print(m.name)
 
 
-    def safe_generate(*, model, contents, config, retries=6, backoff_seconds=2):
-        """Call Gemini with automatic retry on 503 (server busy) errors."""
+    def safe_generate(*, model, contents, config, retries=4, backoff_seconds=2):
+        """Call Gemini with automatic retry on 503 (busy) and 429 (rate-limit).
+
+        For 429 with an explicit retry-after hint (e.g. "Please retry in 49s"),
+        honor the API's suggestion up to 70s. The previous 8s cap was wrong:
+        per-minute token quotas need a full ~60s to reset, and capping the
+        wait short of that just burns retries on guaranteed-fail attempts."""
+        import re
         for attempt in range(retries):
             try:
                 return gemini.models.generate_content(
@@ -329,7 +344,7 @@ async def run_chat() -> None:
                 #503 UNAVAILABLE - Gemini servers are overloaded
                 msg = str(e)
                 if ("503" in msg or "UNAVAILABLE" in msg) and attempt < retries - 1:
-                    wait = min(backoff_seconds * (2 ** attempt), 30)
+                    wait = min(backoff_seconds * (2 ** attempt), 8)
                     print(f"\n[Gemini busy (503). Retrying in {wait}s...]")
                     time.sleep(wait)
                     continue
@@ -339,12 +354,15 @@ async def run_chat() -> None:
                 msg = str(e)
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                     if attempt < retries - 1:
-                        # Try to parse the suggested retry delay from the error message
-                        import re
+                        # Honor Google's suggested retry delay when present —
+                        # it's almost always the per-minute quota cooldown
+                        # (~30-60s). Cap at 70s so a single bad call can't
+                        # block the demo for minutes.
                         match = re.search(r"retry[^\d]*(\d+(?:\.\d+)?)\s*s", msg, re.IGNORECASE)
                         wait = float(match.group(1)) + 1 if match else backoff_seconds * (2 ** attempt)
-                        wait = max(wait, 2)  # always wait at least 2 seconds
-                        print(f"\n[Rate limit hit (429). Retrying in {wait:.0f}s...]")
+                        wait = max(wait, 2)
+                        wait = min(wait, 70)
+                        print(f"\n[Rate limit hit (429). Waiting {wait:.0f}s for quota reset...]")
                         time.sleep(wait)
                         continue
                 raise

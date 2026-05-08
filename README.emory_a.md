@@ -62,7 +62,7 @@ Possible Unhappy Paths:
   - Output: 
     <details>
     <summary>Click to expand sample output</summary>
-  
+    
   ```json
   You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
   [Tool call] → crispr_fetch_target_sequence
@@ -126,8 +126,8 @@ Possible Unhappy Paths:
   1.  **System Selection**: I will run the `crispr_cas_selector` on each sequence to determine the recommended nuclease (Cas9 vs. Cas12a).
   2.  **Guide Design**: I will proceed with guide design based on that recommendation.
   3.  **Aggregation**: I will then aggregate these results to provide a unified strategy.
-    ```
-    </details>
+  ```
+  </details>
   
   
   - Citations: 

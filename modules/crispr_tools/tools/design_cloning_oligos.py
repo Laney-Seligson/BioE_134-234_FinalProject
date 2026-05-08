@@ -199,8 +199,9 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         selection="Puro",
         notes=(
             "Lentiviral all-in-one vector for stable Cas9 + guide integration.  "
-            "BsmBI is a Type IIS enzyme that leaves the same CACC/AAAC overhangs "
-            "as pX330-BbsI — identical oligo design logic."
+            "BsmBI is a Type IIS enzyme; lentiCRISPR v2 uses CACC/AAAC overhangs "
+            "that match the pX330-BbsI convention, so the oligo design is the same "
+            "for these two specific vectors. Other BsmBI vectors may use different overhangs."
         ),
         citations=(
             Citation("Sanjana et al. Nat Methods 2014",
@@ -230,8 +231,10 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         cell_strain="Zebrafish embryo (microinjection)",
         selection="Kan",
         notes=(
-            "Zebrafish T7-driven sgRNA vector.  TAGG overhang encodes the "
-            "required +1 G; no extra 5′G is prepended."
+            "Zebrafish sgRNA-only vector (guide RNA cassette; no Cas9).  T7 RNA "
+            "polymerase drives in vitro transcription; SpCas9 mRNA or protein is "
+            "co-injected separately.  TAGG overhang encodes the required +1 G; "
+            "no extra 5′G is prepended."
         ),
         citations=(
             Citation("Hwang et al. PLoS One 2013",
@@ -292,8 +295,10 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
     cell_strain="Mammalian lentiviral delivery",
     selection="Puro",
     notes=(
-        "LbCpf1/Cas12a crRNA cloning vector. Uses a U6 direct-repeat crRNA cassette "
-        "and BsmBI cloning. Overhangs must be verified from the plasmid map/protocol."
+        "Lentiviral crRNA-only vector for use with LbCas12a (crRNA cassette; no "
+        "Cas12a/Cpf1 nuclease). LbCas12a is provided by a separate construct or "
+        "stable cell line. Uses a U6 direct-repeat crRNA cassette and BsmBI cloning. "
+        "Overhangs must be verified from the plasmid map/protocol."
     ),
     citations=(
         Citation("Chow et al Nat Methods. 2019 May;16(5):405–408",
@@ -321,8 +326,10 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
     cell_strain="Mammalian / cloning entry vector",
     selection="Amp",
     notes=(
-        "FnCas12a crRNA entry vector with U6 promoter; spacer oligos are cloned "
-        "into a BsmBI cassette. Overhangs must be verified from the plasmid map/protocol."
+        "crRNA-only entry vector for use with FnCas12a (crRNA cassette; no Cas12a "
+        "nuclease). FnCas12a is provided by a separate construct. U6 promoter; "
+        "spacer oligos are cloned into a BsmBI cassette. Overhangs must be verified "
+        "from the plasmid map/protocol."
     ),
     citations=(
         Citation(
@@ -360,11 +367,11 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         cell_strain="E. coli MG1655 or equivalent",
         selection="Amp",
         notes=(
-            "Used with companion pCas9-CR4 plasmid for E. coli editing.  The "
+            "Used with COMPANION pCas9-CR4 plasmid for E. coli editing.  The "
             "sgRNA cassette (J23119 + guide + scaffold) is PCR-amplified with "
             "SpeI-site-tailed primers, then restriction-ligated into pTargetF.  "
             "SpeI and XbaI leave compatible CTAG overhangs — the ligation product "
-            "is not re-cuttable by either enzyme alone."
+            "is NOT re-cuttable by either enzyme alone."
         ),
         citations=(
             Citation("Jiang et al. Appl Environ Microbiol. 2015 Apr;81(7):2506-14. doi: 10.1128/AEM.04023-14. Epub 2015 Jan 30.",
@@ -404,7 +411,7 @@ VECTOR_SPECS: dict[str, VectorSpec] = {
         notes=(
             "pX458 can accept a guide insert by Gibson assembly if the insert "
             "carries overlaps matching the sequences flanking the linearisation "
-            "site.  Vector linearisation primers are NOT designed by this tool."
+            "site. Vector linearisation primers are NOT designed by this tool."
         ),
         citations=(
             Citation("Ran et al. Nat Protoc 2013",
@@ -679,9 +686,11 @@ GOLDEN_GATE_ENZYME_SPECS: dict[str, dict] = {
 }
 
 # ---------------------------------------------------------------------------
-# Addgene API fallback: standard TypeIIS overhangs for well-characterised CRISPR
-# enzymes. BbsI/BsmBI are consistent across virtually all published CRISPR vectors.
-# BsaI overhangs vary by vector — leave empty so the fallback asks the user.
+# Addgene API fallback: common TypeIIS overhangs for well-known pX330/lentiCRISPR-
+# family vectors. CACC/AAAC is the predominant convention for BbsI and BsmBI in
+# those lineages, but is NOT universal — other vectors using the same enzyme may
+# differ. Always verify against the actual plasmid protocol before ordering oligos.
+# BsaI overhangs vary by vector; always ask the user.
 # ---------------------------------------------------------------------------
 
 _TYPEII_ENZYME_OVERHANGS: dict[str, dict] = {
@@ -1150,7 +1159,7 @@ class CRISPRCloningDesigner:
                 missing_fields=["cloning_method"],
                 questions=[
                     "Which cloning method do you want to use? "
-                    "Options: TypeIISOligoCloning, RestrictionLigation, GibsonAssembly."
+                    "Options: TypeIISOligoCloning, RestrictionLigation, GibsonAssembly, GoldenGateAssembly."
                 ],
                 note=(
                     "No vector was recognised and no cloning_method was specified. "
@@ -1192,7 +1201,7 @@ class CRISPRCloningDesigner:
             missing_fields=["cloning_method"],
             questions=[
                 f"'{method}' is not a recognised cloning method. "
-                "Use: TypeIISOligoCloning, RestrictionLigation, or GibsonAssembly."
+                "Use: TypeIISOligoCloning, RestrictionLigation, GibsonAssembly, or GoldenGateAssembly."
             ],
         )
 

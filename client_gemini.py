@@ -300,16 +300,17 @@ def _print_help() -> None:
 async def run_chat() -> None:
     load_dotenv()
 
-    # gemini-3.1-flash-lite-preview: in the free tier; what you were running
-    # before. Hit 503s sometimes but at least the daily quota is non-zero.
-    model = "gemini-3.1-flash-lite-preview"
+    # gemini-2.5-flash-lite: most permissive free-tier model right now —
+    # higher RPM than the preview models, lower 503 rate, and crucially
+    # NOT limit:0 like gemini-2.0-flash for new accounts.
+    model = "gemini-2.5-flash-lite"
 
     # Alternatives — try these if the default is rate-limited or 503-ing.
     # Note: some "stable" models like gemini-2.0-flash have free-tier
     # quota = 0 for new accounts; only the preview / lite models reliably
     # work without billing enabled.
+    # model = "gemini-3.1-flash-lite-preview"  # Google's newest preview
     # model = "gemini-2.5-flash"               # smarter, lower RPM
-    # model = "gemini-2.5-flash-lite"          # usually permissive free tier
     # model = "gemini-2.5-flash-preview"
 
     # The client will pick up GEMINI_API_KEY (or GOOGLE_API_KEY) from a .env file.

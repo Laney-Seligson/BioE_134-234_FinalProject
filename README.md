@@ -488,7 +488,7 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
 
 
 
-## 1. run_full_crispr_workflow
+## 1. [run_full_crispr_workflow](modules/crispr_tools/tools/run_full_crispr_workflow.py)
 
 - What it does: 
   - NEEDS gene and Organism name to successfully call tool 
@@ -513,7 +513,7 @@ Possible Unhappy Paths:
 - Pytests ([tests/unit/test_run_full_crispr_workflow.py](tests/unit/test_run_full_crispr_workflow.py)): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
 
-## 2. fetch_target_sequence
+## 2. [fetch_target_sequence.py](modules/crispr_tools/tools/fetch_target_sequence.py)
 - What it does: 
   - Resolves a gene name or accession to a clean DNA sequence using NCBI Entrez tools
   - Closely related to Karina's gene lookup tool integrated directly into `run_full_crispr_workflow` for semi- seamless end-to-end operation
@@ -613,7 +613,7 @@ Possible Unhappy Paths:
   
     - National Center for Biotechnology Information. n.d. "Gene Database Help." U.S. National Library of Medicine. https://www.ncbi.nlm.nih.gov/books/NBK3841/.
   
-## 3. cas_selector
+## 3. [cas_selector.py](modules/crispr_tools/tools/cas_selector.py)
   - What it does: 
   - Recommends Cas9 or Cas12a based on guide availability, multiplexing needs, and specificity requirements by scanning the full genomic locus (or CDS if specified) from `fetch_target_sequence`
   - For multiplexing: results across multiple genomic loci are aggregated by majority vote
@@ -726,7 +726,7 @@ Possible Unhappy Paths:
   
   
   
-## 4. design_cas9_grna
+## 4. [design_cas9_grna](modules/crispr_tools/tools/design_cas9_grna.py)
   - What it does: 
     - Enumerates SpCas9 guide RNA candidates from NGG PAM sites across the sequence; candidate scoring applies GC content (40–65% optimum) and poly-T checks as heuristics derived from Doench et al. 2016 Rule Set 2 — downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
     - It does this with a prompt that is directly about designing guides if nuclease, genes and organism are known. 
@@ -980,7 +980,7 @@ Possible Unhappy Paths:
   
     - Doench, John G., Nicolo Fusi, Meagan Sullender, Mudra Hegde, Emma W. Vaimberg, Katherine F. Donovan, Ian Smith, et al. 2016. "Optimized sgRNA Design to Maximize Activity and Minimize Off-Target Effects of CRISPR-Cas9." Nature Biotechnology 34 (2): 184–191. https://doi.org/10.1038/nbt.3437. *(GC content optimum 40–65%, poly-T termination penalty, PAM-proximal position weights used in candidate scoring)*
   
-## 5. design_cas12a_crrna
+## 5. [design_cas12a_crrna.py](modules/crispr_tools/tools/design_cas12a_crrna.py)
   - What it does: 
     - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates 
     - For multiplexing across multiple genes, each gene goes through a separate workflow.
@@ -1081,7 +1081,7 @@ Possible Unhappy Paths:
     - Kim, Hoon Cho, Sunghyeok Ye, Daesik Kim, Young-Chang Cho, Ju-Hyun Lee, and Jin-Soo Kim. 2018. "In Vivo High-Throughput Profiling of CRISPR-Cpf1 Activity." Nature Methods 15 (1): 10–12. https://doi.org/10.1038/nbt.4061. *(Position-specific nucleotide preferences for Cas12a on-target activity; informs crRNA candidate scoring)*
     - Hu, Xianrong, Kejian Wang, Yiping Tong, et al. 2020. "Technological Advances in CRISPR-Cas-Based Plant Genome Editing." The Crop Journal 8 (3): 403–407. https://doi.org/10.1016/j.cj.2019.06.007. *(Cas12a crRNA array cloning strategy using BbsI/BsmBI into pML104/pML107 vectors)*
   
-## 6. design_cloning_oligos
+## 6. [design_cloning_oligos.py](modules/crispr_tools/tools/design_cloning_oligos.py)
 
 - What it does:
     - Takes the vector and guide information from the guide design tools and
@@ -1192,7 +1192,7 @@ Possible Unhappy Paths:
   
     - New England Biolabs. "Which Restriction Enzymes Are Used in Golden Gate Assembly?" NEB FAQ. https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly. *(BbsI, BsmBI, BsaI cut outside recognition site leaving 4-nt overhangs; basis for TypeIIS enzyme selection)*
   
-  ## 7. Shared utilities ([modules/crispr_tools/tools/_utils.py](modules/crispr_tools/tools/_utils.py))
+  ## 7.[_utils.py](modules/crispr_tools/tools/_utils.py)
   
   - What it does:
     

@@ -63,9 +63,8 @@ Possible Unhappy Paths:
     <details>
     <summary>Click to expand sample output</summary>
   
-    ```json
-    You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
-  
+  ```json
+  You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
   [Tool call] → crispr_fetch_target_sequence
   {
     "organism": "Caenorhabditis elegans",

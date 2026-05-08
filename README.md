@@ -535,7 +535,7 @@ Possible Unhappy Paths:
 
   - Output:
 
-  ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 <details>
 <summary>Click to expand sample output</summary>
         

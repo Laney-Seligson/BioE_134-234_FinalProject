@@ -59,7 +59,7 @@ Possible Unhappy Paths:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
   <details>
-  <summary>📂 Click to expand sample output</summary>
+  <summary> Click to expand sample output</summary>
         
       ```json
       You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
@@ -151,7 +151,7 @@ Possible Unhappy Paths:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>📂 Click to expand sample output</summary>
+    <summary> Click to expand sample output</summary>
 
         ```json 
         You: What Cas system would I use to edit sma-2, sma-3 and sma-4 in C.elegans all at once?
@@ -265,7 +265,7 @@ Possible Unhappy Paths:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>📂 Click to expand sample output</summary>
+    <summary> Click to expand sample output</summary>
   
     ```json
     After calling previous tools →
@@ -518,7 +518,7 @@ Possible Unhappy Paths:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>📂 Click to expand sample output</summary>
+    <summary> Click to expand sample output</summary>
   
         ```json
         After calling previous tools →
@@ -629,7 +629,7 @@ Possible Unhappy Paths:
 
   ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
     <details>
-    <summary>📂 Click to expand sample output</summary>
+    <summary> Click to expand sample output</summary>
     
         ```json
         [Tool result] ← crispr_design_cloning_oligos:

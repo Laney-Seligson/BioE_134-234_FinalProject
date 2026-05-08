@@ -499,8 +499,8 @@ def test_lab_sheet_thread_prefix():
 
 def test_lab_sheet_step_count_includes_all_sections():
     result = lab_sheet(_make_record())
-    # PCR + Gel+DpnI + Zymo + Assemble + Transform + Pick + Miniprep + Sequencing = 8
-    assert result["step_count"] == 8
+    # PCR + Gel+DpnI + Zymo + Assemble + Transform + Plate + Pick + Miniprep + Sequencing = 9
+    assert result["step_count"] == 9
 
 
 def test_lab_sheet_pick_section():
@@ -1296,10 +1296,14 @@ def test_lab_sheet_restriction_ligation_renders():
     }
     result = lab_sheet(record)
     text = result["lab_sheet_text"]
-    # RestrictionLigation must appear AFTER PCR but BEFORE Transform
-    assert "RestrictionLigation" in text
-    assert text.find("RestrictionLigation") > text.find("PCR")
-    assert text.find("RestrictionLigation") < text.find("Transform")
+    # RestrictionLigation now renders as separate Digest + Ligate sub-sections
+    # (per the LabPlanner per-operation labpacket model). Both must appear
+    # AFTER PCR and BEFORE Transform.
+    assert "A: Digest" in text
+    assert "A: Ligate" in text
+    assert text.find("A: Digest") > text.find("PCR")
+    assert text.find("A: Ligate") > text.find("A: Digest")
+    assert text.find("A: Ligate") < text.find("Transform")
     # Recipe content
     assert "EcoRI" in text or "BamHI" in text
     assert "T4 DNA Ligase" in text or "T4 ligase" in text.lower() or "ligate" in text.lower()

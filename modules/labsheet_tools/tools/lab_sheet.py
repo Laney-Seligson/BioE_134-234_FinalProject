@@ -14,7 +14,28 @@ from modules.crispr_tools.tools.citations import cites, format_citations
 # tool, and lets us fail soft (skip the prediction, render the sheet).
 _PREDICT_EFFICIENCY_KNOWN = {"cas9", "cas12a"}
 
-_RESCUE_ANTIBIOTICS = {"Spec", "spectinomycin", "Spc"}
+_NO_RESCUE_ANTIBIOTICS = {
+    # Beta-lactams: act on cell-wall synthesis, slow enough that
+    # resistance can be expressed during plating.
+    "amp", "ampicillin",
+    "carb", "carbenicillin",
+    # Yeast auxotrophic markers: not antibiotics at all, plated on
+    # dropout media (e.g. -URA, -LEU). No recovery step needed.
+    "ura3", "leu2", "his3", "trp1", "lys2", "met15",
+}
+
+
+def _needs_rescue(antibiotic: str) -> bool:
+    """Rescue is required unless the antibiotic is a beta-lactam (Amp/Carb)
+    or a yeast auxotrophic marker (URA3/LEU2/HIS3/TRP1/...).
+
+    Substring check so compound strings like
+    'URA3 (yeast) / Ampicillin (bacteria)' still suppress rescue when
+    they contain a no-rescue marker."""
+    lowered = (antibiotic or "").strip().lower()
+    if not lowered:
+        return False
+    return not any(marker in lowered for marker in _NO_RESCUE_ANTIBIOTICS)
 
 # Map of CRISPRDelivery method name → registry protocol key. Lets the
 # construction record specify {"step_type": "CRISPRDelivery",
@@ -61,24 +82,37 @@ def _is_circular_part(part: dict) -> bool:
 
 
 def _locate_primer(primer_seq: str, template: str, circular: bool) -> int | None:
-    """Find the position where the primer (or its 3'-end annealing region)
-    binds the template. Returns the 0-based start in `template`, or None."""
+    """Find the position where the primer binds the template. Returns the
+    0-based start of the whole primer string in `template`, or None.
+
+    Handles both orientations:
+    - Forward primer (5' overhang ... 3' anneal): anneal is at the END.
+    - Reverse-complemented reverse primer (5' anneal ... 3' overhang): the
+      anneal is at the START of the rev_rc string. We try the 3' end first
+      (forward case) and fall back to the 5' end (rev_rc case)."""
     if not primer_seq or not template:
         return None
     primer_seq = primer_seq.upper()
     template = template.upper()
     search = template + (template if circular else "")
-    # Try progressively shorter 3' anneal lengths. Real primers often have
-    # 5' overhangs (Gibson, Golden Gate BsaI sites) that don't anneal.
+    # Pass 1: 3'-end anneal (forward primer with 5' overhang).
     for anneal_len in (len(primer_seq), 25, 22, 20, 18, 15):
         if anneal_len > len(primer_seq):
             continue
         anneal = primer_seq[-anneal_len:]
         idx = search.find(anneal)
         if idx != -1:
-            # `idx` is the start of the anneal region; the primer's 5' end
-            # would be at idx - (len(primer_seq) - anneal_len).
             return idx - (len(primer_seq) - anneal_len)
+    # Pass 2: 5'-end anneal (rev_rc — the rev primer's 3' anneal becomes
+    # the 5' end of the rev_rc string). Returns the 0-based start of the
+    # rev_rc string on the template.
+    for anneal_len in (len(primer_seq), 25, 22, 20, 18, 15):
+        if anneal_len > len(primer_seq):
+            continue
+        anneal = primer_seq[:anneal_len]
+        idx = search.find(anneal)
+        if idx != -1:
+            return idx
     return None
 
 
@@ -103,10 +137,13 @@ def _expected_amplicon_size(
         while rev_end <= fwd_pos:
             rev_end += n
         size = rev_end - fwd_pos
-        # Add primer 5' overhang contribution beyond template-anneal:
-        # caller expects total amplified length, which already equals
-        # (rev_end - fwd_pos) since fwd_pos was anchored to the primer's
-        # 5' end in `_locate_primer`.
+        # Vector PCR primers in Gibson assembly point OUTWARD from the
+        # insertion site, so the small "gap" between them is the overlap
+        # region — the actual amplicon wraps the whole plasmid the other
+        # way. If the apparent size is shorter than the two primers
+        # combined, interpret as wrap-around.
+        if size < len(fwd_seq) + len(rev_seq):
+            size = n - size + len(fwd_seq) + len(rev_seq)
         return size
     if rev_end <= fwd_pos:
         return None
@@ -297,6 +334,10 @@ def _format_pcr_section(ops: list[dict], thread: str) -> str:
     rows = []
     source_map: dict[str, str] = {}
 
+    fwd_set: set[str] = set()
+    rev_set: set[str] = set()
+    tmpl_set: set[str] = set()
+
     for i, op in enumerate(ops, start=1):
         label = f"{thread}{i}"
         p = op.get("parameters", {})
@@ -305,6 +346,9 @@ def _format_pcr_section(ops: list[dict], thread: str) -> str:
         tmpl = p.get("template", "")
         product = op.get("output", "")
         rows.append([label, fwd, rev, tmpl, product])
+        if fwd: fwd_set.add(fwd)
+        if rev: rev_set.add(rev)
+        if tmpl: tmpl_set.add(tmpl)
 
         oligo_col = 65 + (i - 1) * 2
         if fwd:
@@ -318,8 +362,66 @@ def _format_pcr_section(ops: list[dict], thread: str) -> str:
     src_rows = [[name, loc, ""] for name, loc in source_map.items()]
     source_table = _col_table(["label", "location", "note"], src_rows)
 
+    # Reaction recipe / mastermix block.
+    # Per-rxn (25 uL) volumes match standard Q5/Phusion setups:
+    #   16.75 uL ddH2O, 5 uL 5x buffer, 2.5 uL 2mM dNTPs,
+    #   0.5 uL each primer, 0.5 uL template, 0.25 uL polymerase.
+    # For 4+ samples, build a mastermix that pools every component
+    # shared across all reactions (10% dead volume, per Anderson lab).
+    n = len(ops)
+    fwd_shared = len(fwd_set) == 1
+    rev_shared = len(rev_set) == 1
+    tmpl_shared = len(tmpl_set) == 1
+    fwd_name = next(iter(fwd_set)) if fwd_shared else None
+    rev_name = next(iter(rev_set)) if rev_shared else None
+    tmpl_name = next(iter(tmpl_set)) if tmpl_shared else None
+
+    recipe_lines: list[str] = []
+    if n >= 4:
+        scale = n * 1.1  # 10% dead volume
+        mm: list[tuple[str, float]] = [
+            ("ddH2O", 16.75),
+            ("5x Q5 buffer", 5.0),
+            ("2 mM dNTPs", 2.5),
+        ]
+        per_rxn: list[tuple[str, float]] = []
+        if fwd_shared:
+            mm.append((f"{fwd_name} (10 uM)", 0.5))
+        else:
+            per_rxn.append(("forward primer (10 uM)", 0.5))
+        if rev_shared:
+            mm.append((f"{rev_name} (10 uM)", 0.5))
+        else:
+            per_rxn.append(("reverse primer (10 uM)", 0.5))
+        if tmpl_shared:
+            mm.append((f"{tmpl_name} (template)", 0.5))
+        else:
+            per_rxn.append(("template", 0.5))
+        mm.append(("Q5 polymerase", 0.25))
+        mm_total = sum(v for _, v in mm)
+        per_rxn_mm_volume = mm_total
+        recipe_lines.append(f"mastermix (covers {n} reactions + 10% dead volume):")
+        for name, v in mm:
+            recipe_lines.append(f"  {round(v * scale, 3)} uL  {name}")
+        recipe_lines.append("")
+        recipe_lines.append("reaction (per tube):")
+        recipe_lines.append(f"  {per_rxn_mm_volume} uL mastermix")
+        for name, v in per_rxn:
+            recipe_lines.append(f"  {v} uL {name}")
+    else:
+        recipe_lines.append("reaction (per tube, 25 uL):")
+        recipe_lines.append("  16.75 uL ddH2O")
+        recipe_lines.append("  5 uL 5x Q5 buffer")
+        recipe_lines.append("  2.5 uL 2 mM dNTPs")
+        recipe_lines.append("  0.5 uL forward primer (10 uM)")
+        recipe_lines.append("  0.5 uL reverse primer (10 uM)")
+        recipe_lines.append("  0.5 uL template")
+        recipe_lines.append("  0.25 uL Q5 polymerase")
+
     return "\n".join([
         f"{thread}: PCR",
+        "",
+        *recipe_lines,
         "",
         "samples:",
         samples_table,
@@ -438,13 +540,35 @@ def _format_assemble_section(op: dict, thread: str) -> str:
     ])
 
 
+def _split_restriction_ligation_reagents() -> tuple[str, str]:
+    """Split the `restriction_ligation` protocol's reagents into two
+    blocks: one combined Digest recipe (vector + insert) and one Ligate
+    recipe. The protocol entry uses '--- ... ---' marker rows to group
+    them; this helper walks those groups."""
+    proto = PROTOCOLS["restriction_ligation"]
+    digest_lines: list[str] = []
+    ligate_lines: list[str] = []
+    bucket: list[str] | None = None
+    for reagent, vol in proto.reagents:
+        if reagent.startswith("---"):
+            label = reagent.strip("- ").lower()
+            if "digest" in label:
+                bucket = digest_lines
+                digest_lines.append(reagent)
+            elif "ligation" in label or "ligate" in label:
+                bucket = ligate_lines
+            continue
+        if bucket is not None:
+            bucket.append(f"{vol} {reagent}")
+    return "\n".join(digest_lines), "\n".join(ligate_lines)
+
+
 def _format_restriction_ligation_section(op: dict, thread: str) -> str:
-    """Render a RestrictionLigation step (vector + insert, one or two
-    restriction enzymes, then T4 ligation). Without this section the
-    workflow would jump straight from PCR to Transform — the same
-    biological-completeness gap that TypeIISOligoCloning had."""
-    proto_key = "restriction_ligation"
-    proto = PROTOCOLS[proto_key]
+    """Render a RestrictionLigation step as TWO labsheet sub-sections —
+    `{thread}: Digest` and `{thread}: Ligate` — matching the per-operation
+    labpacket model from the LabPlanner lecture (one labsheet per physical
+    bench session)."""
+    proto = PROTOCOLS["restriction_ligation"]
     params = op.get("parameters", {})
     inputs = op.get("inputs", [])
     output = op.get("output", "")
@@ -453,39 +577,64 @@ def _format_restriction_ligation_section(op: dict, thread: str) -> str:
     backbone = inputs[0] if len(inputs) > 0 else "vector"
     insert = inputs[1] if len(inputs) > 1 else "insert"
 
-    src_rows = [
+    digest_recipe, ligate_recipe = _split_restriction_ligation_reagents()
+
+    digest_src_rows = [
         [backbone, f"box{thread}/A1"],
         [insert, f"box{thread}/B1"],
     ]
-    source_table = _col_table(["dna", "location"], src_rows)
-    samples_table = _col_table(
-        ["label", "fragments", "product"],
-        [[thread, f"{backbone} / {insert}", output]],
+    digest_source_table = _col_table(["dna", "location"], digest_src_rows)
+    digest_samples_table = _col_table(
+        ["label", "dna", "source", "product"],
+        [
+            [f"{thread}1", backbone, f"box{thread}/A1", f"{backbone}/dig"],
+            [f"{thread}2", insert,   f"box{thread}/B1", f"{insert}/dig"],
+        ],
     )
 
-    return "\n".join([
-        f"{thread}: RestrictionLigation",
+    digest_section = "\n".join([
+        f"{thread}: Digest",
         "",
-        f"protocol: {proto.name}",
         f"enzyme(s): {enzyme}",
         "",
         "reaction:",
-        reagent_block(proto_key),
-        "",
-        f"program: {proto.program}",
-        "",
-        "source:",
-        source_table,
+        digest_recipe,
         "",
         "samples:",
-        samples_table,
+        digest_samples_table,
         "",
-        "destination: thermocycler1A (digest) -> bench (ligate)",
+        "source:",
+        digest_source_table,
+        "",
+        "destination: thermocycler1A",
+        "program: 37C 1 hr; 65C 20 min heat-inactivate; gel-purify",
+        "",
+        _ENZYME_NOTE,
+    ])
+
+    ligate_samples_table = _col_table(
+        ["label", "digest", "source", "product"],
+        [[f"{thread}1", f"{backbone}/dig + {insert}/dig", f"box{thread}/A1+B1", output]],
+    )
+
+    ligate_section = "\n".join([
+        f"{thread}: Ligate",
+        "",
+        "reaction:",
+        ligate_recipe,
+        "",
+        "samples:",
+        ligate_samples_table,
+        "",
+        "destination: thermocycler1A",
+        "program: 16C overnight (or RT 1 hr for sticky ends)",
         "",
         f"notes:\n{proto.notes}",
         "",
         _ENZYME_NOTE,
     ])
+
+    return digest_section + "\n\n" + ligate_section
 
 
 def _format_typeiis_oligo_section(op: dict, thread: str) -> str:
@@ -551,7 +700,7 @@ def _format_transform_section(op: dict, thread: str) -> str:
     strain = params.get("cells", "Mach1")
     antibiotic = params.get("selection", "Amp")
     temp = params.get("temperature_c", 37)
-    rescue = antibiotic in _RESCUE_ANTIBIOTICS
+    rescue = _needs_rescue(antibiotic)
     rescue_str = "yes" if rescue else "no"
 
     product = inputs[0] if inputs else op.get("output", "")
@@ -580,6 +729,37 @@ def _format_transform_section(op: dict, thread: str) -> str:
         ]
 
     return "\n".join(lines)
+
+
+def _format_plate_section(op: dict, thread: str) -> str:
+    """Render the post-transformation plating step. Same per-sample fields
+    as Transform (label/product/strain/antibiotic/incubate) but framed as a
+    distinct labsheet section so the per-step labpacket model matches the
+    professor's LabPlanner format."""
+    params = op.get("parameters", {})
+    inputs = op.get("inputs", [])
+
+    strain = params.get("cells", "Mach1")
+    antibiotic = params.get("selection", "Amp")
+    temp = params.get("temperature_c", 37)
+    product = inputs[0] if inputs else op.get("output", "")
+
+    rows = [[f"{thread}1", product, strain, antibiotic, f"{temp}°C"]]
+    samples_table = _col_table(["label", "product", "strain", "antibiotic", "incubate"], rows)
+
+    return "\n".join([
+        f"{thread}: Plate",
+        "",
+        "samples:",
+        samples_table,
+        "",
+        "protocol:",
+        f"Warm up (or prepare) a plate containing {antibiotic}.",
+        "Label the plate with date, product name, lab member name.",
+        "Pipette 100 uL of transformed cells onto plate.",
+        "Spread the cells with glass beads or a sterile wand.",
+        f"Incubate the plates upside down, without shaking, in a {temp}°C incubator.",
+    ])
 
 
 def _format_pick_section(op: dict, thread: str, plan: dict) -> str:
@@ -662,7 +842,11 @@ def _normalize_seq_primers(seq_primers: list[dict] | None) -> list[dict]:
 
 
 def _format_sequencing_section(
-    op: dict, thread: str, plan: dict, seq_primers: list[dict] | None = None,
+    op: dict,
+    thread: str,
+    plan: dict,
+    seq_primers: list[dict] | None = None,
+    protospacer: str | None = None,
 ) -> str:
     params = op.get("parameters", {})
     inputs = op.get("inputs", [])
@@ -677,6 +861,48 @@ def _format_sequencing_section(
         src_rows.append([sp["name"], sp["location"], sp["note"]])
     source_table = _col_table(["label", "location", "product"], src_rows)
 
+    example_label = f"{thread}1{plan['labels'][0]}"
+    instructions: list[str] = []
+    for sp in seq_primers:
+        save_loc = sp.get("save_location", sp["location"])
+        instructions += [
+            f"- Resuspend the oligo {sp['name']} to the appropriate volume for a 100 uM stock",
+            f"- In an eppendorf, prepare a 2.66 uM dilute stock of {sp['name']} as:",
+            "    o 487 uL ddH2O",
+            "    o 13.3 uL of 100 uM oligo",
+        ]
+    instructions += [
+        "- For each plasmid listed, mix the following sequencing reactions in an eppendorf tube:",
+        "    o 6 uL ddH2O",
+        "    o 4 uL miniprep DNA (undiluted)",
+        "    o 3 uL oligo (2.66 uM)",
+        f'- Label the tops of the tubes with the "label", ie "{example_label}"',
+    ]
+    for sp in seq_primers:
+        save_loc = sp.get("save_location", sp["location"])
+        instructions.append(f"- When done, save the {sp['name']} stock at: {save_loc}")
+    instructions.append(
+        "- Take the sequencing reactions and order form to: 237 Stanley Hall (second floor cold room)"
+    )
+
+    expected_block: list[str] = []
+    if protospacer:
+        expected_block = [
+            "",
+            "expected read should contain:",
+            f"  {protospacer}  (20-nt protospacer; confirms guide cloning)",
+            "  + sgRNA scaffold + terminator downstream",
+        ]
+
+    trailing_note = (
+        []
+        if any(sp["name"] == "L4440" for sp in seq_primers)
+        else [
+            "",
+            "Note: using guide-specific verification primers (verify_edit) — read WILL span the edit site.",
+        ]
+    )
+
     return "\n".join([
         f"{thread}: Sequencing (plasmid — confirms vector clone, NOT the genomic edit)",
         "",
@@ -684,18 +910,9 @@ def _format_sequencing_section(
         source_table,
         "",
         "Instructions:",
-    ] + [
-        f"For each plasmid + primer combination, mix the following in an eppendorf tube:"
-    ] + [
-        f"Primers in this run: {', '.join(sp['name'] for sp in seq_primers)}.",
-        "Resuspend each primer to a 100 uM stock; dilute 1:37.6 in ddH2O for a 2.66 uM working stock.",
-        "  6 uL ddH2O",
-        "  4 uL miniprep DNA (undiluted)",
-        "  3 uL primer (2.66 uM)",
-        f'Label the tops of the tubes with the label (e.g. "{thread}1{plan["labels"][0]}").',
-        "Take the sequencing reactions and order form to: 237 Stanley Hall (second floor cold room).",
-        "" if any(sp["name"] == "L4440" for sp in seq_primers) else
-        "Note: using guide-specific verification primers (verify_edit) — sequence WILL span the edit site.",
+        *instructions,
+        *expected_block,
+        *trailing_note,
     ])
 
 
@@ -951,6 +1168,7 @@ def _build_tsv(
     parts_map: dict[str, dict] | None = None,
     sequencing_primers: list[dict] | None = None,
     verify_edit_result: dict | None = None,
+    protospacer: str | None = None,
 ) -> str:
     transform_plans = transform_plans or []
     parts_map = parts_map or {}
@@ -1097,7 +1315,7 @@ def _build_tsv(
         strain = params.get("cells", "Mach1")
         antibiotic = params.get("selection", "Amp")
         temp = params.get("temperature_c", 37)
-        rescue = antibiotic in _RESCUE_ANTIBIOTICS
+        rescue = _needs_rescue(antibiotic)
         note = (
             f"Rescue required: after transformation add 200 uL 2YT, shake before plating."
             if rescue else ""
@@ -1110,6 +1328,18 @@ def _build_tsv(
             "antibiotic": antibiotic,
             "incubation": f"{temp}°C",
             "notes": note,
+        }))
+        rows.append(_tsv_row({
+            "section": f"{thread}: Plate",
+            "label": f"{thread}1",
+            "product": product,
+            "strain": strain,
+            "antibiotic": antibiotic,
+            "incubation": f"{temp}°C",
+            "notes": (
+                f"Plate 100 uL on {antibiotic} plate; spread; incubate upside down at "
+                f"{temp}°C, no shaking."
+            ),
         }))
 
     # Pick rows
@@ -1163,17 +1393,20 @@ def _build_tsv(
         product_str = " / ".join(f"{product}-{ch}" for ch in labels)
         primer_names = " / ".join(sp["name"] for sp in seq_primers)
         primer_locs = " / ".join(sp["location"] for sp in seq_primers)
+        seq_note = (
+            f"6 uL ddH2O / 4 uL miniprep DNA / 3 uL primer (2.66 uM). "
+            f"Submit to sequencing facility. (Confirms plasmid; does NOT "
+            f"confirm the genomic edit — see EditVerification section.)"
+        )
+        if protospacer:
+            seq_note += f" Expected read should contain: {protospacer} + scaffold + terminator."
         rows.append(_tsv_row({
             "section": f"{thread}: Sequencing (plasmid)",
             "label": label_str,
             "product": product_str,
             "primer1": primer_names,
             "primer1_location": primer_locs,
-            "notes": (
-                f"6 uL ddH2O / 4 uL miniprep DNA / 3 uL primer (2.66 uM). "
-                f"Submit to sequencing facility. (Confirms plasmid; does NOT "
-                f"confirm the genomic edit — see EditVerification section.)"
-            ),
+            "notes": seq_note,
         }))
 
     # EditVerification row (genomic Sanger after the experiment)
@@ -1443,9 +1676,10 @@ class LabSheet:
 
         for op, plan in zip(transform_ops, transform_plans):
             sections.append(_format_transform_section(op, thread))
+            sections.append(_format_plate_section(op, thread))
             sections.append(_format_pick_section(op, thread, plan))
             sections.append(_format_miniprep_section(op, thread, plan))
-            sections.append(_format_sequencing_section(op, thread, plan, sequencing_primers))
+            sections.append(_format_sequencing_section(op, thread, plan, sequencing_primers, protospacer))
 
         for op in crispr_ops:
             sections.append(_format_crispr_delivery_section(op, thread))
@@ -1472,7 +1706,7 @@ class LabSheet:
         lab_sheet_text = "\n\n".join(sections)
         lab_sheet_tsv = _build_tsv(
             operations, thread, notes, transform_plans, parts_map,
-            sequencing_primers, verify_edit_result,
+            sequencing_primers, verify_edit_result, protospacer,
         )
 
         # Apply user-supplied location overrides as a final pass over both

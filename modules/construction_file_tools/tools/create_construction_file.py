@@ -211,11 +211,44 @@ class CreateConstructionFile:
             self._require_nonempty_string(insert_name, "insert_name")
             self._require_nonempty_string(insert_sequence, "insert_sequence")
 
-        backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
+        # Gibson with auto-designed primers is the only path that needs the
+        # actual backbone DNA sequence (to design the homology arms). For every
+        # other strategy (TypeIISOligoCloning, RestrictionLigation, GoldenGate,
+        # plain Gibson without auto-primers) the backbone is just a label —
+        # the wetlab digest/ligate/anneal happens on the physical plasmid.
+        # If the caller passes a plasmid name we don't have on disk (e.g.
+        # "pTargetF", "pX330"), accept it as a label and use "N" as the
+        # placeholder sequence.
+        gibson_needs_real_sequence = (
+            assembly_strategy == "Gibson" and auto_design_primers
+        )
+        if gibson_needs_real_sequence:
+            backbone_sequence = self._resolve_sequence_input(backbone_sequence, "backbone_sequence")
+        else:
+            try:
+                backbone_sequence = self._resolve_sequence_input(
+                    backbone_sequence, "backbone_sequence"
+                )
+            except ValueError:
+                backbone_sequence = "N"
+        # Same lenient handling for insert_sequence — Gemini sometimes
+        # passes a comma-separated list of primer names here.
         if insert_sequence.strip():
-            insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
+            if gibson_needs_real_sequence:
+                insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
+            else:
+                try:
+                    insert_sequence = self._resolve_sequence_input(insert_sequence, "insert_sequence")
+                except ValueError:
+                    insert_sequence = "N"
 
         if assembly_strategy == "Gibson" and auto_design_primers:
+            # Default to position 0 (insert at start of linearized backbone)
+            # if the caller didn't specify. This unblocks the autonomous
+            # Gemini flow when it asks for Gibson without an explicit
+            # insertion site.
+            if insertion_index is None:
+                insertion_index = 0
             primer_design = self._design_gibson_primers(
                 backbone_sequence=backbone_sequence,
                 insert_sequence=insert_sequence,
@@ -626,8 +659,11 @@ class CreateConstructionFile:
         auto_design_primers: bool = False,
         insertion_index: int | None = None,
     ) -> None:
+        # insertion_index defaults to 0 (start of linearized backbone) in
+        # run() above, so this validation is no longer reachable for the
+        # default path — kept as a safety net for any other call sites.
         if assembly_strategy == "Gibson" and auto_design_primers and insertion_index is None:
-            raise ValueError("insertion_index is required for Gibson when auto_design_primers=True.")
+            insertion_index = 0
 
         if assembly_strategy == "GoldenGate":
             required_pairs = [

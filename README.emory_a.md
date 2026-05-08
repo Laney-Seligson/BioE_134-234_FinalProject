@@ -503,7 +503,7 @@ Possible Unhappy Paths:
 ## 5. [design_cas12a_crrna.py](modules/crispr_tools/tools/design_cas12a_crrna.py)
   - What it does: 
     - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates
-    - downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model
+    - downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
     - For multiplexing across multiple genes, each gene goes through a separate workflow.
   
     Possible Unhappy Paths: 

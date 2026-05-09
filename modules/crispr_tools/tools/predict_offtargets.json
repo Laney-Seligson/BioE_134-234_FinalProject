@@ -16,7 +16,7 @@
     {
       "name": "reference",
       "type": "string",
-      "description": "The DNA sequence to scan for off-target sites. Accepts a resource name (e.g. 'pBR322'), a raw sequence string, a FASTA-formatted string, or a GenBank-formatted string. The framework resolves these automatically."
+      "description": "The DNA sequence to scan for off-target sites. Must be a raw DNA sequence string (A/T/G/C only), a FASTA-formatted string, a GenBank-formatted string, or a known seq_basics resource name (e.g. 'pBR322'). Do NOT pass a gene name (e.g. 'EMX1') or a GenBank accession — these are not valid here. To scan a genomic region, first call crispr_fetch_target_sequence and pass the returned 'sequence' field as this parameter."
     },
     {
       "name": "nuclease",

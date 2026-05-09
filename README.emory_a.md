@@ -686,6 +686,7 @@ Possible Unhappy Paths:
 - MCP Wrapper: [run_full_crispr_workflow.json](modules/crispr_tools/tools/run_full_crispr_workflow.json)
 - Pytests ([tests/unit/test_run_full_crispr_workflow.py](tests/unit/test_run_full_crispr_workflow.py)): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Citations:
+  - ***TypeIIS oligo cloning steps (BbsI/BsmBI annealed-oligo ligation into digested vector backbones) follow the standard protocols used in `create_construction_file` and `validate_construction_file` and are additions that are my responsibility to cite! (Addgene/Zhang Lab 2015; NEB FAQ; Hu et al. 2020).***
   - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. “Genome Engineering Using the CRISPR-Cas9 System.” Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; basis for mammalian guide-insertion workflow)*
   - Jiang, Yihui, Bin Chen, Caifeng Duan, Bing Sun, Jian Yang, and Sheng Yang. 2015. “Multigene Editing in the Escherichia coli Genome via the CRISPR-Cas9 System.” Applied and Environmental Microbiology 81 (7): 2506–2514. https://doi.org/10.1128/AEM.04023-14. *(pTargetF/pCas9-CR4 two-plasmid E. coli editing system; basis for bacterial guide-insertion workflow)*
   - Hsu, Patrick D., David A. Scott, Joshua A. Weinstein, F. Ann Ran, Silvana Konermann, Vineeta Agarwala, Yinqing Li, et al. 2013. “DNA Targeting Specificity of RNA-Guided Cas9 Nucleases.” Nature Biotechnology 31 (9): 827–832. https://doi.org/10.1038/nbt.2647. *(canonical benchmark loci including EMX1; SpCas9 off-target specificity framework that validates this workflow's NGG PAM and low-off-target prioritization)*
@@ -2012,7 +2013,9 @@ You:
 
 
   
-  - Citations: 
+  - Citations:
+      - ***TypeIIS oligo cloning steps (BbsI/BsmBI annealed-oligo ligation into digested vector backbones) follow the standard protocols used in `create_construction_file` and `validate_construction_file` and are additions that are my responsibility to cite! (Addgene/Zhang Lab 2015; NEB FAQ; Hu et al. 2020).***
+       - 
     - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. "Genome Engineering Using the CRISPR-Cas9 System." Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; CACC/AAAC overhang logic for annealed-oligo ligation)*
   
     - Jiang, Yihui, Bin Chen, Caifeng Duan, Bing Sun, Jian Yang, and Sheng Yang. 2015. "Multigene Editing in the Escherichia coli Genome via the CRISPR-Cas9 System." Applied and Environmental Microbiology 81 (7): 2506–2514. https://doi.org/10.1128/AEM.04023-14. *(pTargetF/pCas9-CR4 two-plasmid E. coli editing system; SpeI restriction ligation)*

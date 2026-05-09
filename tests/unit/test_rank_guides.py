@@ -9,7 +9,8 @@ from modules.crispr_tools.tools.rank_guides import rank_guides
 
 
 def test_rank_guides_scores_single_guide_cas9():
-    # GC=50%, no TTTT → efficiency max (2); on-target → specificity 1
+    # Doench et al. 2016, Nat Biotechnol doi:10.1038/nbt.3437
+    # GC content 40–70% and absence of polyT runs are the two primary SpCas9 efficiency predictors.
     protospacer = "ATGCATGCATGCATGCATGG"
     reference = protospacer + "AGG" + "C" * 60
     result = rank_guides(
@@ -29,6 +30,8 @@ def test_rank_guides_scores_single_guide_cas9():
 
 
 def test_rank_guides_penalizes_polyt_and_low_gc():
+    # Doench et al. 2016, Nat Biotechnol doi:10.1038/nbt.3437
+    # GC < 40% and polyT runs (≥4 consecutive T) each reduce predicted on-target efficiency.
     bad  = "AAAAAAAAAAAAAAAAAAAA"   # GC=0%, fails
     good = "ATGCATGCATGCATGCATGG"  # GC=50%, passes
     reference = good + "AGG" + "C" * 40 + bad + "AGG" + "C" * 40
@@ -42,11 +45,13 @@ def test_rank_guides_penalizes_polyt_and_low_gc():
 
 
 def test_rank_guides_empty_list_raises():
+    # No guides to rank is an invalid call; ValueError enforces valid input at the boundary.
     with pytest.raises(ValueError):
         rank_guides(guides=[], reference="ATGATGATG", nuclease="cas9")
 
 
 def test_rank_guides_invalid_nuclease_raises():
+    # Scoring rules differ by nuclease (PAM, protospacer length); an unsupported nuclease must be rejected.
     with pytest.raises(ValueError):
         rank_guides(
             guides=[{"protospacer": "ATGATGATGATGATGATGAG"}],
@@ -56,6 +61,7 @@ def test_rank_guides_invalid_nuclease_raises():
 
 
 def test_rank_guides_missing_protospacer_raises():
+    # Each guide dict must supply a "protospacer" key; missing it makes scoring impossible.
     with pytest.raises(ValueError):
         rank_guides(
             guides=[{"not_a_protospacer": "ATGATGATGATGATGATGAG"}],
@@ -65,6 +71,8 @@ def test_rank_guides_missing_protospacer_raises():
 
 
 def test_rank_guides_cas12a_max_efficiency_is_two():
+    # Zetsche et al. 2015, Cell doi:10.1016/j.cell.2015.09.038
+    # Cas12a efficiency uses the same GC% and polyT criteria as SpCas9 but for a 23 nt protospacer.
     protospacer = "ATGCATGCATGCATGCATGCATG"  # 23 bp, GC=52%, no TTTT
     reference = "TTTA" + protospacer + "A" * 40
     result = rank_guides(
@@ -80,6 +88,8 @@ def test_rank_guides_cas12a_max_efficiency_is_two():
 
 
 def test_rank_guides_sorted_best_first():
+    # Hsu et al. 2013, Nat Biotechnol doi:10.1038/nbt.2647
+    # Presenting guides in descending score order lets experimenters pick the best candidate immediately.
     bad  = "AAAAAAAAAAAAAAAAAAAA"
     good = "ATGCATGCATGCATGCATGG"
     reference = good + "AGG" + "C" * 40 + bad + "AGG" + "C" * 40
@@ -93,6 +103,8 @@ def test_rank_guides_sorted_best_first():
 
 
 def test_rank_guides_emits_citations():
+    # Doench et al. 2016, Nat Biotechnol doi:10.1038/nbt.3437; Hsu et al. 2013, Nat Biotechnol doi:10.1038/nbt.2647
+    # Each scoring criterion must be traceable to a primary citation with label, reference, and claim fields.
     result = rank_guides(
         guides=[{"protospacer": "ATGCATGCATGCATGCATGG"}],
         reference="ATGCATGCATGCATGCATGGAGG" + "C" * 50,

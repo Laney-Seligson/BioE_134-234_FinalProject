@@ -2467,8 +2467,6 @@ All CRISPR design and validation steps are complete. Would you like me to genera
 
 You: 
 
-```
-
 > **Notes on session above**
 > - `crispr_predict_editing_efficiency` and `crispr_predict_offtargets` were not called directly by `run_full_crispr_workflow.py`; they were autonomously selected by Gemini as downstream validation tools after guide selection completed.
 > - These validation tools were authored by other project contributors and are integrated into the MCP ecosystem as optional downstream analysis modules.

@@ -13,7 +13,7 @@ class CasSelector:
               evaluated for quality:
                 - PAM: NGG (3') for SpCas9; TTTV (5', V = A/C/G) for LbCas12a.
                 - Spacer quality: GC content 30-70%; no TTTT run (Pol III
-                  termination); no homopolymer run >= 5 bases.
+                  termination); no homopolymer run >= 5 bases (Mali et al. 2013)
               Spacers that fail any filter are excluded.
 
         Step 2 -- Is the difference meaningful?

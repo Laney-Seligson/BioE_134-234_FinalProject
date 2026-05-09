@@ -1,4 +1,32 @@
 ### Karina:
+
+The main goal of my individual scope is to bridge natural-language biological questions with structured biological knowledge sources such as:
+- OLS4 Ontology Lookup Service
+- NCBI Gene / NCBI E-utilities
+
+The implemented tools enable users to:
+- convert biological questions into ontology searches,
+- retrieve relevant GO terms and ontology definitions,
+- identify genes associated with biological processes,
+- and retrieve genomic locus or sequence information.
+
+The repository contains four primary tools:
+1. **Semantic Tool**
+   - Performs ontology-driven semantic search using biological natural-language queries.
+2. **Annotation Tool**
+   - Retrieves genes associated with Gene Ontology (GO) terms.
+3. **Locus Tool** *(earlier prototype; not used in the final pipeline)*
+   - Retrieves genomic coordinate and chromosome locus information.
+4. **Sequence Tool** *(earlier prototype; not used in the final pipeline)*
+   - Retrieves nucleotide sequence records and FASTA information.
+
+Each tool follows the MCP architecture introduced in the course:
+- backend Python implementation,
+- MCP wrapper metadata,
+- structured JSON outputs,
+- pytest validation,
+- and example prompts for LLM interaction.
+
 <b>1. Semantic Tool</b>
 
 - What it does:
@@ -388,6 +416,20 @@
   If you need to perform specific analyses, such as guide RNA design or sequence translation for a specific region, please let me know!
   ```
 <br>
+
+<b> Pytest Overview </b>
+The pytest suite validates that each tool can successfully run its expected workflow and return structured biological outputs. Since most of these tools depend on external APIs such as OLS4 and NCBI E-utilities, the tests function mainly as integration and smoke tests rather than isolated unit tests. They verify that the API-based workflows are still reachable, that the returned data has the expected structure, and that biologically plausible results are produced.
+
+The semantic tool test checks that a natural-language query such as `"oxidative stress in yeast"` is correctly parsed into the organism `Saccharomyces cerevisiae` and mapped to the expected Gene Ontology term `GO:0006979`.
+
+The annotation tool tests check that the GO term lookup returns a structured result containing the correct GO ID, organism, and a non-empty gene list. They also verify that plausible oxidative stress-related yeast genes, such as `YAP1` or `SOD1`, appear in the returned results.
+
+The locus and sequence lookup tests check that the tools can resolve the yeast gene `YAP1`, return valid NCBI-linked records, and provide structured outputs such as genomic coordinates, strand direction, nucleotide records, and optional FASTA sequences.
+
+The pipeline smoke test runs a multi-step workflow across the semantic, annotation, and locus tools. It confirms that the tools can work together by first identifying a GO term from a natural-language query, then retrieving associated yeast genes, and finally resolving locus information for `YAP1`.
+
+Because these tests rely on external databases, failures may sometimes reflect API downtime, rate limits, or changes in database search results rather than errors in the local code. However, they are useful for confirming that the full MCP tool workflows remain functional end-to-end.
+
 <b>Citation:</b>
 
   - James McLaughlin, Josh Lagrimas, Haider Iqbal, Helen Parkinson, Henriette Harmse, OLS4: a new Ontology Lookup Service for a growing interdisciplinary knowledge ecosystem, Bioinformatics, Volume 41, Issue 5, May 2025, btaf279, https://doi.org/10.1093/bioinformatics/btaf279

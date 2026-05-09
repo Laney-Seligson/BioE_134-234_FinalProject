@@ -1193,11 +1193,7 @@ Possible Unhappy Paths:
 ---
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-  - Sample Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
-  
-  Notice that all genes are formatted simply and that the organism is stated. This is usually the way this tool works best. 
-
-  - Output:
+Sample Prompt:“Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
 
 <details>
 <summary>Click to expand sample output</summary>
@@ -1296,7 +1292,7 @@ Possible Unhappy Paths:
 ---
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-  - Sample Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
+Sample Prompt:“Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
   - Output:
 
 <details>
@@ -2298,8 +2294,7 @@ You:
 ---
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-
-  - Sample Prompt: “Design oligos to clone this protospacer into px330.” 
+Sample Prompt:“Design oligos to clone this protospacer into px330.” 
   - Output:
 
 

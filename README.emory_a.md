@@ -3,6 +3,9 @@
 
 ## Emory Adelman — CRISPR Toolchain
 
+> **DISCLAIMER**  
+> Several scripts contain additional inline citations and implementation-level references that are not fully reproduced in the README coding examples. These citations support lower-level biological heuristics, vector-specific cloning logic, organism-specific workflows, scoring behavior, PAM-preference rules, and engineering constraints used internally by the tools. The README focuses primarily on benchmark workflows and representative end-user examples, while the scripts themselves provide more granular justification for individual implementation decisions and helper logic.
+
 My tools support CRISPR education and wet-lab protocol design. Every design decision — vector selection, guide scoring, primer logic — is backed by literature citations. The workflow begins when the user provides a gene name: the tool fetches the genomic locus or coding sequence from NCBI, selects a Cas nuclease using a heuristic I developed (the nuclease with more high-quality PAM-compatible guides wins), designs and ranks up to 10 guide sequences, then passes the best guide and all cloning variables to teammates' tools for construction file and lab sheet generation.
       
 

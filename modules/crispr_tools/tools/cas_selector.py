@@ -136,6 +136,9 @@ class CasSelector:
         checks for short reverse-complement matches within the spacer.
         This approximates potential secondary structure (hairpins).
         """
+        # This is a sequence-based approximation, not a thermodynamic fold.
+        # It catches obvious self-complementary runs but will miss weaker hairpins
+        # that a tool like Mfold or RNAfold would detect.
         comp = {"A": "T", "T": "A", "G": "C", "C": "G"}
 
         def rev_comp(s):
@@ -272,6 +275,10 @@ class CasSelector:
             # stronger signal (3x) before awarding Cas9 the guide-count win.
             # (Minkah et al. 2018 Cell Host Microbe; Ghorbal et al. 2014 Nat Methods)
             effective_threshold = margin_threshold
+            # 3.0x is a conservative judgment call, not a figure from the cited papers.
+            # In extremely AT-rich sequences the GC quality filter systematically
+            # undercounts usable Cas12a guides, so a stronger signal is required
+            # before awarding the guide-count win to Cas9.
             if gc_content < 0.35 and tttv_count >= ngg_count and cas9_valid_guides > cas12a_valid_guides:
                 effective_threshold = max(margin_threshold, 3.0)
 

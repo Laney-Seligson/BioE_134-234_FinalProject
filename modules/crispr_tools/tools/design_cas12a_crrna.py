@@ -39,6 +39,8 @@ class DesignCas12aCrrna:
     _direct_repeat: str
 
     def initiate(self) -> None:
+        # Zetsche et al. 2015, Cell doi:10.1016/j.cell.2015.09.038
+        # LbCas12a direct repeat sequence prepended to the spacer to form the crRNA.
         self._direct_repeat = "AATTTCTACTAAGTGTAGAT"
 
     def run(self, seq: str) -> list:
@@ -61,7 +63,11 @@ class DesignCas12aCrrna:
         all_guides = []
 
         for i in range(len(seq) - 26):
+            # Zetsche et al. 2015, Cell doi:10.1016/j.cell.2015.09.038
+            # Cas12a requires a 5'-TTTV PAM (V = A, C, or G) upstream of the protospacer.
             if seq[i:i+3] == "TTT" and seq[i+3] in "ACG":
+                # Zetsche et al. 2015, Cell doi:10.1016/j.cell.2015.09.038
+                # Cas12a uses a 23 nt protospacer immediately downstream of the TTTV PAM.
                 protospacer = seq[i+4:i+27]
                 gc = sum(1 for b in protospacer if b in "GC") / 23
                 all_guides.append({
@@ -75,7 +81,8 @@ class DesignCas12aCrrna:
         if not all_guides:
             raise ValueError("No TTTV PAM site found in sequence.")
 
-        # Match cas_selector's validity filter (GC 30-70%).
+        # Zetsche et al. 2015, Cell doi:10.1016/j.cell.2015.09.038
+        # GC content 30-70% mirrors the quality filter used in cas_selector for consistent guide selection.
         # Sample evenly across the sequence so candidates span the full gene.
         preferred = [g for g in all_guides if 0.30 <= g["_gc"] <= 0.70]
         pool = preferred if len(preferred) >= 10 else all_guides

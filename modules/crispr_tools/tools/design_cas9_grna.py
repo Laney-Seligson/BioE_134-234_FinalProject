@@ -42,6 +42,8 @@ class DesignCas9Grna:
     _sgRNA_scaffold: str
 
     def initiate(self) -> None:
+        # Jinek et al. 2012, Science doi:10.1126/science.1225829
+        # tracrRNA scaffold fused to the 20 nt protospacer to form a single-guide RNA.
         self._sgRNA_scaffold = "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGC"
 
     def run(self, seq: str) -> list:
@@ -63,7 +65,11 @@ class DesignCas9Grna:
 
         all_guides = []
         for i in range(20, len(seq) - 2):
+            # Jinek et al. 2012, Science doi:10.1126/science.1225829
+            # SpCas9 requires an NGG PAM immediately 3' of the protospacer on the non-template strand.
             if seq[i+1:i+3] == "GG":
+                # Cong et al. 2013, Science doi:10.1126/science.1231143
+                # SpCas9 base-pairs with the 20 nt DNA protospacer immediately upstream of the NGG PAM.
                 protospacer = seq[i-20:i]
                 gc = sum(1 for b in protospacer if b in "GC") / 20
                 all_guides.append({
@@ -77,7 +83,8 @@ class DesignCas9Grna:
         if not all_guides:
             raise ValueError("No NGG PAM site found in sequence.")
 
-        # Match cas_selector's validity filter (GC 30-70%, consistent range).
+        # Doench et al. 2016, Nat Biotechnol doi:10.1038/nbt.3437
+        # GC content 30-70% is used as a first-pass efficiency filter, consistent with cas_selector.
         # Sample evenly across the sequence so the 10 returned guides cover the
         # full gene rather than clustering at the first NGG-dense region.
         preferred = [g for g in all_guides if 0.30 <= g["_gc"] <= 0.70]

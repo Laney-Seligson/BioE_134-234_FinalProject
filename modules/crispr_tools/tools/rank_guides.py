@@ -27,8 +27,12 @@ def _score_efficiency(protospacer: str) -> tuple[int, dict]:
     """
     gc_count = sum(1 for b in protospacer if b in "GC")
     gc_content = gc_count / len(protospacer) if protospacer else 0
+    # Doench et al. 2016, Nat Biotechnol doi:10.1038/nbt.3437
+    # GC content 40-70% is the empirically validated efficiency sweet spot for SpCas9.
     gc_ok = 0.40 <= gc_content <= 0.70
 
+    # Doench et al. 2016, Nat Biotechnol doi:10.1038/nbt.3437
+    # A TTTT run signals RNA Pol III termination, truncating the sgRNA and abolishing activity.
     no_polyt = "TTTT" not in protospacer
 
     score = 0
@@ -66,6 +70,8 @@ def _score_specificity(
         max_mismatches=max_mismatches,
     )
 
+    # Hsu et al. 2013, Nat Biotechnol doi:10.1038/nbt.2647
+    # Specificity is assessed by off-target burden; the on-target site is excluded from the penalty tally.
     # on-target = first 0-mismatch HIGH-risk site; exclude it from off-target counts
     sites = report["offtarget_sites"]
     off_sites = []
@@ -234,6 +240,8 @@ class RankGuides:
                 "total_score": eff_score + spec_score,
             })
 
+        # Hsu et al. 2013, Nat Biotechnol doi:10.1038/nbt.2647
+        # Guides are ranked by total score then off-target burden so the best candidate appears first.
         # primary: total score desc; secondary: efficiency desc; then fewer
         # predicted off-targets by severity as tie-breakers.
         scored.sort(

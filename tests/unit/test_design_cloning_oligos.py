@@ -339,3 +339,53 @@ def test_pcrispr_zebrafish_returns_needs_user_input():
         target_organism="zebrafish",
     )
     assert result["status"] == "needs_user_input"
+
+
+# ---------------------------------------------------------------------------
+# Paper-grounded vector logic tests
+# ---------------------------------------------------------------------------
+
+def test_px330_bbsI_overhangs_match_ran_protocol():
+    # Ran et al. 2013, Nat Protoc doi:10.1038/nprot.2013.143
+    # Supports pX330 BbsI annealed-oligo cloning with CACC/AAAC overhang logic.
+    result = design_cloning_oligos(
+        vector="px330",
+        protospacer="GCTCTCCAAACCACGGCTCC",
+        target_organism="Homo sapiens",
+    )
+    assert result["status"] == "ready"
+    assert result["enzyme"] == "BbsI"
+    assert result["top_overhang"] == "CACC"
+    assert result["bottom_overhang"] == "AAAC"
+    assert result["top_oligo"] == "CACCGCTCTCCAAACCACGGCTCC"
+    assert result["bottom_oligo"] == "AAACGGAGCCGTGGTTTGGAGAGC"
+
+
+def test_ptargetf_uses_spei_restriction_ligation_from_jiang_2015():
+    # Jiang et al. 2015, Appl Environ Microbiol doi:10.1128/AEM.04023-14
+    # Supports pTargetF/pCas9-CR4 E. coli workflow and SpeI-based guide cassette insertion.
+    result = design_cloning_oligos(
+        vector="ptargetf",
+        protospacer="CAGCTGGCGTAATAGCGAAG",
+        target_organism="Escherichia coli",
+    )
+    assert result["status"] == "ready"
+    assert result["cloning_method"] == "RestrictionLigation"
+    assert result["enzyme"] == "SpeI"
+    assert "ACTAGT" in result["forward_primer"]
+    assert "ACTAGT" in result["reverse_primer"]
+    assert result["guide_cassette_sequence"].startswith(PROMOTER_SEQUENCES["J23119"])
+    assert result["guide_cassette_sequence"].endswith(SCAFFOLD_SEQUENCES["SpCas9"])
+
+
+def test_gibson_assembly_requires_vector_overlap_contexts():
+    # Gibson et al. 2009, Nat Methods doi:10.1038/nmeth.1318
+    # Supports overlap-based assembly, so missing vector-flanking overlap contexts should trigger user input.
+    result = design_cloning_oligos(
+        vector="pdd162",
+        insert_sequence=PROTOSPACER * 3,
+        target_organism="Caenorhabditis elegans",
+    )
+    assert result["status"] == "needs_user_input"
+    assert "left_overlap_context" in result["missing_fields"]
+    assert "right_overlap_context" in result["missing_fields"]

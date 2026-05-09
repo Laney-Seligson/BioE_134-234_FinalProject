@@ -1296,7 +1296,6 @@ Sample Prompt:“Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.”
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 
 Sample Prompt:“Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
-  - Output:
 
 <details>
 <summary>Click to expand sample output</summary>

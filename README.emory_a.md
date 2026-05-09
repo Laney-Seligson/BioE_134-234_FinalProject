@@ -24,9 +24,11 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
 
 The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called. TypeIIS oligo cloning steps (BbsI/BsmBI annealed-oligo ligation into digested vector backbones) follow the standard protocols used in `create_construction_file` and `validate_construction_file` (Addgene/Zhang Lab 2015; NEB FAQ; Hu et al. 2020).
 
+Sample Prompt: Run a CRISPR edit workflwo for EMX1 in homo sapiens using px330. 
+
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 <details>
-<summary>Click to expand sample output</summary>
+<summary>Click to expand source sample output</summary>
 
 ```
 You: Run a CRISPR edit workflow for EMX1 in homo sapiens using px330 
@@ -674,7 +676,7 @@ You:
 > - `predict_editing_efficiency` was called autonomously by Gemini as an extra validation step — it is **not** invoked by `run_full_crispr_workflow.py` directly and is not part of the core pipeline.
 > - The three `crispr_predict_offtargets` errors occurred because Gemini initially passed `"NC_000002.12"` (an NCBI accession) and `"EMX1"` (a gene name) as the `reference` parameter. `predict_offtargets` requires a raw DNA sequence; the `predict_offtargets.json` tool description was updated after this session to explicitly forbid accessions/gene names and direct callers to use `crispr_fetch_target_sequence` first.
 
-> **Benchmark alignment — Hsu et al. 2013:** The sample above targets EMX1 in *Homo sapiens* with pX330, one of the canonical SpCas9 benchmark loci from [Hsu, P.D. et al. 2013, *Nat Biotechnol*](https://doi.org/10.1038/nbt.2647). Alignment points: NGG PAM targeting (SpCas9), mammalian guide generation via U6-driven sgRNA scaffold, pX330 BbsI CACC/AAAC sticky-end overhangs, and zero predicted off-target sites (low-off-target prioritization).
+> **Benchmark alignment — Hsu et al. 2013:** The  above targets EMX1 in *Homo sapiens* with pX330, one of the canonical SpCas9 benchmark loci from [Hsu, P.D. et al. 2013, *Nat Biotechnol*](https://doi.org/10.1038/nbt.2647). Alignment points: NGG PAM targeting (SpCas9), mammalian guide generation via U6-driven sgRNA scaffold, pX330 BbsI CACC/AAAC sticky-end overhangs, and zero predicted off-target sites (low-off-target prioritization).
 
 Possible Unhappy Paths:
 - Predict editing efficiency and predict offtargets could be called in pipeline before correct gene is used
@@ -709,7 +711,7 @@ Possible Unhappy Paths:
   - MCP Wrapper: [fetch_target_sequence.json](modules/crispr_tools/tools/fetch_target_sequence.json)
   - Pytests ([tests/unit/test_fetch_target_sequence.py](tests/unit/test_fetch_target_sequence.py)): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
 ---
-  - Sample Happy Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
+  - Sample Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
   
   Notice that all genes are formatted simply and that the organism is stated. This is usually the way this tool works best. 
 
@@ -811,7 +813,7 @@ Possible Unhappy Paths:
   - MCP Wrapper: [cas_selector.json](modules/crispr_tools/tools/cas_selector.json)
   - Pytests ([tests/unit/test_cas_selector.py](tests/unit/test_cas_selector.py)): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
 ---
-  - Sample Happy Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
+  - Sample Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
   - Output:
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
@@ -942,7 +944,7 @@ Possible Unhappy Paths:
   - MCP Wrapper: [design_cas9_grna.json](modules/crispr_tools/tools/design_cas9_grna.json)
   - Pytests ([tests/unit/test_design_cas9_grna.py](tests/unit/test_design_cas9_grna.py)): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
 ---
-  - Sample Happy Prompt: “Design Cas9 guides for the lacZ locus.” 
+  - Sample Prompt: “Design Cas9 guides for the lacZ locus.” 
   
   - Output:
 
@@ -1456,7 +1458,7 @@ You:
   - MCP Wrapper: [design_cas12a_crrna.json](modules/crispr_tools/tools/design_cas12a_crrna.json)
   - Pytests ([tests/unit/test_design_cas12a_crrna.py](tests/unit/test_design_cas12a_crrna.py)): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
 ---
-  - Sample Happy Prompt: “Give me Cas12a guides for the araB locus.”
+  - Sample Prompt: “Give me Cas12a guides for the araB locus.”
   - Output:
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
@@ -1809,7 +1811,7 @@ You:
   - MCP Wrapper: [design_cloning_oligos.json](modules/crispr_tools/tools/design_cloning_oligos.json)
   - Pytests ([tests/unit/test_design_cloning_oligos.py](tests/unit/test_design_cloning_oligos.py)): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
 ---
-  - Sample Happy Prompt: “Design oligos to clone this protospacer into px330.” 
+  - Sample Prompt: “Design oligos to clone this protospacer into px330.” 
   - Output:
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)

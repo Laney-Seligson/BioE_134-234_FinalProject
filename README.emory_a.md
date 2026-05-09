@@ -22,11 +22,13 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
   - design cloning oligos 
   - prepares construction file inputs 
 
-The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called. TypeIIS oligo cloning steps (BbsI/BsmBI annealed-oligo ligation into digested vector backbones) follow the standard protocols used in `create_construction_file` and `validate_construction_file` (Addgene/Zhang Lab 2015; NEB FAQ; Hu et al. 2020).
+The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called. 
+
+![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 
 Sample Prompt: Run a CRISPR edit workflwo for EMX1 in homo sapiens using px330. 
 
-![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
 <details>
 <summary>Click to expand source sample output</summary>
 
@@ -812,11 +814,11 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: [cas_selector.json](modules/crispr_tools/tools/cas_selector.json)
   - Pytests ([tests/unit/test_cas_selector.py](tests/unit/test_cas_selector.py)): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
----
-  - Sample Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
-  - Output:
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
+Sample Prompt: “Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans?
+
 <details>
 <summary>Click to expand sample output</summary>
 
@@ -943,13 +945,10 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: [design_cas9_grna.json](modules/crispr_tools/tools/design_cas9_grna.json)
   - Pytests ([tests/unit/test_design_cas9_grna.py](tests/unit/test_design_cas9_grna.py)): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
----
-  - Sample Prompt: “Design Cas9 guides for the lacZ locus.” 
-  
-  - Output:
-
+    
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-<details>
+
+Sample Prompt: Design guide RNA for EMX1 in Homo Sapiens. 
 <summary>Click to expand sample output</summary>
 
 ```json
@@ -1457,11 +1456,11 @@ You:
   
   - MCP Wrapper: [design_cas12a_crrna.json](modules/crispr_tools/tools/design_cas12a_crrna.json)
   - Pytests ([tests/unit/test_design_cas12a_crrna.py](tests/unit/test_design_cas12a_crrna.py)): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
----
-  - Sample Prompt: “Give me Cas12a guides for the araB locus.”
-  - Output:
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
+Sample Prompt: Design Cas12a crRNAs for sma-2 in C.elegans and rank 
+
 <details>
 <summary>Click to expand sample output</summary>
 
@@ -1810,11 +1809,10 @@ You:
   
   - MCP Wrapper: [design_cloning_oligos.json](modules/crispr_tools/tools/design_cloning_oligos.json)
   - Pytests ([tests/unit/test_design_cloning_oligos.py](tests/unit/test_design_cloning_oligos.py)): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
----
-  - Sample Prompt: “Design oligos to clone this protospacer into px330.” 
-  - Output:
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
+Sample Prompt: Design cloning oligos (after running EMX1 guide design)
 <details>
 <summary>Click to expand sample output</summary>
 

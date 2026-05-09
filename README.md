@@ -476,8 +476,6 @@ The client is ready and you can start entering prompts.
   - James McLaughlin, Josh Lagrimas, Haider Iqbal, Helen Parkinson, Henriette Harmse, OLS4: a new Ontology Lookup Service for a growing interdisciplinary knowledge ecosystem, Bioinformatics, Volume 41, Issue 5, May 2025, btaf279, https://doi.org/10.1093/bioinformatics/btaf279
   - Sayers E. A General Introduction to the E-utilities. 2009 May 26 [Updated 2022 Nov 17]. In: Entrez® Programming Utilities Help [Internet]. Bethesda (MD): National Center for Biotechnology Information (US); 2010-. Available from: https://www.ncbi.nlm.nih.gov/books/NBK25497/
 </div>
-
-
 ![CRISPR](https://img.shields.io/badge/CRISPR-Workflow-F527F2?style=for-the-badge)
 
 
@@ -1147,13 +1145,14 @@ You:
 
 </details>
 
-> **Note on the sample session above:**
+> **What happened?**
 > - `predict_editing_efficiency` was called autonomously by Gemini as an extra validation step — it is **not** invoked by `run_full_crispr_workflow.py` directly and is not part of the core pipeline.
 > - The three `crispr_predict_offtargets` errors occurred because Gemini initially passed `"NC_000002.12"` (an NCBI accession) and `"EMX1"` (a gene name) as the `reference` parameter. `predict_offtargets` requires a raw DNA sequence; the `predict_offtargets.json` tool description was updated after this session to explicitly forbid accessions/gene names and direct callers to use `crispr_fetch_target_sequence` first.
 
 > **Benchmark alignment — Hsu et al. 2013:** The sample above targets EMX1 in *Homo sapiens* with pX330, one of the canonical SpCas9 benchmark loci from [Hsu, P.D. et al. 2013, *Nat Biotechnol*](https://doi.org/10.1038/nbt.2647). Alignment points: NGG PAM targeting (SpCas9), mammalian guide generation via U6-driven sgRNA scaffold, pX330 BbsI CACC/AAAC sticky-end overhangs, and zero predicted off-target sites (low-off-target prioritization).
 
 Possible Unhappy Paths:
+- Predict editing efficiency and predict offtargets could be called in pipeline before correct gene is used
 - A user may say "Run full CRISPR workflow on genes that cause cystic fibrosis in Homo sapiens." If only a disease name is given, semantic tools are called to identify a target gene before the workflow proceeds.
 - After gene resolution, the organism is occasionally re-prompted if it was inferred rather than explicitly stated.
 - Vectors are not always known; the MCP supplies organism-appropriate recommendations or waits for user input before calling `design_cloning_oligos`.
@@ -1161,7 +1160,6 @@ Possible Unhappy Paths:
  
 - MCP Wrapper: [run_full_crispr_workflow.json](modules/crispr_tools/tools/run_full_crispr_workflow.json)
 - Pytests ([tests/unit/test_run_full_crispr_workflow.py](tests/unit/test_run_full_crispr_workflow.py)): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
-- Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
 - Citations:
   - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. “Genome Engineering Using the CRISPR-Cas9 System.” Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; basis for mammalian guide-insertion workflow)*
   - Jiang, Yihui, Bin Chen, Caifeng Duan, Bing Sun, Jian Yang, and Sheng Yang. 2015. “Multigene Editing in the Escherichia coli Genome via the CRISPR-Cas9 System.” Applied and Environmental Microbiology 81 (7): 2506–2514. https://doi.org/10.1128/AEM.04023-14. *(pTargetF/pCas9-CR4 two-plasmid E. coli editing system; basis for bacterial guide-insertion workflow)*
@@ -1194,8 +1192,8 @@ Possible Unhappy Paths:
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 <details>
 <summary>Click to expand sample output</summary>
-        
-      ```json
+
+```json
       You: Fetch sequences to edit sma-2, sma-3, and sma-4 in c.elegans             
       [Tool call] → crispr_fetch_target_sequence
       {
@@ -1258,10 +1256,10 @@ Possible Unhappy Paths:
       1.  **System Selection**: I will run the `crispr_cas_selector` on each sequence to determine the recommended nuclease (Cas9 vs. Cas12a).
       2.  **Guide Design**: I will proceed with guide design based on that recommendation.
       3.  **Aggregation**: I will then aggregate these results to provide a unified strategy.
-      ```
+```
 </details>
 
-> **What happened in this session?**
+> **What happened ?**
 > - `fetch_target_sequence.py` normalized the organism alias ("c.elegans" → "Caenorhabditis elegans") before querying NCBI.
 > - The tool then used Entrez `esearch`, `esummary`, and `efetch` operations to retrieve genomic loci for sma-2, sma-3, and sma-4.
 > - The returned accession and genomic coordinate information were formatted into downstream-compatible sequence records for CRISPR guide discovery.
@@ -1294,7 +1292,7 @@ Possible Unhappy Paths:
 <details>
 <summary>Click to expand sample output</summary>
 
-        ```json 
+```json
         You: What Cas system would I use to edit sma-2, sma-3 and sma-4 in C.elegans all at once?
         
         [Gemini busy (503). Retrying in 2s...]
@@ -1375,10 +1373,10 @@ Possible Unhappy Paths:
         2.  **Ranking these guides** based on efficiency and specificity?
         3.  **Assisting with the cloning strategy** for a Cas12a multiplexing vector?
         
-        ```
+```
 </details>
 
-> **What happened in this session?**
+> **What happened ?**
 > - `crispr_cas_selector` evaluated both NGG-compatible SpCas9 windows and TTTV-compatible LbCas12a windows across all supplied loci.
 > - The workflow aggregated guide statistics across sma-2, sma-3, and sma-4 before generating a single nuclease recommendation.
 > - Multiplexing support was treated as a tie-breaker when guide counts between nucleases fell within the configured threshold margin.
@@ -1396,9 +1394,12 @@ Possible Unhappy Paths:
   
   
   
-## 4. [design_cas9_grna](modules/crispr_tools/tools/design_cas9_grna.py)
+## 4. [design_cas9_grna](modules/crispr_tools/tools/design_cas9_grna.py) with [rank_guides.py](modules/crispr_tools/tools/rank_guides.py)
   - What it does: 
-    - Enumerates SpCas9 guide RNA candidates from NGG PAM sites across the sequence; candidate scoring applies GC content (40–65% optimum) and poly-T checks as heuristics derived from Doench et al. 2016 Rule Set 2 — downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
+    - Enumerates SpCas9 guide RNA candidates from NGG PAM sites across the sequence; candidate scoring applies GC content (40–65% optimum) and poly-T checks as heuristics derived from Doench et al. 2016 Rule Set 2 — downstream [rank_guides.py](modules/crispr_tools/tools/rank_guides.py) applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
+     - Shared downstream scoring layer: candidate guides generated here are passed into [rank_guides.py](modules/crispr_tools/tools/rank_guides.py), where efficiency heuristics (GC content, poly-T filtering, homopolymer penalties) and specificity metrics from `predict_offtargets.py` are combined into a final ranked score used by downstream cloning workflows.
+    - Infrastructure integration: although [rank_guides.py](modules/crispr_tools/tools/rank_guides.py) is not exposed as a standalone end-user MCP workflow, it includes its own MCP JSON wrapper [rank_guides.json](modules/crispr_tools/tools/rank_guides.json) and dedicated pytest suite (`tests/unit/test_rank_guides.py`) for validation of guide ranking, scoring consistency, off-target aggregation, and best-guide selection behavior.
+    - Downstream [rank_guides.py](modules/crispr_tools/tools/rank_guides.py) applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
     - It does this with a prompt that is directly about designing guides if nuclease, genes and organism are known. 
     - For multiplexing, say on 3 different genes, each gene has to go through 1 individual workflow. 
   
@@ -1416,9 +1417,9 @@ Possible Unhappy Paths:
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 <details>
 <summary>Click to expand sample output</summary>
-  
+
 ```json
-   
+
 You: Design guide RNA for EXM1 in Homo Sapiens  
 
 [Tool call] → crispr_fetch_target_sequence
@@ -1888,7 +1889,7 @@ You:
 ```
 </details>
 
-> **Note on the sample session above:**
+> **What happened?**
 > EMX1 was not recognizable in NCBI, therefore semantic tools were used instead. This will be diagnosed with future work. 
 
 > **Benchmark alignment — Hsu et al. 2013 / Ran et al. 2013:**  
@@ -1901,14 +1902,16 @@ You:
     - Hsu, Patrick D., David A. Scott, Joshua A. Weinstein, F. Ann Ran, Silvana Konermann, Vineeta Agarwala, Yinqing Li, et al. 2013. "DNA Targeting Specificity of RNA-Guided Cas9 Nucleases." Nature Biotechnology 31 (9): 827–832. https://doi.org/10.1038/nbt.2647.
     *(EMX1 benchmark loci and SpCas9 NGG specificity framework)*
 
-    -Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. “Genome Engineering Using the CRISPR-Cas9 System.” Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; basis for mammalian guide-insertion workflow)*
+    - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. “Genome Engineering Using the CRISPR-Cas9 System.” Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; basis for mammalian guide-insertion workflow)*
   
     - Doench, John G., Nicolo Fusi, Meagan Sullender, Mudra Hegde, Emma W. Vaimberg, Katherine F. Donovan, Ian Smith, et al. 2016. "Optimized sgRNA Design to Maximize Activity and Minimize Off-Target Effects of CRISPR-Cas9." Nature Biotechnology 34 (2): 184–191. https://doi.org/10.1038/nbt.3437. *(GC content optimum 40–65%, poly-T termination penalty, PAM-proximal position weights used in candidate scoring)*
   
-## 5. [design_cas12a_crrna.py](modules/crispr_tools/tools/design_cas12a_crrna.py)
+## 5. [design_cas12a_crrna.py](modules/crispr_tools/tools/design_cas12a_crrna.py) with [rank_guides.py](modules/crispr_tools/tools/rank_guides.py)
   - What it does: 
     - Scans a sequence for TTTV PAM sites and returns up to 10 LbCas12a crRNA candidates
-    - downstream `rank_guides` applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
+    - Shared downstream scoring layer: candidate guides generated here are passed into [rank_guides.py](modules/crispr_tools/tools/rank_guides.py), where efficiency heuristics (GC content, poly-T filtering, homopolymer penalties) and specificity metrics from `predict_offtargets.py` are combined into a final ranked score used by downstream cloning workflows.
+    - Infrastructure integration: although [rank_guides.py](modules/crispr_tools/tools/rank_guides.py) is not exposed as a standalone end-user MCP workflow, it includes its own MCP JSON wrapper [rank_guides.json](modules/crispr_tools/tools/rank_guides.json) and dedicated pytest suite (`tests/unit/test_rank_guides.py`) for validation of guide ranking, scoring consistency, off-target aggregation, and best-guide selection behavior.
+    - Downstream [rank_guides.py](modules/crispr_tools/tools/rank_guides.py) applies weighted heuristics for final ranking (not a reproduction of the trained Doench ML model)
     - For multiplexing across multiple genes, each gene goes through a separate workflow.
   
     Possible Unhappy Paths: 
@@ -1925,87 +1928,329 @@ You:
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 <details>
 <summary>Click to expand sample output</summary>
-  
-        ```json
-        After calling previous tools →
-        [Tool result] ← crispr_design_cas12a_crrna:
-        {
-          "result": [
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUGCAGUGAUUCUGUGCGAGCUUUG",
-              "protospacer": "GCAGTGATTCTGTGCGAGCTTTG",
-              "pam_site": "TTTG"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUGCGGUGGACUGCGCUACCGGUGA",
-              "protospacer": "GCGGTGGACTGCGCTACCGGTGA",
-              "pam_site": "TTTG"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUGAUGCCCCGAAUAACCAGUUCC",
-              "protospacer": "TGATGCCCCGAATAACCAGTTCC",
-              "pam_site": "TTTG"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUCCGAAAACCCGAACGCGAUGUUC",
-              "protospacer": "CCGAAAACCCGAACGCGATGTTC",
-              "pam_site": "TTTG"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUGCCACGCGCCGGGCAACGUUGA",
-              "protospacer": "TGCCACGCGCCGGGCAACGTTGA",
-              "pam_site": "TTTG"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUUCCAGCGAAUGGUUCUGGGCAA",
-              "protospacer": "TTCCAGCGAATGGTTCTGGGCAA",
-              "pam_site": "TTTA"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUCGGUACCACCCGCCCGCAGGAUA",
-              "protospacer": "CGGTACCACCCGCCCGCAGGATA",
-              "pam_site": "TTTC"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUUUGAUGAGCUGGACCCGAUCCU",
-              "protospacer": "TTTGATGAGCTGGACCCGATCCT",
-              "pam_site": "TTTC"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUAUGAGCUGGACCCGAUCCUCAAU",
-              "protospacer": "ATGAGCTGGACCCGATCCTCAAT",
-              "pam_site": "TTTG"
-            },
-            {
-              "crrna_sequence": "AAUUUCUACUAAGUGUAGAUCCUUCCCCGCUGUUCACUGACAC",
-              "protospacer": "CCTTCCCCGCTGTTCACTGACAC",
-              "pam_site": "TTTG"
-            }
-          ]
-        }
-        Gemini: I have designed several Cas12a crRNA candidates targeting the *araB* gene in *E. coli*. These were identified by scanning for the TTTV PAM sites (TTTA, TTTC, TTTG) required for LbCas12a.
-        | Protospacer (23 nt) | PAM | crRNA Candidate |
-        | :--- | :--- | :--- |
-        | `GCAGTGATTCTGTGCGAGCTTTG` | TTTG | `AAUUUCUACUAAGUGUAGAUGCAGUGAUUCUGUGCGAGCUUUG` |
-        | `GCGGTGGACTGCGCTACCGGTGA` | TTTG | `AAUUUCUACUAAGUGUAGAUGCGGUGGACUGCGCUACCGGUGA` |
-        | `TGATGCCCCGAATAACCAGTTCC` | TTTG | `AAUUUCUACUAAGUGUAGAUUGAUGCCCCGAAUAACCAGUUCC` |
-        | `CCGAAAACCCGAACGCGATGTTC` | TTTG | `AAUUUCUACUAAGUGUAGAUCCGAAAACCCGAACGCGAUGUUC` |
-        | `TGCCACGCGCCGGGCAACGTTGA` | TTTG | `AAUUUCUACUAAGUGUAGAUUGCCACGCGCCGGGCAACGUUGA` |
-        | `TTCCAGCGAATGGTTCTGGGCAA` | TTTA | `AAUUUCUACUAAGUGUAGAUUUCCAGCGAAUGGUUCUGGGCAA` |
-        | `CGGTACCACCCGCCCGCAGGATA` | TTTC | `AAUUUCUACUAAGUGUAGAUCGGUACCACCCGCCCGCAGGAUA` |
-        | `TTTGATGAGCTGGACCCGATCCT` | TTTC | `AAUUUCUACUAAGUGUAGAUUUUGAUGAGCUGGACCCGAUCCU` |
-        | `ATGAGCTGGACCCGATCCTCAAT` | TTTG | `AAUUUCUACUAAGUGUAGAUAUGAGCUGGACCCGAUCCUCAAU` |
-        | `CCTTCCCCGCTGTTCACTGACAC` | TTTG | `AAUUUCUACUAAGUGUAGAUCCUUCCCCGCUGUUCACUGACAC` |
-        These crRNAs include the LbCas12a direct repeat sequence (`AAUUUCUACUAAGUGUAGAU`) at the 5' end. 
-        If you would like to proceed, I can help you select the best candidates based on specificity, design cloning oligos for your vector, or provide an editing efficiency prediction for a specific guide. How would          you like to continue?
-        ```
+
+```json
+     You: Design Cas12a crRNAs for sma-2 in C.elegans and rank 
+
+[Tool call] → crispr_design_cas12a_crrna
+{
+  "organism": "C. elegans",
+  "seq": "GGACACAAGTTGACTGTCGCCGGGTGGAAACACATCTGTGAAGATGATTGCACAATTTGGAGAGACGGAGAGTTGAAAACAATGAGTAGACAGTTAGACGGTTGATGATGGGCTGGTGAA\u2026 (7410 chars)"
+}
+[Tool result] ← crispr_design_cas12a_crrna:
+{
+  "result": [
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUGAGAGACGGAGAGUUGAAAACAA",
+      "protospacer": "GAGAGACGGAGAGTTGAAAACAA",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUCCAAAAGACCAAUAGGGUGGGG",
+      "protospacer": "TCCAAAAGACCAATAGGGTGGGG",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUACAAAAAUUACACCAGCCAAAAC",
+      "protospacer": "ACAAAAATTACACCAGCCAAAAC",
+      "pam_site": "TTTC"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUGCACGUGGAGAUCACUGGAAAA",
+      "protospacer": "TGCACGTGGAGATCACTGGAAAA",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUUGCUCAUGAUUCGUCACUGCUG",
+      "protospacer": "TTGCTCATGATTCGTCACTGCTG",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUAAAAGAUCAAGAAUAUCCCAAGU",
+      "protospacer": "AAAAGATCAAGAATATCCCAAGT",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUGUAGAGCAUUGCGACAAUUUGAU",
+      "protospacer": "GTAGAGCATTGCGACAATTTGAT",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUAGAGGGAAAAGGUUACGAAAAGA",
+      "protospacer": "AGAGGGAAAAGGTTACGAAAAGA",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUAAAAAAACUGGGUUACUGUACUU",
+      "protospacer": "AAAAAAACTGGGTTACTGTACTT",
+      "pam_site": "TTTG"
+    },
+    {
+      "crrna_sequence": "AAUUUCUACUAAGUGUAGAUUCGGUCGUCAAAAAAUGUUCAAA",
+      "protospacer": "TCGGTCGTCAAAAAATGTTCAAA",
+      "pam_site": "TTTG"
+    }
+  ]
+}
+
+[Tool call] → crispr_rank_guides
+{
+  "reference": "GGACACAAGTTGACTGTCGCCGGGTGGAAACACATCTGTGAAGATGATTGCACAATTTGGAGAGACGGAGAGTTGAAAACAATGAGTAGACAGTTAGACGGTTGATGATGGGCTGGTGAA\u2026 (7410 chars)",
+  "nuclease": "cas12a",
+  "guides": [
+    "GAGAGACGGAGAGTTGAAAACAA",
+    "TCCAAAAGACCAATAGGGTGGGG",
+    "ACAAAAATTACACCAGCCAAAAC",
+    "TGCACGTGGAGATCACTGGAAAA",
+    "TTGCTCATGATTCGTCACTGCTG",
+    "AAAAGATCAAGAATATCCCAAGT",
+    "GTAGAGCATTGCGACAATTTGAT",
+    "AGAGGGAAAAGGTTACGAAAAGA",
+    "AAAAAAACTGGGTTACTGTACTT",
+    "TCGGTCGTCAAAAAATGTTCAAA"
+  ]
+}
+[Tool result] ← crispr_rank_guides:
+{
+  "ranked_guides": [
+    {
+      "protospacer": "GAGAGACGGAGAGTTGAAAACAA",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.435,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "protospacer": "TCCAAAAGACCAATAGGGTGGGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.522,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "protospacer": "TGCACGTGGAGATCACTGGAAAA",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.478,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "protospacer": "TTGCTCATGATTCGTCACTGCTG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.478,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "protospacer": "ACAAAAATTACACCAGCCAAAAC",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.348,
+        "gc_content_ok": false,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 2
+    },
+    {
+      "protospacer": "AAAAGATCAAGAATATCCCAAGT",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.304,
+        "gc_content_ok": false,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 2
+    },
+    {
+      "protospacer": "GTAGAGCATTGCGACAATTTGAT",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.391,
+        "gc_content_ok": false,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 2
+    },
+    {
+      "protospacer": "AGAGGGAAAAGGTTACGAAAAGA",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.391,
+        "gc_content_ok": false,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 2
+    },
+    {
+      "protospacer": "AAAAAAACTGGGTTACTGTACTT",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.304,
+        "gc_content_ok": false,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 2
+    },
+    {
+      "protospacer": "TCGGTCGTCAAAAAATGTTCAAA",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.348,
+        "gc_content_ok": false,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 1,
+        "total_offtargets": 1,
+        "on_target_found": true
+      },
+      "total_score": 2
+    }
+  ],
+  "best_guide": {
+    "protospacer": "GAGAGACGGAGAGTTGAAAACAA",
+    "efficiency_score": 2,
+    "efficiency_details": {
+      "gc_content": 0.435,
+      "gc_content_ok": true,
+      "no_polyt_run": true
+    },
+    "specificity_score": 1,
+    "specificity_details": {
+      "high_risk_offtargets": 0,
+      "medium_risk_offtargets": 0,
+      "total_offtargets": 0,
+      "on_target_found": true
+    },
+    "total_score": 3
+  },
+  "scoring_rationale": "Best guide 'GAGAGACGGAGAGTTGAAAACAA' scored 3/3 (efficiency 2/2, specificity 1/1). GC content: 44%. Off-target sites: 0 \u2026 (145 chars)"
+}
+
+Gemini: The Cas12a crRNA design for the *sma-2* gene in *C. elegans* is complete. The top-ranked crRNA was selected based on a combination of high on-target efficiency scores (GC content optimization and lack of poly-T runs) and specificity (zero predicted off-target binding sites).
+
+### Top-Ranked crRNA
+*   **Protospacer:** `GAGAGACGGAGAGTTGAAAACAA`
+*   **PAM Site:** `TTTG` (5' to the protospacer)
+*   **Total Score:** 3/3
+*   **Rationale:** This guide has a GC content of 44%, which is within the optimal range, and contains no poly-T sequence runs that could cause premature termination of Pol III-driven transcription. Most importantly, it shows no predicted off-target binding sites in the *C. elegans* genome.
+
+### Summary of Ranked Candidates
+| Protospacer | GC% | Total Score | Specificity Notes |
+| :--- | :--- | :--- | :--- |
+| **GAGAGACGGAGAGTTGAAAACAA** | 44% | 3 | 0 total off-targets |
+| **TCCAAAAGACCAATAGGGTGGGG** | 52% | 3 | 0 total off-targets |
+| **TGCACGTGGAGATCACTGGAAAA** | 48% | 3 | 0 total off-targets |
+| **TTGCTCATGATTCGTCACTGCTG** | 48% | 3 | 0 total off-targets |
+| **ACAAAAATTACACCAGCCAAAAC** | 35% | 2 | Low GC% |
+| **AAAAGATCAAGAATATCCCAAGT** | 30% | 2 | Low GC% |
+| **GTAGAGCATTGCGACAATTTGAT** | 39% | 2 | Low GC% |
+| **AGAGGGAAAAGGTTACGAAAAGA** | 39% | 2 | Low GC% |
+| **AAAAAAACTGGGTTACTGTACTT** | 30% | 2 | Low GC% |
+| **TCGGTCGTCAAAAAATGTTCAAA** | 35% | 2 | 1 medium risk off-target |
+
+All designs were scanned for TTTV PAM sites.
+
+**Next Steps:**
+1.  Would you like me to predict the on-target editing efficiency for this top guide?
+2.  Would you like me to design the cloning oligos needed to clone this crRNA into an expression vector?
+3.  Would you like me to design flanking Sanger sequencing primers to verify the edit later?
+
+You: 
+
+```
 </details>
+
+> **What Happened?**
+> - `design_cas12a_crrna.py` scanned the fetched genomic locus for valid TTTV PAM sites compatible with LbCas12a.
+> - The tool generated up to 10 candidate crRNAs by extracting the 23 nt protospacer immediately downstream of each TTTV PAM and prepending the Cas12a direct repeat sequence.
+> - These candidate crRNAs were then passed into `rank_guides.py`, where GC-content heuristics, poly-T filtering, homopolymer penalties, and off-target metrics from `predict_offtargets.py` were aggregated into a final ranked score.
+> - The highest-scoring crRNA was selected as the recommended downstream cloning and editing candidate.
+
+> **Benchmark alignment — Zetsche et al. 2015 / Kim et al. 2016:**
+> The workflow follows canonical LbCas12a targeting logic by scanning for TTTV PAMs and generating staggered-cut-compatible crRNAs. The ranking stage prioritizes low predicted off-target activity and biologically reasonable spacer composition, consistent with early Cas12a specificity and multiplexing studies.
     
   - Citations:
-    - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. "Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System." Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038.
-    - Fonfara, Ines, Hagen Richter, Majda Bratovič, Anaïs Le Rhun, and Emmanuelle Charpentier. 2016. "The CRISPR-Associated DNA-Cleaving Enzyme Cpf1 Also Processes Precursor CRISPR RNA." Nature 532 (7600): 517–521. https://doi.org/10.1038/nature17945.
-    - Kim, Hoon Cho, Sunghyeok Ye, Daesik Kim, Young-Chang Cho, Ju-Hyun Lee, and Jin-Soo Kim. 2018. "In Vivo High-Throughput Profiling of CRISPR-Cpf1 Activity." Nature Methods 15 (1): 10–12. https://doi.org/10.1038/nbt.4061. *(Position-specific nucleotide preferences for Cas12a on-target activity; informs crRNA candidate scoring)*
-    - Hu, Xianrong, Kejian Wang, Yiping Tong, et al. 2020. "Technological Advances in CRISPR-Cas-Based Plant Genome Editing." The Crop Journal 8 (3): 403–407. https://doi.org/10.1016/j.cj.2019.06.007. *(Cas12a crRNA array cloning strategy using BbsI/BsmBI into pML104/pML107 vectors)*
+  - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ioanna M. Slaymaker, Kira S. Makarova, Patrick Essletzbichler, Sara E. Volz, et al. 2015. “Cpf1 Is a Single RNA-Guided Endonuclease of a Class 2 CRISPR-Cas System.” Cell 163 (3): 759–771. https://doi.org/10.1016/j.cell.2015.09.038. *(canonical Cas12a/Cpf1 TTTV PAM targeting and crRNA architecture framework used in this workflow)*
+
+  - Kim, Hui K., Minju Song, Ji Hyun Lee, Hyunho Ko, Youngbin Kim, Seung Hwan Jang, and Jin-Soo Kim. 2016. “In Vivo High-Throughput Profiling of CRISPR–Cpf1 Activity.” Nature Methods 14 (2): 153–159. https://doi.org/10.1038/nmeth.4104. *(Cas12a activity and targeting-efficiency benchmark supporting spacer-selection heuristics and PAM-based targeting logic)*
   
 ## 6. [design_cloning_oligos.py](modules/crispr_tools/tools/design_cloning_oligos.py)
 
@@ -2036,7 +2281,7 @@ You:
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 <details>
 <summary>Click to expand sample output</summary>
-    
+
 ```json
         Gemini: The CRISPR guide RNA design for targeting the **EMX1** gene in *Homo sapiens* has been completed.
 
@@ -2261,7 +2506,7 @@ You:
   
     - New England Biolabs. "Which Restriction Enzymes Are Used in Golden Gate Assembly?" NEB FAQ. https://www.neb.com/en-us/faqs/which-restriction-enzymes-are-used-in-golden-gate-assembly. *(BbsI, BsmBI, BsaI cut outside recognition site leaving 4-nt overhangs; basis for TypeIIS enzyme selection)*
   
-  ## 7.[_utils.py](modules/crispr_tools/tools/_utils.py) ( NOT callable by MCP, only for support, no test files ) 
+  ## 7. [_utils.py](modules/crispr_tools/tools/_utils.py) ( NOT callable by MCP, only for support, no test files ) 
   
   - What it does:
     
@@ -2279,6 +2524,7 @@ You:
     - [design_cloning_oligos.py](modules/crispr_tools/tools/design_cloning_oligos.py) — replaced local `_reverse_complement` and `_COMPLEMENT`; uses `normalize_organism()` in vector compatibility check
     - [cas_selector.py](modules/crispr_tools/tools/cas_selector.py) — replaced inline `_reverse_complement` instance method
     - [run_full_crispr_workflow.py](modules/crispr_tools/tools/run_full_crispr_workflow.py) — replaced local `_VALID_DNA` definition
+
 
 ### Laney:
 <div style="margin-left: 20px;">

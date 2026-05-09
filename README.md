@@ -503,6 +503,8 @@ The MCP will then stop and ask if the user wants to generate a construction file
 
 **Example shown in demo video!, this output is very long** 
 
+> **Benchmark alignment — Hsu et al. 2013:** The demo targets EMX1 in *Homo sapiens* with pX330, one of the canonical SpCas9 benchmark loci from [Hsu, P.D. et al. 2013, *Nat Biotechnol*](https://doi.org/10.1038/nbt.2647). Alignment points: NGG PAM targeting (SpCas9), mammalian guide generation via U6-driven sgRNA scaffold, pX330 BbsI CACC/AAAC sticky-end overhangs, and zero predicted off-target sites (low-off-target prioritization).
+
 Possible Unhappy Paths:
 - A user may say "Run full CRISPR workflow on genes that cause cystic fibrosis in Homo sapiens." If only a disease name is given, semantic tools are called to identify a target gene before the workflow proceeds.
 - After gene resolution, the organism is occasionally re-prompted if it was inferred rather than explicitly stated.
@@ -512,6 +514,10 @@ Possible Unhappy Paths:
 - MCP Wrapper: [run_full_crispr_workflow.json](modules/crispr_tools/tools/run_full_crispr_workflow.json)
 - Pytests ([tests/unit/test_run_full_crispr_workflow.py](tests/unit/test_run_full_crispr_workflow.py)): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
+- Citations:
+  - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. “Genome Engineering Using the CRISPR-Cas9 System.” Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; basis for mammalian guide-insertion workflow)*
+  - Jiang, Yihui, Bin Chen, Caifeng Duan, Bing Sun, Jian Yang, and Sheng Yang. 2015. “Multigene Editing in the Escherichia coli Genome via the CRISPR-Cas9 System.” Applied and Environmental Microbiology 81 (7): 2506–2514. https://doi.org/10.1128/AEM.04023-14. *(pTargetF/pCas9-CR4 two-plasmid E. coli editing system; basis for bacterial guide-insertion workflow)*
+  - Hsu, Patrick D., David A. Scott, Joshua A. Weinstein, F. Ann Ran, Silvana Konermann, Vineeta Agarwala, Yinqing Li, et al. 2013. “DNA Targeting Specificity of RNA-Guided Cas9 Nucleases.” Nature Biotechnology 31 (9): 827–832. https://doi.org/10.1038/nbt.2647. *(canonical benchmark loci including EMX1; SpCas9 off-target specificity framework that validates this workflow's NGG PAM and low-off-target prioritization)*
 
 ## 2. [fetch_target_sequence.py](modules/crispr_tools/tools/fetch_target_sequence.py)
 - What it does: 
@@ -1172,6 +1178,8 @@ Possible Unhappy Paths:
   
   - Citations: 
     - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. "Genome Engineering Using the CRISPR-Cas9 System." Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; CACC/AAAC overhang logic for annealed-oligo ligation)*
+  
+    - Jiang, Yihui, Bin Chen, Caifeng Duan, Bing Sun, Jian Yang, and Sheng Yang. 2015. "Multigene Editing in the Escherichia coli Genome via the CRISPR-Cas9 System." Applied and Environmental Microbiology 81 (7): 2506–2514. https://doi.org/10.1128/AEM.04023-14. *(pTargetF/pCas9-CR4 two-plasmid E. coli editing system; SpeI restriction ligation)*
   
     - Sanjana, Neville E., Ophir Shalem, and Feng Zhang. 2014. "Improved Vectors and Genome-Wide Libraries for CRISPR Screening." Nature Methods 11 (8): 783–784. https://doi.org/10.1038/nmeth.3047.
   

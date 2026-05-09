@@ -21,7 +21,657 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
 
 The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called.
 
-**Example shown at bottom in appendix, this output is very long** 
+![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+<details>
+<summary>Click to expand sample output</summary>
+
+```
+You: Run a CRISPR edit workflow for EMX1 in homo sapiens using px330 
+
+[Tool call] → crispr_run_full_workflow
+{
+  "vector": "px330",
+  "organism": "homo sapiens",
+  "query": "EMX1"
+}
+[Tool result] ← crispr_run_full_workflow:
+{
+  "status": "needs_user_input",
+  "missing_fields": [
+    "target_type"
+  ],
+  "query": "EMX1",
+  "organism": "homo sapiens",
+  "questions": [
+    "Should I fetch the full genomic locus or just the coding sequence (CDS) for 'EMX1' in homo sapiens?"
+  ],
+  "options": [
+    "genomic_locus \u2014 full gene region including introns and flanking sequence (recommended for most CRISPR experiments)",
+    "cds \u2014 coding sequence only, mRNA-derived; use when targeting transcribed exons specifically"
+  ],
+  "continue_with": {
+    "query": "EMX1",
+    "organism": "homo sapiens",
+    "vector": "px330",
+    "confirmed": false,
+    "source_query": "",
+    "gene_confirmed": false,
+    "target_type": "<genomic_locus or cds>"
+  },
+  "workflow_trace": []
+}
+
+Gemini: Please confirm whether I should fetch the full genomic locus or just the coding sequence (CDS) for EMX1 in homo sapiens:
+
+*   **genomic_locus**: full gene region including introns and flanking sequence (recommended for most CRISPR experiments)
+*   **cds**: coding sequence only, mRNA-derived (use when targeting transcribed exons specifically)
+
+You: genomic locus 
+
+[Tool call] → crispr_run_full_workflow
+{
+  "vector": "px330",
+  "target_type": "genomic_locus",
+  "confirmed": true,
+  "query": "EMX1",
+  "organism": "homo sapiens",
+  "gene_confirmed": true
+}
+[Tool result] ← crispr_run_full_workflow:
+{
+  "status": "needs_user_input",
+  "missing_fields": [
+    "generate_docs"
+  ],
+  "sequence_info": {
+    "source": "ncbi",
+    "resource": "EMX1",
+    "organism": "Homo sapiens",
+    "target_type": "genomic_locus",
+    "ncbi_gene_id": "2016",
+    "ncbi_accession": "NC_000002.12",
+    "length": 18703,
+    "note": "Fetched genomic locus from NCBI Entrez: gene 'EMX1' in 'Homo sapiens'. Nucleotide record: NC_000002.12. Verify the recor\u2026 (162 chars)"
+  },
+  "guides": [
+    {
+      "grna_sequence": "GCUCUCCAAACCACGGCUCCGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "GCTCTCCAAACCACGGCTCC",
+      "pam_site": "CGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.65,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "UUUAGAAGUUACUGCCGGGAGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "TTTAGAAGTTACTGCCGGGA",
+      "pam_site": "AGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.45,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "GUCCAGGACUCCGAAGGUCGGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "GTCCAGGACTCCGAAGGTCG",
+      "pam_site": "GGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.65,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "ACUACGUGGUGGGCGCCGAGGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "ACTACGTGGTGGGCGCCGAG",
+      "pam_site": "CGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.7,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "CACUUAACCUCUCUGAGCUCGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "CACTTAACCTCTCTGAGCTC",
+      "pam_site": "TGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.5,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "GGAAAGAAGGGCAGGGUUUGGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "GGAAAGAAGGGCAGGGTTTG",
+      "pam_site": "AGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.55,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "GUGUAGGGGCAGCACCUCCUGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "GTGTAGGGGCAGCACCTCCT",
+      "pam_site": "GGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.65,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "CAGCUGGUCAGAGGGGACCCGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "CAGCTGGTCAGAGGGGACCC",
+      "pam_site": "CGG",
+      "efficiency_score": 2,
+      "efficiency_details": {
+        "gc_content": 0.7,
+        "gc_content_ok": true,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 3
+    },
+    {
+      "grna_sequence": "UACAUAGAUGUUUCCAGAGAGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "TACATAGATGTTTCCAGAGA",
+      "pam_site": "TGG",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.35,
+        "gc_content_ok": false,
+        "no_polyt_run": true
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 2
+    },
+    {
+      "grna_sequence": "GGAGAAUGGAGACUUUUGGAGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+      "protospacer": "GGAGAATGGAGACTTTTGGA",
+      "pam_site": "AGG",
+      "efficiency_score": 1,
+      "efficiency_details": {
+        "gc_content": 0.45,
+        "gc_content_ok": true,
+        "no_polyt_run": false
+      },
+      "specificity_score": 1,
+      "specificity_details": {
+        "high_risk_offtargets": 0,
+        "medium_risk_offtargets": 0,
+        "total_offtargets": 0,
+        "on_target_found": true
+      },
+      "total_score": 2
+    }
+  ],
+  "selected_guide": {
+    "grna_sequence": "GCUCUCCAAACCACGGCUCCGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+    "protospacer": "GCTCTCCAAACCACGGCTCC",
+    "pam_site": "CGG",
+    "efficiency_score": 2,
+    "efficiency_details": {
+      "gc_content": 0.65,
+      "gc_content_ok": true,
+      "no_polyt_run": true
+    },
+    "specificity_score": 1,
+    "specificity_details": {
+      "high_risk_offtargets": 0,
+      "medium_risk_offtargets": 0,
+      "total_offtargets": 0,
+      "on_target_found": true
+    },
+    "total_score": 3
+  },
+  "scoring_rationale": "Best guide 'GCTCTCCAAACCACGGCTCC' scored 3/3 (efficiency 2/2, specificity 1/1). GC content: 65%. Off-target sites: 0 tot\u2026 (142 chars)",
+  "protospacer": "GCTCTCCAAACCACGGCTCC",
+  "cloning": {
+    "status": "ready",
+    "cloning_method": "TypeIISOligoCloning",
+    "vector": "pX330",
+    "enzyme": "BbsI",
+    "top_overhang": "CACC",
+    "bottom_overhang": "AAAC",
+    "top_oligo_name": "px330_guide_top",
+    "bottom_oligo_name": "px330_guide_bottom",
+    "top_oligo": "CACCGCTCTCCAAACCACGGCTCC",
+    "bottom_oligo": "AAACGGAGCCGTGGTTTGGAGAGC",
+    "end_structure": "two sticky-end overhangs",
+    "g_prepended": false,
+    "final_protospacer": "GCTCTCCAAACCACGGCTCC",
+    "construction_file_inputs": {
+      "construct_name": "px330_guide_construct",
+      "assembly_strategy": "TypeIISOligoCloning",
+      "backbone_name": "px330",
+      "backbone_sequence": "GAGGGCCTATTTCCCATGATTCCTTCATATTTGCATATACGATACAAGGCTGTTAGAGAGATAATTGGAATTAATTTGACTGTAAACACAAAGATATTAGTACAAAATACGTGACGTAGA\u2026 (8484 chars)",
+      "insert_name": "px330_annealed_guide_insert",
+      "insert_sequence": "GCTCTCCAAACCACGGCTCC",
+      "insert_forward_primer_name": "",
+      "insert_forward_primer_sequence": "",
+      "insert_reverse_primer_name": "",
+      "insert_reverse_primer_sequence": "",
+      "top_oligo_name": "px330_guide_top",
+      "top_oligo_sequence": "CACCGCTCTCCAAACCACGGCTCC",
+      "bottom_oligo_name": "px330_guide_bottom",
+      "bottom_oligo_sequence": "AAACGGAGCCGTGGTTTGGAGAGC",
+      "top_overhang": "CACC",
+      "bottom_overhang": "AAAC",
+      "vector_forward_primer_name": "",
+      "vector_forward_primer_sequence": "",
+      "vector_reverse_primer_name": "",
+      "vector_reverse_primer_sequence": "",
+      "enzyme": "BbsI",
+      "cell_strain": "Any mammalian",
+      "selection": "Amp",
+      "temperature_c": 37,
+      "notes": "Vector 'pX330' \u2014 BbsI (TypeIIS) cloning. All-in-one SpCas9 + sgRNA vector.  BbsI digest leaves CACC/AAAC overhangs.  5\u2032G\u2026 (603 chars)"
+    }
+  },
+  "questions": [
+    "Oligo design is complete. Would you like to also generate a construction file and lab sheet, or return the oligo results\u2026 (126 chars)"
+  ],
+  "options": [
+    "Yes, generate both construction file and lab sheet (generate_docs=true)",
+    "No, return oligo results only (generate_docs=false)"
+  ],
+  "continue_with": {
+    "query": "EMX1",
+    "organism": "homo sapiens",
+    "vector": "px330",
+    "confirmed": true,
+    "source_query": "",
+    "target_type": "genomic_locus",
+    "generate_docs": true,
+    "gene_confirmed": true
+  },
+  "workflow_trace": [
+    {
+      "step": 1,
+      "tool": "crispr_fetch_target_sequence",
+      "inputs": {
+        "query": "EMX1",
+        "organism": "homo sapiens",
+        "target_type": "genomic_locus"
+      },
+      "output_summary": {
+        "source": "ncbi",
+        "resource": "EMX1",
+        "organism": "Homo sapiens",
+        "length": 18703,
+        "target_type": "genomic_locus",
+        "ncbi_gene_id": "2016",
+        "ncbi_accession": "NC_000002.12"
+      }
+    },
+    {
+      "step": 2,
+      "tool": "crispr_cas_selector",
+      "inputs": {
+        "sequence_length": 18703,
+        "repair_template": false
+      },
+      "output_summary": {
+        "recommendation": "Cas9",
+        "cas9_valid_guides": 1499,
+        "cas12a_valid_guides": 172,
+        "gc_content": 0.551
+      }
+    },
+    {
+      "step": 3,
+      "tool": "crispr_design_cas9_grna",
+      "inputs": {
+        "sequence_length": 18703
+      },
+      "output_summary": {
+        "guide_count": 10,
+        "nuclease_system": "SpCas9"
+      }
+    },
+    {
+      "step": 4,
+      "tool": "crispr_rank_guides",
+      "inputs": {
+        "guide_count": 10,
+        "reference_length": 18703,
+        "nuclease": "cas9"
+      },
+      "output_summary": {
+        "ranked_guide_count": 10,
+        "best_guide": "GCTCTCCAAACCACGGCTCC",
+        "best_score": 3
+      }
+    },
+    {
+      "step": 5,
+      "tool": "crispr_design_cloning_oligos",
+      "inputs": {
+        "vector": "px330",
+        "protospacer": "GCTCTCCAAACCACGGCTCC",
+        "construct_name": null
+      },
+      "output_summary": {
+        "status": "ready",
+        "vector": "pX330",
+        "cloning_method": "TypeIISOligoCloning",
+        "enzyme": "BbsI",
+        "top_oligo": "CACCGCTCTCCAAACCACGGCTCC",
+        "bottom_oligo": "AAACGGAGCCGTGGTTTGGAGAGC",
+        "end_structure": "two sticky-end overhangs"
+      }
+    }
+  ]
+}
+
+[Tool call] → crispr_predict_editing_efficiency
+{
+  "protospacer": "GCTCTCCAAACCACGGCTCC",
+  "pam": "CGG"
+}
+[Tool result] ← crispr_predict_editing_efficiency:
+{
+  "protospacer": "GCTCTCCAAACCACGGCTCC",
+  "nuclease": "cas9",
+  "raw_score": 5.5,
+  "on_target_efficiency_pct": 40.2,
+  "confidence_range": [
+    25.2,
+    55.2
+  ],
+  "delivery": "plasmid",
+  "outcome": "nhej",
+  "delivery_multiplier": 0.55,
+  "outcome_multiplier": 1.0,
+  "feature_contributions": {
+    "position_specific_nucleotides": -0.5,
+    "pam_context": 5.0,
+    "gc_content": 1.0,
+    "polyt_penalty": 0.0
+  },
+  "interpretation": "Predicted NHEJ knockout efficiency: 40.2% (range 25.2-55.2%) for CAS9 delivered via plasmid. This is moderate \u2014 usable, \u2026 (228 chars)",
+  "warnings": []
+}
+
+[Tool call] → crispr_predict_offtargets
+{
+  "reference": "NC_000002.12",
+  "protospacer": "GCTCTCCAAACCACGGCTCC"
+}
+[05/08/26 17:28:10] Error calling tool 'crispr_predict_offtargets'              
+                    ╭─────────── Traceback (most recent call last) ────────────╮
+                    │ /opt/anaconda3/lib/python3.12/site-packages/fastmcp/serv │
+                    │ er/server.py:987 in call_tool                            │
+                    │                                                          │
+                    │ /opt/anaconda3/lib/python3.12/site-packages/fastmcp/tool │
+                    │ s/tool.py:354 in _run                                    │
+                    │                                                          │
+                    │                 ... 7 frames hidden ...                  │
+                    │                                                          │
+                    │ /Users/emory/Documents/BioE_134-234_FinalProject/modules │
+                    │ /seq_basics/_plumbing/resolve.py:84 in resolve_to_seq    │
+                    │                                                          │
+                    │    81 │   │   │   return _clean_sequence(remainder)      │
+                    │    82 │                                                  │
+                    │    83 │   # 4. Assume it's a raw sequence string - clean │
+                    │ ❱  84 │   return _clean_sequence(input_value)            │
+                    │    85                                                    │
+                    │    86                                                    │
+                    │    87 def _parse_file(path: Path) -> str:                │
+                    │                                                          │
+                    │ /Users/emory/Documents/BioE_134-234_FinalProject/modules │
+                    │ /seq_basics/_plumbing/resolve.py:152 in _clean_sequence  │
+                    │                                                          │
+                    │   149 │   # Validate characters                          │
+                    │   150 │   invalid = set(cleaned) - VALID_SEQUENCE_CHARS  │
+                    │   151 │   if invalid:                                    │
+                    │ ❱ 152 │   │   raise ValueError(                          │
+                    │   153 │   │   │   │   │   │   f"Invalid sequence charact │
+                    │   154 │   │   │   │   │   │   "Valid DNA/RNA/IUPAC chara │
+                    │   155 )                                                  │
+                    ╰──────────────────────────────────────────────────────────╯
+                    ValueError: Invalid sequence characters detected: ['.',     
+                    '_']. Valid DNA/RNA/IUPAC characters are: ATUCGRSYKWMN.     
+[Tool result] ← crispr_predict_offtargets:
+{
+  "error": "Error calling tool 'crispr_predict_offtargets': Invalid sequence characters detected: ['.', '_']. Valid DNA/RNA/IUPAC ch\u2026 (147 chars)"
+}
+
+[Tool call] → crispr_predict_offtargets
+{
+  "reference": "EMX1",
+  "protospacer": "GCTCTCCAAACCACGGCTCC"
+}
+[05/08/26 17:28:22] Error calling tool 'crispr_predict_offtargets'              
+                    ╭─────────── Traceback (most recent call last) ────────────╮
+                    │ /opt/anaconda3/lib/python3.12/site-packages/fastmcp/serv │
+                    │ er/server.py:987 in call_tool                            │
+                    │                                                          │
+                    │ /opt/anaconda3/lib/python3.12/site-packages/fastmcp/tool │
+                    │ s/tool.py:354 in _run                                    │
+                    │                                                          │
+                    │                 ... 7 frames hidden ...                  │
+                    │                                                          │
+                    │ /Users/emory/Documents/BioE_134-234_FinalProject/modules │
+                    │ /seq_basics/_plumbing/resolve.py:84 in resolve_to_seq    │
+                    │                                                          │
+                    │    81 │   │   │   return _clean_sequence(remainder)      │
+                    │    82 │                                                  │
+                    │    83 │   # 4. Assume it's a raw sequence string - clean │
+                    │ ❱  84 │   return _clean_sequence(input_value)            │
+                    │    85                                                    │
+                    │    86                                                    │
+                    │    87 def _parse_file(path: Path) -> str:                │
+                    │                                                          │
+                    │ /Users/emory/Documents/BioE_134-234_FinalProject/modules │
+                    │ /seq_basics/_plumbing/resolve.py:152 in _clean_sequence  │
+                    │                                                          │
+                    │   149 │   # Validate characters                          │
+                    │   150 │   invalid = set(cleaned) - VALID_SEQUENCE_CHARS  │
+                    │   151 │   if invalid:                                    │
+                    │ ❱ 152 │   │   raise ValueError(                          │
+                    │   153 │   │   │   │   │   │   f"Invalid sequence charact │
+                    │   154 │   │   │   │   │   │   "Valid DNA/RNA/IUPAC chara │
+                    │   155 )                                                  │
+                    ╰──────────────────────────────────────────────────────────╯
+                    ValueError: Invalid sequence characters detected: ['E',     
+                    'X']. Valid DNA/RNA/IUPAC characters are: ATUCGRSYKWMN.     
+[Tool result] ← crispr_predict_offtargets:
+{
+  "error": "Error calling tool 'crispr_predict_offtargets': Invalid sequence characters detected: ['E', 'X']. Valid DNA/RNA/IUPAC ch\u2026 (147 chars)"
+}
+
+[Tool call] → crispr_predict_offtargets
+{
+  "reference": "GCUCUCCAAACCACGGCUCCGUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCGUUAUCAACUUGAAAAAGUGGCACCGAGUCGGUGC",
+  "protospacer": "GCTCTCCAAACCACGGCTCC"
+}
+[05/08/26 17:31:08] Error calling tool 'crispr_predict_offtargets'              
+                    ╭─────────── Traceback (most recent call last) ────────────╮
+                    │ /opt/anaconda3/lib/python3.12/site-packages/fastmcp/serv │
+                    │ er/server.py:987 in call_tool                            │
+                    │                                                          │
+                    │ /opt/anaconda3/lib/python3.12/site-packages/fastmcp/tool │
+                    │ s/tool.py:354 in _run                                    │
+                    │                                                          │
+                    │                 ... 6 frames hidden ...                  │
+                    │                                                          │
+                    │ /Users/emory/Documents/BioE_134-234_FinalProject/modules │
+                    │ /seq_basics/_plumbing/register.py:354 in wrapped         │
+                    │                                                          │
+                    │   351 │   │   # Drop any kwargs the underlying function  │
+                    │   352 │   │   if _func_params is not None:               │
+                    │   353 │   │   │   kwargs = {k: v for k, v in kwargs.item │
+                    │ ❱ 354 │   │   return func(**kwargs)                      │
+                    │   355 │                                                  │
+                    │   356 │   wrapped.__name__ = mcp_name                    │
+                    │   357 │   wrapped.__doc__  = description                 │
+                    │                                                          │
+                    │ /Users/emory/Documents/BioE_134-234_FinalProject/modules │
+                    │ /crispr_tools/tools/predict_offtargets.py:227 in run     │
+                    │                                                          │
+                    │   224 │   │                                              │
+                    │   225 │   │   invalid_ref = [b for b in set(reference) i │
+                    │   226 │   │   if invalid_ref:                            │
+                    │ ❱ 227 │   │   │   raise ValueError(                      │
+                    │   228 │   │   │   │   f"Invalid base(s) in reference: {s │
+                    │   229 │   │   │   │   "Only standard bases A, T, G, C (a │
+                    │   230 │   │   │   )                                      │
+                    ╰──────────────────────────────────────────────────────────╯
+                    ValueError: Invalid base(s) in reference: ['U']. Only       
+                    standard bases A, T, G, C (and N) are accepted.             
+[Tool result] ← crispr_predict_offtargets:
+{
+  "error": "Error calling tool 'crispr_predict_offtargets': Invalid base(s) in reference: ['U']. Only standard bases A, T, G, C (and\u2026 (137 chars)"
+}
+
+[Tool call] → crispr_predict_offtargets
+{
+  "reference": "GCTCTCCAAACCACGGCTCCGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGC",
+  "protospacer": "GCTCTCCAAACCACGGCTCC"
+}
+[Tool result] ← crispr_predict_offtargets:
+{
+  "protospacer": "GCTCTCCAAACCACGGCTCC",
+  "nuclease": "cas9",
+  "reference_length": 96,
+  "strands_scanned": 2,
+  "sites_evaluated": 154,
+  "offtarget_sites": [
+    {
+      "position": 0,
+      "strand": "+",
+      "sequence": "GCTCTCCAAACCACGGCTCC",
+      "mismatches": 0,
+      "mismatch_positions": [],
+      "seed_mismatches": 0,
+      "has_pam": false,
+      "risk": "LOW",
+      "cfd_score": 0.0
+    }
+  ],
+  "high_risk_count": 0,
+  "aggregate_offtarget_cfd": 0.0,
+  "max_offtarget_cfd": 0.0,
+  "specificity_summary": "1 potential off-target site(s) found within 3 mismatches (0 HIGH risk). Consider redesigning the guide or choosing a mor\u2026 (143 chars)"
+}
+
+Gemini: The CRISPR design for targeting the **EMX1** gene in *Homo sapiens* using the **pX330** vector is complete.
+
+### Guide RNA Selection
+*   **Best Guide:** `GCTCTCCAAACCACGGCTCC`
+*   **Scoring Rationale:** This guide was selected because it achieved a total score of 3/3 (Efficiency 2/2, Specificity 1/1). It has 65% GC content and 0 predicted off-target sites (0 HIGH or MEDIUM risk).
+
+### Pre-experiment Efficiency Prediction
+*   **Predicted NHEJ Knockout Efficiency:** 40.2% (±15% confidence interval: 25.2–55.2%)
+*   **Interpretation:** Moderate efficiency. This guide is usable, but you should expect to screen a slightly larger number of colonies to recover an edited clone.
+
+### Off-target Analysis
+*   **Specificity Flag:** The max predicted off-target CFD score is 0.0, indicating high specificity for the target site.
+
+### Cloning Oligos
+To clone this protospacer into the pX330 vector (using the BbsI restriction site), order the following annealed oligos:
+*   **Top:** `CACCGCTCTCCAAACCACGGCTCC`
+*   **Bottom:** `AAACGGAGCCGTGGTTTGGAGAGC`
+
+***
+
+All CRISPR design and validation steps are complete. Would you like me to generate:
+(a) **a construction file** — a structured record of the cloning workflow,
+(b) **a lab sheet** — bench-ready step-by-step protocol (requires a construction file),
+(c) **both**, or
+(d) **neither**?
+
+You: 
+```
+
+</details>
+
+> **Note on the sample session above:**
+> - `predict_editing_efficiency` was called autonomously by Gemini as an extra validation step — it is **not** invoked by `run_full_crispr_workflow.py` directly and is not part of the core pipeline.
+> - The three `crispr_predict_offtargets` errors occurred because Gemini initially passed `"NC_000002.12"` (an NCBI accession) and `"EMX1"` (a gene name) as the `reference` parameter. `predict_offtargets` requires a raw DNA sequence; the `predict_offtargets.json` tool description was updated after this session to explicitly forbid accessions/gene names and direct callers to use `crispr_fetch_target_sequence` first.
+
+> **Benchmark alignment — Hsu et al. 2013:** The sample above targets EMX1 in *Homo sapiens* with pX330, one of the canonical SpCas9 benchmark loci from [Hsu, P.D. et al. 2013, *Nat Biotechnol*](https://doi.org/10.1038/nbt.2647). Alignment points: NGG PAM targeting (SpCas9), mammalian guide generation via U6-driven sgRNA scaffold, pX330 BbsI CACC/AAAC sticky-end overhangs, and zero predicted off-target sites (low-off-target prioritization).
 
 Possible Unhappy Paths:
 - A user may say "Run full CRISPR workflow on genes that cause cystic fibrosis in Homo sapiens." If only a disease name is given, semantic tools are called to identify a target gene before the workflow proceeds.
@@ -32,6 +682,10 @@ Possible Unhappy Paths:
 - MCP Wrapper: [run_full_crispr_workflow.json](modules/crispr_tools/tools/run_full_crispr_workflow.json)
 - Pytests ([tests/unit/test_run_full_crispr_workflow.py](tests/unit/test_run_full_crispr_workflow.py)): guide selection, vector prompting, workflow confirmation gate, upstream-selected gene confirmation, empty query error, per-guide score fields
 - Sample Prompt: “Design a CRISPR edit targeting lacZ in E.Coli using pTargetF.”
+- Citations:
+  - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. “Genome Engineering Using the CRISPR-Cas9 System.” Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; basis for mammalian guide-insertion workflow)*
+  - Jiang, Yihui, Bin Chen, Caifeng Duan, Bing Sun, Jian Yang, and Sheng Yang. 2015. “Multigene Editing in the Escherichia coli Genome via the CRISPR-Cas9 System.” Applied and Environmental Microbiology 81 (7): 2506–2514. https://doi.org/10.1128/AEM.04023-14. *(pTargetF/pCas9-CR4 two-plasmid E. coli editing system; basis for bacterial guide-insertion workflow)*
+  - Hsu, Patrick D., David A. Scott, Joshua A. Weinstein, F. Ann Ran, Silvana Konermann, Vineeta Agarwala, Yinqing Li, et al. 2013. “DNA Targeting Specificity of RNA-Guided Cas9 Nucleases.” Nature Biotechnology 31 (9): 827–832. https://doi.org/10.1038/nbt.2647. *(canonical benchmark loci including EMX1; SpCas9 off-target specificity framework that validates this workflow's NGG PAM and low-off-target prioritization)*
 
 ## 2. [fetch_target_sequence.py](modules/crispr_tools/tools/fetch_target_sequence.py)
 - What it does: 
@@ -692,6 +1346,8 @@ Possible Unhappy Paths:
   
   - Citations: 
     - Ran, F. Ann, Patrick D. Hsu, Jason Wright, Vineeta Agarwala, David A. Scott, and Feng Zhang. 2013. "Genome Engineering Using the CRISPR-Cas9 System." Nature Protocols 8 (11): 2281–2308. https://doi.org/10.1038/nprot.2013.143. *(pX330 BbsI cloning protocol; CACC/AAAC overhang logic for annealed-oligo ligation)*
+  
+    - Jiang, Yihui, Bin Chen, Caifeng Duan, Bing Sun, Jian Yang, and Sheng Yang. 2015. "Multigene Editing in the Escherichia coli Genome via the CRISPR-Cas9 System." Applied and Environmental Microbiology 81 (7): 2506–2514. https://doi.org/10.1128/AEM.04023-14. *(pTargetF/pCas9-CR4 two-plasmid E. coli editing system; SpeI restriction ligation)*
   
     - Sanjana, Neville E., Ophir Shalem, and Feng Zhang. 2014. "Improved Vectors and Genome-Wide Libraries for CRISPR Screening." Nature Methods 11 (8): 783–784. https://doi.org/10.1038/nmeth.3047.
   

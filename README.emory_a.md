@@ -712,14 +712,11 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: [fetch_target_sequence.json](modules/crispr_tools/tools/fetch_target_sequence.json)
   - Pytests ([tests/unit/test_fetch_target_sequence.py](tests/unit/test_fetch_target_sequence.py)): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
----
-  - Sample Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
-  
-  Notice that all genes are formatted simply and that the organism is stated. This is usually the way this tool works best. 
 
-  - Output:
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
+Sample Prompt: “Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
 <details>
 <summary>Click to expand sample output</summary>
 

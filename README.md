@@ -478,78 +478,7 @@ The client is ready and you can start entering prompts.
 </div>
 
 
-![CRISPR](https://img.shields.io/badge/CRISPR-Workflow-F527F2?style=for-the-badge)
 
-
-## Emory Adelman — CRISPR Toolchain
-
-> **DISCLAIMER**  
-> Citations here do not cover every piece of material in the script. The README focuses primarily on benchmark workflows and representative end-user examples, while the scripts themselves provide more granular justification for individual implementation decisions and helper logic.
-
-My tools support CRISPR education and wet-lab protocol design. Every design decision — vector selection, guide scoring, primer logic — is backed by literature citations. The workflow begins when the user provides a gene name: the tool fetches the genomic locus or coding sequence from NCBI, selects a Cas nuclease using a heuristic I developed (the nuclease with more high-quality PAM-compatible guides wins), designs and ranks up to 10 guide sequences, then passes the best guide and all cloning variables to teammates' tools for construction file and lab sheet generation.
-      
-
-
-
-## 1. [run_full_crispr_workflow](modules/crispr_tools/tools/run_full_crispr_workflow.py)
-
-- What it does: 
-  - NEEDS gene and Organism name to successfully call tool 
-  - Fetches a target sequence, genomic locus or cds from the NCBI GenBank file for the gene chosen 
-  - design guide or crRNA sequence using the 10 found in the fetched sequence, meant to cover the gene broadly from PAM-based windows across the whole sequence 
-  - rank guide and crispr RNAs with [rank_guides.py](modules/crispr_tools/tools/rank_guides.py), authored by Jillian and I, and find the single best one to use out of the 10 
-  - off-target prediction is calculated with [predict_offtargets.py](modules/crispr_tools/tools/predict_offtargets.py) 
-  - design cloning oligos 
-  - prepares construction file inputs 
-
-The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called.
-
-![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-<details>
-<summary>Click to expand sample output</summary>
-
-```
-You: Run a CRISPR edit workflow for EMX1 in homo sapiens using px330 
-
-[Tool call] → crispr_run_full_workflow
-{
-  "vector": "px330",
-  "organism": "homo sapiens",
-  "query": "EMX1"
-}
-[Tool result] ← crispr_run_full_workflow:
-{
-  "status": "needs_user_input",
-  "missing_fields": [
-    "target_type"
-  ],
-  "query": "EMX1",
-  "organism": "homo sapiens",
-  "questions": [
-    "Should I fetch the full genomic locus or just the coding sequence (CDS) for 'EMX1' in homo sapiens?"
-  ],
-  "options": [
-    "genomic_locus \u2014 full gene region including introns and flanking sequence (recommended for most CRISPR experiments)",
-    "cds \u2014 coding sequence only, mRNA-derived; use when targeting transcribed exons specifically"
-  ],
-  "continue_with": {
-    "query": "EMX1",
-    "organism": "homo sapiens",
-    "vector": "px330",
-    "confirmed": false,
-    "source_query": "",
-    "gene_confirmed": false,
-    "target_type": "<genomic_locus or cds>"
-  },
-  "workflow_trace": []
-}
-
-Gemini: Please confirm whether I should fetch the full genomic locus or just the coding sequence (CDS) for EMX1 in homo sapiens:
-
-*   **genomic_locus**: full gene region including introns and flanking sequence (recommended for most CRISPR experiments)
-Use Control + Shift + m to toggle the tab key moving focus. Alternatively, use esc then tab to move to the next interactive element on the page.
-No file chosen
-Attach files by dragging & dropping, selecting or pasting them.
 
 ### Laney:
 <div style="margin-left: 20px;">

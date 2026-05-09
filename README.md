@@ -505,6 +505,7 @@ The MCP will then stop and ask if the user wants to generate a construction file
 
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
 Sample Prompt: Run a CRISPR edit workflow for EMX1 in homo sapiens using px330 
 
 <details>
@@ -1190,9 +1191,10 @@ Possible Unhappy Paths:
   
   - MCP Wrapper: [fetch_target_sequence.json](modules/crispr_tools/tools/fetch_target_sequence.json)
   - Pytests ([tests/unit/test_fetch_target_sequence.py](tests/unit/test_fetch_target_sequence.py)): raw DNA passthrough, uppercase normalization, invalid DNA error, empty query error, required output keys
----
+
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
 Sample Prompt:“Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.” 
 
 <details>
@@ -1289,9 +1291,10 @@ Sample Prompt:“Fetch the sequence for sma-2, sma-3 and sma-4 in C.elegans.”
   
   - MCP Wrapper: [cas_selector.json](modules/crispr_tools/tools/cas_selector.json)
   - Pytests ([tests/unit/test_cas_selector.py](tests/unit/test_cas_selector.py)): GC-rich → Cas9, AT-rich → Cas12a (PAM-density heuristic), multiplexing override, empty sequence error
----
+
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
 Sample Prompt:“Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in c.elegans? 
   - Output:
 
@@ -1421,12 +1424,11 @@ Sample Prompt:“Which Cas nuclease should I use for sma-2, sma-3, and sma-4 in 
   
   - MCP Wrapper: [design_cas9_grna.json](modules/crispr_tools/tools/design_cas9_grna.json)
   - Pytests ([tests/unit/test_design_cas9_grna.py](tests/unit/test_design_cas9_grna.py)): 20 bp protospacer, NGG PAM, max 10 guides, no-PAM error, empty input error
----
+
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
+
   - Sample Prompt: “Design Cas9 guides for the lacZ locus.” 
-  
-  - Output:
 
 <details>
 <summary>Click to expand sample output</summary>
@@ -1936,12 +1938,11 @@ You:
   
   - MCP Wrapper: [design_cas12a_crrna.json](modules/crispr_tools/tools/design_cas12a_crrna.json)
   - Pytests ([tests/unit/test_design_cas12a_crrna.py](tests/unit/test_design_cas12a_crrna.py)): 23 bp protospacer, TTTV PAM, max 10 guides, no-PAM error, empty input error
----
+
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-  - Sample Prompt: “Give me Cas12a guides for the araB locus.”
-  - Output:
 
+  - Sample Prompt: “Give me Cas12a guides for the araB locus.”
 
 <details>
 <summary>Click to expand sample output</summary>
@@ -2291,12 +2292,11 @@ You:
   
   - MCP Wrapper: [design_cloning_oligos.json](modules/crispr_tools/tools/design_cloning_oligos.json)
   - Pytests ([tests/unit/test_design_cloning_oligos.py](tests/unit/test_design_cloning_oligos.py)): pCRISPR E. coli produces ready oligos; pml104 enzyme is BclI-SwaI, top overhang is GATC, bottom overhang is blank, top/bottom oligo sequences verified; pml107 present with LEU2 selection; organism mismatch → needs_user_input
----
+
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
-Sample Prompt:“Design oligos to clone this protospacer into px330.” 
-  - Output:
 
+Sample Prompt:“Design oligos to clone this protospacer into px330.” 
 
 <details>
 <summary>Click to expand sample output</summary>

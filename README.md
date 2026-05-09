@@ -501,7 +501,9 @@ My tools support CRISPR education and wet-lab protocol design. Every design deci
   - design cloning oligos 
   - prepares construction file inputs 
 
-The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called. TypeIIS oligo cloning steps (BbsI/BsmBI annealed-oligo ligation into digested vector backbones) follow the standard protocols used in `create_construction_file` and `validate_construction_file` (Addgene/Zhang Lab 2015; NEB FAQ; Hu et al. 2020).
+The MCP will then stop and ask if the user wants to generate a construction file or lab sheet, then Laney and Jillian's tools are called. 
+
+***TypeIIS oligo cloning steps (BbsI/BsmBI annealed-oligo ligation into digested vector backbones) follow the standard protocols used in `create_construction_file` and `validate_construction_file` and are additions that are my responsibility to cite! (Addgene/Zhang Lab 2015; NEB FAQ; Hu et al. 2020).***
 
 ![Sample Output](https://img.shields.io/badge/expand-sample_output-F527F2?style=flat-square)
 <details>

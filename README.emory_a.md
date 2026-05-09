@@ -913,6 +913,12 @@ Possible Unhappy Paths:
   - Kim, Daesik, Jinu Kim, Jeongbin Hur, Kwang-Hyun Been, Sung Roh Yoon, and Jin-Soo Kim. 2016. “Genome-wide Analysis Reveals Specificities of Cpf1 Endonucleases in Human Cells.” Nature Biotechnology 34 (8): 863–868. https://doi.org/10.1038/nbt.3609. *(Cas12a specificity behavior and PAM-density heuristic supporting Cas9-vs-Cas12a recommendation logic)*
 
   - Zetsche, Bernd, Jonathan S. Gootenberg, Omar O. Abudayyeh, Ian M. Slaymaker, Maximilian V. Makarova, Patrick Essletzbichler, et al. 2017. “Multiplex Gene Editing by CRISPR-Cpf1 Using a Single crRNA Array.” Nature Biotechnology 35 (1): 31–34. https://doi.org/10.1038/nbt.3737. *(multiplex Cas12a crRNA-array framework and multi-locus editing rationale used for aggregated recommendations)*
+
+  - Mali, Prashant, Luhan Yang, Kevin M. Esvelt, John Aach, Marc Guell, James E. DiCarlo, Julie E. Norville, and George M. Church. 2013. “RNA-Guided Human Genome Engineering via Cas9.” Science 339 (6121): 823–826. https://doi.org/10.1126/science.1232033. *(U6 promoter-driven sgRNA expression constraints supporting poly-T filtering and practical guide-design heuristics)*
+
+  - Ghorbal, Mehdi, Michelle Gorman, Christopher R. Macpherson, Rui Martins, Anja Scherf, and Jake Baum. 2014. “Genome Editing in the Human Malaria Parasite Plasmodium falciparum Using the CRISPR-Cas9 System.” Nature Methods 11 (8): 819–821. https://doi.org/10.1038/nmeth.3063. *(extreme AT-rich genome editing context motivating Cas12a-favoring AT-richness heuristics)*
+
+- Minkah, Nkuli K., et al. 2018. “CRISPR-Cas9-Mediated Genome Editing of Plasmodium falciparum.” Cell Host & Microbe. *(AT-rich genome editing validation supporting TTTV PAM abundance rationale in highly AT-biased loci)*
   
   
   

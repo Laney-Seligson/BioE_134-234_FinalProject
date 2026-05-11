@@ -25,6 +25,18 @@
       "default": 1
     },
     {
+      "name": "high_specificity",
+      "type": "boolean",
+      "description": "True if minimizing off-target edits is a priority (e.g. therapeutic context). When guide counts are within the margin, this biases the recommendation toward Cas12a, which is more mismatch-intolerant than wild-type SpCas9. Defaults to false.",
+      "default": false
+    },
+    {
+      "name": "cas12a_spacer_len",
+      "type": "integer",
+      "description": "Length of the Cas12a spacer to evaluate for quality filtering. Must be 20-24. Defaults to 23 (LbCas12a standard). Adjust only when working with a Cas12a variant that uses a non-standard spacer length.",
+      "default": 23
+    },
+    {
       "name": "margin_threshold",
       "type": "number",
       "description": "Minimum ratio by which one nuclease must exceed the other's valid guide count for the count difference to drive the recommendation. Must be >= 1.0. Default 1.5 means one nuclease needs at least 50% more valid guides (e.g. 40 vs 36 is a tie; 40 vs 20 is a clear win). When counts fall within this margin, secondary criteria (multiplexing, specificity, default Cas9) decide.",
